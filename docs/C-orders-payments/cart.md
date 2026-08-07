@@ -38,3 +38,27 @@ The buyer selects items, `CheckoutService.buildSummary` previews totals, and `pl
 
 Cart building and editing work fully offline. Checkout needs a connection and requires local edits to have uploaded first.
 
+## 6. Edge cases
+
+| Case | Detail |
+|---|---|
+| Edit then checkout before upload | RPC may raise `Cart item does not belong to buyer` or `Cart item quantity changed` |
+| Listing leaves `active` | The stream `marketplace_listings` removes non-active rows from the local mirror; the `JOIN produce_listing` then drops those cart rows from the local view, so the UI's "unavailable" flags (`listingStatus != 'active'`) may never show for sold-out items |
+| Listing deleted | `cart_item` cascades server-side; buyer gets `listing_removed_from_cart` |
+| Zero stock on add | `_clamp` returns 0 when stock <= 0 or the listing is not in the local mirror, so a `quantity_kg = 0` row is inserted locally and would violate `quantity_kg > 0` on upload |
+| Price changes | Cart shows current price; checkout charges the live price |
+| Second device | Cart syncs, but sync lag can yield the checks above |
+| Cart row race | A second `ensureCart` on another device could hit the unique `buyer_profile_id` on upload |
+
+> ⚠ Unverified: (a) the local vanishing of non-active listings from cart joins; (b) the zero-quantity insert path; (c) upload failure handling if either occurs (see [../A-core/data-access.md](../A-core/data-access.md) §4).
+
+## 7. How to modify safely
+
+- Guard `addToCart` against `maxQty <= 0` (do not insert), and consider syncing the buyer's cart listings regardless of status.
+- Keep quantity units as kg (`numeric` server, `REAL` local).
+- Any new cart column needs the stream, `powersync_schema.dart`, and model updated together.
+- Do not delete carts client-side (no policy).
+
+## Source files
+
+`lib/features/cart/cart_service.dart`; `lib/models/cart_item.dart`; `lib/features/orders/checkout_service.dart`; `lib/core/local_db/powersync_schema.dart`, `table_registry.dart`; sync-config YAML. Migrations: `20260827093107_cart`, `20260827094812_cross_component_foreign_keys`, `20260904170222_checkout_transaction`, `20260916050308_wallet_payment_and_payout`.
