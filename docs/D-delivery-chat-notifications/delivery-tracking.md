@@ -50,9 +50,9 @@ Delivery ↔ order status mapping (full order machine in [../C-orders-payments/o
 | Delivery status set | Order status requested | Note |
 |---|---|---|
 | `assigned` | `assigned` | Dispatch does not use this path (it inserts and transitions the order itself). |
-| `picked_up` | `picked_up` | Allowed only if the order is `packed`. |
-| `in_transit` | `in_transit` | from `picked_up` |
-| `delivered` | `delivered` | from `in_transit` |
+| `picked_up` | `picked_up` | Allowed only if the order is `packed`. Marks pickup stop as complete in client. |
+| `in_transit` | `in_transit` | from `picked_up`. Active transit phase towards buyer delivery destination. |
+| `delivered` | `delivered` | from `in_transit`. Completes dropoff stop and triggers wallet fee payout. |
 | `unassigned` | none | Delivery updated, order untouched. |
 
 Order statuses with no delivery counterpart: `placed`, `confirmed`, `packed` (farmer action via `mark_order_packed`), `completed` (never set), `cancelled`.
