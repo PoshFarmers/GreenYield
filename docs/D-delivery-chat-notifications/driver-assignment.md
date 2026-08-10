@@ -113,6 +113,18 @@ Common filters: `da.is_current`, `orders.status <> 'cancelled'`, `coalesce(o.ord
 
 `lib/models/driver_task.dart` still carries stale comments ("no backend table", `sampleDriverTasksFor` placeholder data); the real path is `fromDeliveryRow`.
 
+### DriverStop Model Architecture (`driver_stop.dart`)
+
+The client models each stop on the route using `DriverStop`:
+
+- **Types (`DriverStopType`):** `pickup` (at farmer location) and `dropoff` (at buyer location).
+- **Completion logic (`isDone`):**
+  - Pickup stop: `deliveryStatus != 'assigned'` (considered complete once transition to `picked_up` occurs).
+  - Dropoff stop: `deliveryStatus == 'delivered'`.
+- **Coordinate handling:** `hasCoordinates` validates `latitude != null && longitude != null` before rendering navigation actions (e.g. launching map intents).
+- **Display formatting:** `displayOrderId` formats UUIDs to `GY-XXXXXX` (first 6 characters of stripped UUID uppercase) to preserve consistency with `OrderSummary` and `OrderDetail`.
+- **Mapping:** Constructed via `DriverStop.fromMap`, parsing `stop_type`, coordinates as doubles, `total_amount`, and ISO 8601 `order_date`.
+
 ## 7. RLS / permissions
 
 | Table | Policy |
