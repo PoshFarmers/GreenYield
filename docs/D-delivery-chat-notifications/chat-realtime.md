@@ -28,6 +28,11 @@ Direct one-to-one messaging between buyer, farmer and driver, with role-aware th
 
 Indexes added for unread/thread queries: `idx_message_unread_lookup`, `idx_conversation_participant_profile_role_conversation`, `idx_message_conversation_created_sender`.
 
+### 3.1 Client Models & Streaming Lifecycle (chat_models.dart)
+- **ChatRole**: Validates role strings (uyer, armer, driver) for thread identification and avatar badges.
+- **ChatMessage**: Derived directly from message Supabase Realtime table streams without polling.
+- **Derived Seen State**: No per-message read boolean exists; 'seen' indicator is calculated client-side by comparing createdAt with the other participant's last_read_at.
+
 ## 4. Flow
 
 ```mermaid
@@ -130,7 +135,4 @@ The three chat tables are also in the PowerSync publication and `powersync_schem
 
 `lib/features/chat/chat_service.dart`, `lib/features/chat/application/chat_providers.dart`, `lib/models/chat_models.dart`, `lib/core/roles/role_nav_shell_registry.dart` (Chat tab wiring), `lib/core/local_db/powersync_schema.dart`, sync-config (path unconfirmed) streams `own_conversations`, `own_conversation_participants`, `own_messages`. Migrations: `20260827091748_messaging.sql`, `20260827094812_cross_component_foreign_keys.sql`, `20260829050340_notification_events.sql`, `20260830104327_message_attachment_storage.sql`, `20260830121221_conversation_participant_display_fields.sql`, `20260906092841_chat_system.sql`, `20260906135739_chat_thread_unread_count.sql`, `20260907074658_fix_chat_realtime_publication.sql`, `20260907112905_chat_performance_and_role_fix.sql`, `20260907120353_chat_order_and_unread_refresh.sql`.
 
-### Client Models & Streaming Lifecycle (chat_models.dart)
-- **ChatRole**: Validates role strings (uyer, armer, driver) for thread identification and avatar badges.
-- **ChatMessage**: Derived directly from message Supabase Realtime table streams without polling.
-- **Derived Seen State**: No per-message read boolean exists; 'seen' indicator is calculated client-side by comparing createdAt with the other participant's last_read_at.
+
