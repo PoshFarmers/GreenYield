@@ -65,3 +65,38 @@ flowchart TD
 
 `process_refund` has an idempotency guard (`payment.status = 'refunded'` raises). It refunds to the wallet regardless of original method. Nothing calls it (not `cancel_order`), and there is no client entry point besides a `refund_request` insert policy.
 
+## 7. Notifications
+
+`trg_notify_payment_status`: `payment_received` when `captured`, `payment_failed` when `failed` (update triggers only; the wallet path fires on the in-transaction update). `trg_notify_refund`: `refund_processed` on refund insert. See [../D-delivery-chat-notifications/notification-events.md](../D-delivery-chat-notifications/notification-events.md).
+
+## 8. Client
+
+`WalletService`: `watchBalance(profileId)` (null = no wallet yet, treat as 0), `watchTransactions(profileId, limit = 50)` (joined through `wallet`), `topUp(amount)` -> RPC. `WalletTransactionType` parsing uses `firstWhere` and throws on unknown types. Transaction labels use `transaction_type_*` keys in `common.json`.
+
+## 9. RLS
+
+Wallet tables: select own only; no client writes. `payment`: select as buyer. Sync: `own_wallet`, `own_wallet_transactions`, `own_payments`, `own_refunds`, `own_refund_requests`.
+
+## 10. Offline vs online
+
+Balances/transactions are readable offline; top-up and checkout need a connection. Balance may lag until sync.
+
+## 11. Edge cases
+
+- Insufficient balance during a multi-farmer checkout rolls back all orders and stock changes.
+- First transaction creates the wallet; two concurrent first transactions could race on the unique `profile_id` (second raises).
+- Driver payout runs once (repeat `delivered` calls fail the order transition).
+- Recurring orders would debit the wallet directly, but that function is broken (see [recurring-orders.md](recurring-orders.md)).
+- Wallet enum values `withdrawal`, `adjustment` are defined but unused.
+
+## 12. How to modify safely
+
+1. Change balances only through `apply_wallet_transaction`.
+2. To pay farmers: add credits inside `transition_delivery_status` (on `delivered`) or a settlement function, using `type = 'payout'` and references to `orders`.
+3. Wire `cancel_order` to `process_refund` and `restock_listing_quantity` in one transaction if refunds are required.
+4. Never grant `apply_wallet_transaction` or `process_refund` to `authenticated`.
+5. Replace `topup_wallet` with a gateway-confirmed path before production.
+
+## Source files
+
+`lib/features/wallet/wallet_service.dart`; `lib/models/wallet.dart`; `assets/translations/en/common.json`; sync-config YAML. Migrations: `20260827094613_wallet`, `20260827094657_payment_and_refund`, `20260829050340_notification_events`, `20260916050308_wallet_payment_and_payout`, `20260916050421_wallet_topup_rpc`, `20260927093935_recurring_orders_rpc`.
