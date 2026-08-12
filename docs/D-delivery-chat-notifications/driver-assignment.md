@@ -34,6 +34,13 @@ At checkout, every per-farmer order is auto-dispatched to the nearest driver. Th
 
 `driver_route_preference`: `origin_location`, `destination_location` (text, required), `origin_lat/lng/place_id`, `destination_lat/lng/place_id`, `direction` (enum `route_direction`: `outbound`, `return`, `both`), `active_days smallint` (bit0 = Mon … bit6 = Sun; 0 = none), `is_active`, `distance_km`, `duration_minutes`. It is stored, synced and editable, but **dispatch ignores it**.
 
+### 3.1 Driver Route Preference Models (driver_profile.dart)
+- **LocationPoint**: Encapsulates ddress, nullable latitude, longitude, and placeId to eliminate redundant geocoding.
+- **ctiveDaysMask**: 7-bit mask matching weekdays Monday-to-Sunday (it 0 = Mon .. bit 6 = Sun).
+- **RouteDirection**: Enum mapping outbound, 
+eturn, oth.
+
+
 ## 4. Flow
 
 ```mermaid
@@ -167,7 +174,4 @@ The client models each stop on the route using `DriverStop`:
 
 ## Source files
 
-`lib/features/orders/driver_home_service.dart`, `lib/features/orders/driver_home_providers.dart`, `lib/features/orders/order_providers.dart`, `lib/features/calendar/driver_schedule_service.dart`, `lib/features/profile/driver/driver_profile_service.dart`, `lib/models/driver_stop.dart`, `lib/models/driver_task.dart`, `lib/models/driver_profile.dart`, `lib/core/local_db/powersync_schema.dart`. Sync-config (path unconfirmed): `vehicles`, `driver_routes`, `own_driver_schedule`. Migrations: `20260818014236_driver_profile.sql`, `20260830170843_driver_route_preference_scheduling.sql`, `20260906153615_route_preference_location_details.sql`, `20260827093851_schedule_journey_route.sql`, `20260913105709_notify_and_driver_order_access.sql`, `20260913105735_auto_assign_nearest_driver.sql`, `20260913170000_fix_driver_notifications_and_calendar.sql`, `20260913180000_apply_missing_schema_and_backfill.sql`, `20260915092115_fix_missing_driver_assignment_on_checkout.sql`, `20260915093000_fix_driver_schedule_uses_order_date.sql`, `20260916090642_driver_home_today_stops.sql`. Dart comments cite `20260916210000_driver_home_today_stops` (actual `20260916090642`).### Driver Route Preference Models (driver_profile.dart)
-- **LocationPoint**: Encapsulates ddress, nullable latitude, longitude, and placeId to eliminate redundant geocoding.
-- **ctiveDaysMask**: 7-bit mask matching weekdays Monday-to-Sunday (it 0 = Mon .. bit 6 = Sun).
-- **RouteDirection**: Enum mapping outbound, eturn, oth.
+`lib/features/orders/driver_home_service.dart`, `lib/features/orders/driver_home_providers.dart`, `lib/features/orders/order_providers.dart`, `lib/features/calendar/driver_schedule_service.dart`, `lib/features/profile/driver/driver_profile_service.dart`, `lib/models/driver_stop.dart`, `lib/models/driver_task.dart`, `lib/models/driver_profile.dart`, `lib/core/local_db/powersync_schema.dart`. Sync-config (path unconfirmed): `vehicles`, `driver_routes`, `own_driver_schedule`. Migrations: `20260818014236_driver_profile.sql`, `20260830170843_driver_route_preference_scheduling.sql`, `20260906153615_route_preference_location_details.sql`, `20260827093851_schedule_journey_route.sql`, `20260913105709_notify_and_driver_order_access.sql`, `20260913105735_auto_assign_nearest_driver.sql`, `20260913170000_fix_driver_notifications_and_calendar.sql`, `20260913180000_apply_missing_schema_and_backfill.sql`, `20260915092115_fix_missing_driver_assignment_on_checkout.sql`, `20260915093000_fix_driver_schedule_uses_order_date.sql`, `20260916090642_driver_home_today_stops.sql`. Dart comments cite `20260916210000_driver_home_today_stops` (actual `20260916090642`).
