@@ -108,3 +108,27 @@ Order RLS: select for buyer/farmer (`orders_select_buyer_or_farmer`) and the ass
 
 Model helpers: `isCancellable` (placed..packed), `isReviewable` (`delivered` only, mirroring `submit_farmer_review`), `stepperIndex` (0 placed/confirmed/assigned, 1 packed, 2 picked_up/in_transit, 3 delivered/completed, -1 cancelled).
 
+## 7. Offline vs online
+
+Lists read the local mirror (offline). All transitions are RPCs and need a connection; results return via sync.
+
+## 8. Edge cases
+
+- **Cancel side effects:** `cancel_order` only changes status. It does not restock listings, refund the payment, unassign the driver, or notify (final transition function). `evaluate_refund_eligibility` (last `20260827094657`) has no `packed` branch, so packed orders return `not_eligible`.
+- **Cancelled orders** are excluded from `get_driver_today_stops` but their `delivery` rows persist.
+- Client doc says "buyer or driver may cancel"; SQL allows buyer or farmer.
+- Double `delivered` call fails (`delivered -> delivered` invalid), so payouts cannot repeat.
+- If no driver could be assigned (farmer without location, no driver with vehicle), the order stays `placed`.
+
+> ⚠ Unverified: whether cancel should restock and refund, and whether drivers may cancel.
+
+## 9. How to modify safely
+
+1. Change transitions only in `transition_order_status` (single source), keep `packed` and `completed` in `v_allowed`, and update `OrderStatus` and provider status lists in Dart.
+2. Re-add notification calls (see [../D-delivery-chat-notifications/notification-events.md](../D-delivery-chat-notifications/notification-events.md)) if you replace the function again; each redefinition silently discards prior behaviour.
+3. Decide `assigned -> picked_up` policy: either allow it, or block the driver button until packed.
+4. Keep enum additions (`alter type ... add value`) in their own migration before functions that use them.
+
+## Source files
+
+`lib/features/orders/order_detail_models.dart`, `order_providers.dart`, `order_service.dart`, `driver_home_service.dart`. Migrations: `20260827093223_orders`, `20260827094000_delivery_and_assignment`, `20260827094657_payment_and_refund`, `20260829050340_notification_events`, `20260913105709/20260913105735/20260913170000/20260915093000` (`assign_nearest_driver`), `20260915000000_mark_order_packed`, `20260915130000_fix_orders_rls_recursion`, `20260916050308_wallet_payment_and_payout`.
