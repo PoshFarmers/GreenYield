@@ -18,6 +18,16 @@ Backend-generated in-app notifications: which events create rows, what they cont
 | Category | Client-side grouping derived from `type` (no column). |
 | Preferences | Table `notification_preference` (channel enum) exists but nothing reads it. |
 
+## 2.1 Category classification**: NotificationCategory.fromType(type) maps event types into UI categories:
+  - order_* -> orders
+  - payment_* / 
+efund_* -> payments
+  - delivery_* -> logistics
+  - 
+ew_message -> messages
+- **JSON Payload parsing**: Handles both parsed Maps and serialized strings stored in the PowerSync SQLite text column via _decodeJson.
+
+
 ## 3. Data model
 
 `notification`: `id`, `profile_id` (FK profile, cascade), `type text`, `title text NOT NULL`, `body`, `payload jsonb NOT NULL default '{}'`, `source_table text`, `source_id uuid`, `read_at`, `created_at`. Indexes `(profile_id, created_at desc)` and a partial unread index. Enum `notification_channel`: `in_app`, `push`, `sms`, `email` (used only by `notification_preference`, with mirror `channel_text`).
@@ -114,4 +124,5 @@ Reads, mark-read and delete all work offline against the local mirror and sync l
 
 ## Source files
 
-`lib/features/notifications/application/notification_service.dart`, `lib/features/notifications/application/notification_providers.dart`, `lib/models/notification_item.dart`, `lib/core/local_db/table_registry.dart`, `lib/core/local_db/powersync_schema.dart`, sync-config (path unconfirmed) streams `own_notifications`, `own_notification_preferences`. Migrations: `20260827092248_notifications.sql`, `20260827094812_cross_component_foreign_keys.sql`, `20260829050340_notification_events.sql`, `20260902080057_welcome_notification.sql`, `20260913105709_notify_and_driver_order_access.sql` (superseded), `20260913170000_fix_driver_notifications_and_calendar.sql`, `20260915000000_mark_order_packed.sql`, `20260916090642_driver_home_today_stops.sql`, `20260927093935_recurring_orders_rpc.sql`. Dart comments cite `20260829120000_notification_events` (actual `20260829050340`).
+`lib/features/notifications/application/notification_service.dart`, `lib/features/notifications/application/notification_providers.dart`, `lib/models/notification_item.dart`, `lib/core/local_db/table_registry.dart`, `lib/core/local_db/powersync_schema.dart`, sync-config (path unconfirmed) streams `own_notifications`, `own_notification_preferences`. Migrations: `20260827092248_notifications.sql`, `20260827094812_cross_component_foreign_keys.sql`, `20260829050340_notification_events.sql`, `20260902080057_welcome_notification.sql`, `20260913105709_notify_and_driver_order_access.sql` (superseded), `20260913170000_fix_driver_notifications_and_calendar.sql`, `20260915000000_mark_order_packed.sql`, `20260916090642_driver_home_today_stops.sql`, `20260927093935_recurring_orders_rpc.sql`. Dart comments cite `20260829120000_notification_events` (actual `20260829050340`).### Client Notification Models (
+otification_item.dart)
