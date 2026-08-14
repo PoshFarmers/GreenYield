@@ -95,3 +95,33 @@ Return statuses: `skipped` (`reason: not_active_or_not_found`), `fully_unfulfill
 
 The old policies were dropped in `20260927093817` and recreated on `schedule_id`.
 
+## 7. Offline vs online
+
+| Piece | State |
+|---|---|
+| Publication `powersync` | includes `recurring_order`, `recurring_order_item`; does **not** include `recurring_schedule`. |
+| Stream `own_recurring_orders` | selects `buyer_profile_id`, `farmer_profile_id` (dropped) and filters on `buyer_profile_id`. Invalid against the current schema. |
+| Stream `own_recurring_order_items` | joins on `ro.buyer_profile_id` (dropped). Invalid. |
+| `powersync_schema.dart` | no recurring tables. |
+| Dart code | none in the dump. |
+| Mirror trigger for `recurring_schedule.status` | none. |
+
+> ⚠ Unverified: whether the deployed sync-config was updated (the dump shows the old columns) and whether PowerSync currently reports these streams as invalid.
+
+## 8. Edge cases (if completed)
+
+- A schedule `paused`/`cancelled` is not checked, only `recurring_order.status`. Decide which one governs.
+- Fully unfulfilled and low-balance runs both advance `next_run_at` (the buyer silently skips a cycle, notified only in-app).
+- The `recurring_*` notification types are categorised as "system" by the client (`NotificationCategory.fromType`); see [../D-delivery-chat-notifications/notification-events.md](../D-delivery-chat-notifications/notification-events.md).
+
+## 9. How to modify safely
+
+1. Build creation/edit UI and services first; register `recurring_schedule` in publication, sync-config, `powersync_schema.dart` and `tableRegistry` (see [../A-core/add-a-synced-table.md](../A-core/add-a-synced-table.md)), plus a mirror trigger for `status`.
+2. Fix both streams to join through `recurring_schedule`.
+3. Rewrite `fulfill_recurring_order` to reuse the `place_checkout` logic (ideally by factoring a shared internal function) so tax, fee, stock, driver assignment and idempotency behave identically; use `apply_wallet_transaction`; set `orders.source = 'recurring'`.
+4. Revoke `EXECUTE` from `public`/`anon`/`authenticated`; grant to `service_role`.
+5. Add the scheduler (pg_cron or Edge Function) only after the RPC is proven in a test database.
+
+## Source files
+
+Migrations: `20260827093414_recurring_orders.sql`, `20260927093817_update_recurring_orders.sql`, `20260927093935_recurring_orders_rpc.sql`, `20260827094859_powersync_compat_view.sql`, `20260830035655_powersync_compat_publication_updates.sql` (publication). Sync-config (path unconfirmed): `own_recurring_orders`, `own_recurring_order_items`. `lib/core/local_db/powersync_schema.dart` (no recurring tables).
