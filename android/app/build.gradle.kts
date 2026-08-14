@@ -7,7 +7,7 @@ plugins {
 android {
     namespace = "com.greenyield.greenyield"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.3.13750724"
+    ndkVersion = "flutter.ndkVersion"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
