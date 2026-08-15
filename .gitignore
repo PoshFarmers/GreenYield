@@ -51,3 +51,5 @@ app.*.map.json
 # Environment secrets
 .env
 *.env.local
+
+codebase_dump.txt
