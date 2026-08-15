@@ -107,3 +107,34 @@ Note the review table is public-read at the SQL level, while the local mirror on
 
 UI wording note: `OrderStatus.delivered.displayLabel` is `'Completed'`, so users see "Completed" for the only state that can be reviewed.
 
+## 8. Offline vs online
+
+| Action | Offline | Online |
+|---|---|---|
+| Read own review / eligibility | Works (local mirror) | Works |
+| Submit / edit review | Fails (RPC, nothing is queued) | Works |
+| View a farmer's public rating and reviews | Fails (RPC) | Works |
+| Aggregate refresh on devices | Arrives on next sync | Arrives via PowerSync |
+
+`farmer_review` is registered in `tableRegistry`, but there is no client write policy: a local write would be rejected by RLS on upload. Never write to it locally.
+
+## 9. Edge cases and failure modes
+
+- **Edit after delivery:** allowed indefinitely (no time window); `created_at` stays, `updated_at` moves.
+- **`completed` orders:** would be rejected by the RPC (`status <> 'delivered'`) and by `isReviewable`. If a `delivered → completed` transition is ever added, change both.
+- **Comment-only edit:** does not fire the aggregate trigger (`update of rating`), which is correct because the aggregate does not depend on it.
+- **Comment content:** no length cap, no moderation, no trimming.
+- **Order deleted:** review cascades away and the trigger recomputes.
+- **Buyer with no local `orders` row yet:** `watchLatestDeliveredOrderId` returns null and the Rate button is hidden until sync completes.
+
+## 10. How to modify safely
+
+1. Change validation only inside `submit_farmer_review` (new migration with `create or replace`; re-issue the `revoke`/`grant`, since replacing keeps privileges but be explicit).
+2. Keep the "derive buyer/farmer from the order" rule; never accept those ids from the client.
+3. If you change rating scale, change the `check`, the RPC guard, the `numeric(3,2)` precision and the Dart validation together.
+4. If you add a table column the farmer should see offline, add it to stream `own_farmer_reviews` and to `powersync_schema.dart` (see [../A-core/add-a-synced-table.md](../A-core/add-a-synced-table.md)).
+5. To let buyers see a farmer's rating offline, you would need a new stream (only the farmer's own `farmer_profile` row syncs today). Prefer keeping the RPC.
+
+## Source files
+
+`lib/features/reviews/farmer_review_service.dart`, `lib/features/reviews/farmer_public_profile_service.dart`, `lib/models/farmer_review.dart`, `lib/models/farmer_public_profile.dart`, `lib/features/orders/order_detail_models.dart` (`OrderStatus.isReviewable`), `lib/core/local_db/powersync_schema.dart`, `lib/core/local_db/table_registry.dart`, sync-config (path unconfirmed) streams `own_farmer_reviews` and `farmer_profile`. Migrations: `20260916152234_farmer_review.sql`, `20260916155547_get_farmer_public_profile.sql`, `20260827094922_powersync_publication.sql` (publication baseline). Dart comments cite `20260916120000_farmer_review`; the actual filename is `20260916152234_farmer_review.sql` (see [../cross-cutting.md](../cross-cutting.md)).
