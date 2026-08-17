@@ -66,5 +66,20 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+	<dict>
+		<key>CFBundleURLSchemes</key>
+		<array>
+		<string>io.supabase.greenyield</string>
+		</array>
+	</dict>
+	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>GreenYield uses your location to pre-fill your address during setup.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>GreenYield needs camera access to take a profile photo.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>GreenYield needs photo library access to set a profile photo.</string>
 </dict>
 </plist>
