@@ -2,15 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_providers.dart';
+import '../roles/role_profile_registry.dart';
 import '../../features/auth/presentation/complete_profile_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
+import '../../features/auth/presentation/role_selection_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 
-/// Root of the app's navigation. Watches auth + profile state
-/// and decides what to show:
-///   no session               -> LoginScreen
-///   session, no profile row  -> CompleteProfileScreen
-///   session, profile exists  -> HomeScreen
+/// Root of the app's navigation. Routes through, in order:
+///   no session                -> LoginScreen
+///   session, no profile row   -> CompleteProfileScreen
+///   profile exists, no roles  -> RoleSelectionScreen
+///   role exists, no role-specific profile row yet
+///                              -> that role's completeProfileBuilder
+///                                 (from roleScreensRegistry)
+///   everything exists         -> HomeScreen
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
 
@@ -39,7 +44,48 @@ class AuthGate extends ConsumerWidget {
                 onComplete: () => ref.invalidate(ownProfileProvider),
               );
             }
-            return HomeScreen(profile: profile);
+
+            final rolesAsync = ref.watch(ownRolesProvider);
+            return rolesAsync.when(
+              loading: () => const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              ),
+              error: (error, _) =>
+                  Scaffold(body: Center(child: Text('$error'))),
+              data: (roles) {
+                if (roles.isEmpty) {
+                  return const RoleSelectionScreen();
+                }
+
+                final activeRole = profile.activeRole ?? roles.first;
+                final roleScreens = roleScreensRegistry[activeRole];
+
+                if (roleScreens == null) {
+                  // That role's ticket hasn't merged its registry
+                  // entry yet — expected during parallel development
+                  return Scaffold(
+                    body: Center(
+                      child: Text('$activeRole profile screens coming soon'),
+                    ),
+                  );
+                }
+
+                return FutureBuilder<bool>(
+                  future: roleScreens.hasCompletedProfile(profile.id),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Scaffold(
+                        body: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    if (!snapshot.data!) {
+                      return roleScreens.completeProfileBuilder(context);
+                    }
+                    return HomeScreen(profile: profile);
+                  },
+                );
+              },
+            );
           },
         );
       },
