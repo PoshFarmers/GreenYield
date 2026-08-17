@@ -40,6 +40,7 @@ class AuthService {
     return supabase.auth.signInWithOAuth(
       OAuthProvider.google,
       redirectTo: kIsWeb ? Uri.base.origin : _mobileRedirect,
+      queryParams: {'prompt': 'select_account'},
     );
   }
 
@@ -51,7 +52,7 @@ class AuthService {
     if (user == null) return null;
 
     final row = await supabase
-        .from('profile')
+        .from('profile_read')
         .select()
         .eq('id', user.id)
         .maybeSingle();

@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/widgets/app_text_field.dart';
@@ -41,8 +42,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             email: _emailController.text.trim(),
             password: _passwordController.text,
           );
-      // AuthGate picks up the new session and routes to
-      // CompleteProfileScreen since no profile row exists yet.
+      // Don't navigate here — the ref.listen below in build() pops this
+      // screen once the auth state stream confirms a session exists,
+      // revealing whatever AuthGate has already swapped to underneath.
     } catch (e) {
       setState(() => _errorMessage = e.toString());
     } finally {
@@ -57,6 +59,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     });
     try {
       await ref.read(authServiceProvider).signInWithGoogle();
+      // Same as above: this only *launches* the OAuth flow. Completion
+      // comes back later via deep link and is caught by ref.listen.
     } catch (e) {
       setState(() => _errorMessage = e.toString());
     } finally {
@@ -66,6 +70,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // RegisterScreen is pushed on top of AuthGate's route. AuthGate itself
+    // reacts to auth state and swaps its own content correctly, but that
+    // swap happens *underneath* this pushed screen and stays hidden until
+    // this screen is popped. So: as soon as a session appears (email/pw
+    // success, or returning from the Google OAuth redirect), pop back to
+    // AuthGate's route so the already-correct screen becomes visible.
+    ref.listen<AsyncValue<AuthState>>(authStateChangesProvider, (previous, next) {
+      final session = next.maybeWhen(
+        data: (authState) => authState.session,
+        orElse: () => null,
+      );
+      if (session != null && mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(title: Text('register'.tr())),
       body: SafeArea(

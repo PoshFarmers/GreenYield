@@ -23,5 +23,19 @@
   "error_invalid_email": "Enter a valid email address",
   "error_password_too_short": "Password must be at least 8 characters",
   "error_passwords_dont_match": "Passwords don't match",
-  "signed_in_as": "Signed in as"
+  "signed_in_as": "Signed in as",
+  "address": "Address",
+  "address_line1": "Address line 1",
+  "address_line2": "Address line 2",
+  "city": "City",
+  "postal_code": "Postal code",
+  "location": "Location",
+  "use_current_location": "Use current location",
+  "fetching_location": "Fetching location…",
+  "take_photo": "Take photo",
+  "choose_from_gallery": "Choose from gallery",
+  "location_services_disabled": "Turn on location services to use this.",
+  "location_permission_denied": "Location permission denied.",
+  "location_permission_denied_forever": "Location permission permanently denied — enable it in system settings.",
+  "error_location_unknown": "Couldn't fetch your location. Try again."
 }
