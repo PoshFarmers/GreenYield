@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Runs before a commit is finalized. Blocks the commit if any staged
+# .dart file isn't already formatted the way `dart format` wants —
+# same check CI runs, just moved earlier so you catch it before
+# pushing instead of after.
+
+staged_dart_files=$(git diff --cached --name-only --diff-filter=ACM -- '*.dart')
+
+if [ -z "$staged_dart_files" ]; then
+  exit 0
+fi
+
+unformatted=$(dart format --output=none --set-exit-if-changed $staged_dart_files 2>&1)
+exit_code=$?
+
+if [ $exit_code -ne 0 ]; then
+  echo "These files aren't formatted correctly:"
+  echo "$unformatted"
+  echo ""
+  echo "Run: dart format $staged_dart_files"
+  echo "Then re-stage and commit again."
+  exit 1
+fi
+
+echo "Running flutter analyze on staged files..."
+if ! flutter analyze $staged_dart_files; then
+  echo ""
+  echo "flutter analyze found issues in the files above. Fix them before committing."
+  exit 1
+fi

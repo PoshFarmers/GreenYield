@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Runs before `git push` completes. Mirrors the remaining check in
+# .github/workflows/ci.yml that pre-commit doesn't cover (tests) —
+# analyze now runs on every commit instead (see pre-commit), since
+# tests are the slower one and still make sense batched at push time.
+
+echo "Running flutter analyze..."
+if ! flutter analyze; then
+  echo ""
+  echo "Flutter analyze failed. Fix before pushing."
+  exit 1
+fi
