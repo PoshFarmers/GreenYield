@@ -18,8 +18,9 @@ jobs:
           pattern='^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-z0-9_-]+\))?: .{1,}$'
           failed=0
 
-          for sha in $(git rev-list "origin/${{ github.base_ref }}..HEAD"); do
+          for sha in $(git rev-list --no-merges "origin/${{ github.base_ref }}..HEAD"); do
             msg=$(git log -1 --format=%s "$sha")
+
             if ! [[ "$msg" =~ $pattern ]]; then
               echo "Bad commit message ($sha): $msg"
               failed=1
