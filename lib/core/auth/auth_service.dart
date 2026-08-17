@@ -23,7 +23,7 @@ class AuthService {
     return supabase.auth.signUp(
       email: email,
       password: password,
-      emailRedirectTo: kIsWeb ? null : 'io.supabase.greenyield://login-callback',
+      emailRedirectTo: kIsWeb ? Uri.base.origin : _mobileRedirect,
     );
   }
 
@@ -39,7 +39,7 @@ class AuthService {
   Future<void> signInWithGoogle() {
     return supabase.auth.signInWithOAuth(
       OAuthProvider.google,
-      redirectTo: kIsWeb ? null : _mobileRedirect,
+      redirectTo: kIsWeb ? Uri.base.origin : _mobileRedirect,
     );
   }
 
