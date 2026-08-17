@@ -1,0 +1,15 @@
+{
+  "app_name": "GreenYield",
+  "welcome": "Welcome",
+  "toggle_theme": "Theme",
+  "language": "Language",
+  "logout": "Log out",
+  "save": "Save",
+  "or_divider": "or",
+  "home_title": "Home",
+  "signed_in_as": "Signed in as",
+  "error_required": "This field is required",
+  "error_invalid_email": "Enter a valid email address",
+  "error_password_too_short": "Password must be at least 8 characters",
+  "error_passwords_dont_match": "Passwords don't match"
+}

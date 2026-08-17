@@ -67,7 +67,9 @@ flutter:
 
   assets:
     - .env
-    - assets/translations/
+    - assets/translations/en/
+    - assets/translations/si/
+    - assets/translations/ta/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

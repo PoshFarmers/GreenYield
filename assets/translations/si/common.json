@@ -1,0 +1,15 @@
+{
+  "app_name": "GreenYield",
+  "welcome": "සාදරයෙන් පිළිගනිමු",
+  "toggle_theme": "තේමාව",
+  "language": "භාෂාව",
+  "logout": "ඉවත් වන්න",
+  "save": "සුරකින්න",
+  "or_divider": "හෝ",
+  "home_title": "මුල් පිටුව",
+  "signed_in_as": "ලෙස පිවිසී ඇත",
+  "error_required": "මෙම ක්ෂේත්‍රය අවශ්‍ය වේ",
+  "error_invalid_email": "වලංගු විද්‍යුත් තැපැල් ලිපිනයක් ඇතුළත් කරන්න",
+  "error_password_too_short": "මුරපදයේ අවම වශයෙන් අක්ෂර 8ක් තිබිය යුතුය",
+  "error_passwords_dont_match": "මුරපද නොගැලපේ"
+}
