@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Rejects a commit locally if its message doesn't follow Conventional
+# Commits (feat:, fix:, chore:, etc). No Node/npm involved — this is
+# a plain git hook, shared via .githooks/ + core.hooksPath (see
+# README setup note), not the default .git/hooks (which isn't
+# tracked by git and can't be shared with the team automatically).
+
+commit_msg_file="$1"
+first_line=$(head -n1 "$commit_msg_file")
+
+pattern='^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-z0-9_-]+\))?: .{1,}$'
+
+if ! [[ "$first_line" =~ $pattern ]]; then
+  echo "Commit message doesn't follow Conventional Commits format:"
+  echo "  <type>(optional-scope): <description>"
+  echo ""
+  echo "Allowed types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert"
+  echo ""
+  echo "Your message: $first_line"
+  exit 1
+fi
