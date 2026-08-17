@@ -19,6 +19,9 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Create placeholder .env for CI
+        run: cp .env.example .env
+
       - name: Install dependencies
         run: flutter pub get
 
