@@ -39,6 +39,9 @@ dependencies:
   flutter_riverpod: ^3.4.2
   easy_localization: ^3.0.8
   shared_preferences: ^2.5.5
+  geolocator: ^14.0.3
+  geocoding: ^5.0.0
+  image_picker: ^1.2.3
 
 dev_dependencies:
   flutter_test:

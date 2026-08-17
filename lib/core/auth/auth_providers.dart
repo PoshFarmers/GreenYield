@@ -12,7 +12,18 @@ final authStateChangesProvider = StreamProvider<AuthState>((ref) {
   return ref.watch(authServiceProvider).authStateChanges;
 });
 
+/// Recomputes only when the signed-in user actually changes
+final currentUserIdProvider = Provider<String?>((ref) {
+  final authState = ref.watch(authStateChangesProvider);
+  return authState.maybeWhen(
+    data: (state) => state.session?.user.id,
+    orElse: () => null,
+  );
+});
+
 /// The signed-in user's `profile` row, or null
 final ownProfileProvider = FutureProvider<Profile?>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return null;
   return ref.watch(authServiceProvider).fetchOwnProfile();
 });

@@ -3,18 +3,48 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/storage/avatar_service.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../models/profile.dart';
 
-/// Placeholder landing page for every signed-in user
-class HomeScreen extends ConsumerWidget {
+/// Landing page for every signed-in user. Shows the profile's name and
+/// avatar, plus the existing theme/language controls.
+class HomeScreen extends ConsumerStatefulWidget {
   final Profile profile;
 
   const HomeScreen({super.key, required this.profile});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final _avatarService = AvatarService();
+
+  String? _avatarSignedUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAvatar();
+  }
+
+  Future<void> _loadAvatar() async {
+    final path = widget.profile.avatarUrl;
+    if (path == null) return;
+    try {
+      final url = await _avatarService.signedUrl(path);
+      if (mounted) setState(() => _avatarSignedUrl = url);
+    } catch (_) {
+      // Avatar failing to load isn't fatal — just fall back to the
+      // placeholder icon below.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
+    final profile = widget.profile;
 
     return Scaffold(
       appBar: AppBar(
@@ -34,11 +64,16 @@ class HomeScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('welcome'.tr(), style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 8),
+                CircleAvatar(
+                  radius: 48,
+                  backgroundImage:
+                      _avatarSignedUrl != null ? NetworkImage(_avatarSignedUrl!) : null,
+                  child: _avatarSignedUrl == null ? const Icon(Icons.person, size: 48) : null,
+                ),
+                const SizedBox(height: 16),
                 Text(
-                  '${'signed_in_as'.tr()}: ${profile.firstName} ${profile.lastName}',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  '${profile.firstName} ${profile.lastName}',
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 32),
                 Text('toggle_theme'.tr(), style: Theme.of(context).textTheme.labelLarge),
