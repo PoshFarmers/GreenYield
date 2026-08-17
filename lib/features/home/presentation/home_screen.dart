@@ -66,9 +66,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               children: [
                 CircleAvatar(
                   radius: 48,
-                  backgroundImage:
-                      _avatarSignedUrl != null ? NetworkImage(_avatarSignedUrl!) : null,
-                  child: _avatarSignedUrl == null ? const Icon(Icons.person, size: 48) : null,
+                  backgroundImage: _avatarSignedUrl != null
+                      ? NetworkImage(_avatarSignedUrl!)
+                      : null,
+                  child: _avatarSignedUrl == null
+                      ? const Icon(Icons.person, size: 48)
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -76,27 +79,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 32),
-                Text('toggle_theme'.tr(), style: Theme.of(context).textTheme.labelLarge),
+                Text(
+                  'toggle_theme'.tr(),
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
                 const SizedBox(height: 8),
                 SegmentedButton<ThemeMode>(
                   segments: const [
-                    ButtonSegment(value: ThemeMode.light, label: Text('Light'), icon: Icon(Icons.light_mode)),
-                    ButtonSegment(value: ThemeMode.dark, label: Text('Dark'), icon: Icon(Icons.dark_mode)),
-                    ButtonSegment(value: ThemeMode.system, label: Text('System'), icon: Icon(Icons.settings_suggest)),
+                    ButtonSegment(
+                      value: ThemeMode.light,
+                      label: Text('Light'),
+                      icon: Icon(Icons.light_mode),
+                    ),
+                    ButtonSegment(
+                      value: ThemeMode.dark,
+                      label: Text('Dark'),
+                      icon: Icon(Icons.dark_mode),
+                    ),
+                    ButtonSegment(
+                      value: ThemeMode.system,
+                      label: Text('System'),
+                      icon: Icon(Icons.settings_suggest),
+                    ),
                   ],
                   selected: {themeMode},
-                  onSelectionChanged: (s) => ref.read(themeModeProvider.notifier).setThemeMode(s.first),
+                  onSelectionChanged: (s) => ref
+                      .read(themeModeProvider.notifier)
+                      .setThemeMode(s.first),
                 ),
                 const SizedBox(height: 24),
-                Text('language'.tr(), style: Theme.of(context).textTheme.labelLarge),
+                Text(
+                  'language'.tr(),
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
                 const SizedBox(height: 8),
                 DropdownButton<Locale>(
                   value: context.locale,
                   items: context.supportedLocales
-                      .map((locale) => DropdownMenuItem(
-                            value: locale,
-                            child: Text(locale.languageCode.toUpperCase()),
-                          ))
+                      .map(
+                        (locale) => DropdownMenuItem(
+                          value: locale,
+                          child: Text(locale.languageCode.toUpperCase()),
+                        ),
+                      )
                       .toList(),
                   onChanged: (locale) {
                     if (locale != null) context.setLocale(locale);

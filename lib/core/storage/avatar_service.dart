@@ -18,7 +18,9 @@ class AvatarService {
     required Uint8List bytes,
     required String fileName,
   }) async {
-    final ext = fileName.contains('.') ? fileName.split('.').last.toLowerCase() : 'jpg';
+    final ext = fileName.contains('.')
+        ? fileName.split('.').last.toLowerCase()
+        : 'jpg';
     final path = '$userId/avatar.$ext';
     final contentType = switch (ext) {
       'png' => 'image/png',
@@ -26,7 +28,9 @@ class AvatarService {
       _ => 'image/jpeg',
     };
 
-    await supabase.storage.from(_bucket).uploadBinary(
+    await supabase.storage
+        .from(_bucket)
+        .uploadBinary(
           path,
           bytes,
           fileOptions: FileOptions(contentType: contentType, upsert: true),

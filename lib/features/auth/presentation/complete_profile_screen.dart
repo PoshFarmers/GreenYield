@@ -20,7 +20,8 @@ class CompleteProfileScreen extends ConsumerStatefulWidget {
   const CompleteProfileScreen({super.key, required this.onComplete});
 
   @override
-  ConsumerState<CompleteProfileScreen> createState() => _CompleteProfileScreenState();
+  ConsumerState<CompleteProfileScreen> createState() =>
+      _CompleteProfileScreenState();
 }
 
 class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
@@ -149,12 +150,22 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
           id: userId,
           firstName: _firstNameController.text.trim(),
           lastName: _lastNameController.text.trim(),
-          phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+          phone: _phoneController.text.trim().isEmpty
+              ? null
+              : _phoneController.text.trim(),
           address: Address(
-            line1: _addressLine1Controller.text.trim().isEmpty ? null : _addressLine1Controller.text.trim(),
-            line2: _addressLine2Controller.text.trim().isEmpty ? null : _addressLine2Controller.text.trim(),
-            city: _cityController.text.trim().isEmpty ? null : _cityController.text.trim(),
-            postalCode: _postalCodeController.text.trim().isEmpty ? null : _postalCodeController.text.trim(),
+            line1: _addressLine1Controller.text.trim().isEmpty
+                ? null
+                : _addressLine1Controller.text.trim(),
+            line2: _addressLine2Controller.text.trim().isEmpty
+                ? null
+                : _addressLine2Controller.text.trim(),
+            city: _cityController.text.trim().isEmpty
+                ? null
+                : _cityController.text.trim(),
+            postalCode: _postalCodeController.text.trim().isEmpty
+                ? null
+                : _postalCodeController.text.trim(),
           ),
           avatarUrl: avatarPath,
           preferredLanguage: _preferredLanguage,
@@ -190,8 +201,12 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                         children: [
                           CircleAvatar(
                             radius: 48,
-                            backgroundImage: _avatarBytes != null ? MemoryImage(_avatarBytes!) : null,
-                            child: _avatarBytes == null ? const Icon(Icons.person, size: 48) : null,
+                            backgroundImage: _avatarBytes != null
+                                ? MemoryImage(_avatarBytes!)
+                                : null,
+                            child: _avatarBytes == null
+                                ? const Icon(Icons.person, size: 48)
+                                : null,
                           ),
                           Positioned(
                             right: 0,
@@ -207,7 +222,9 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                                   child: Icon(
                                     Icons.edit,
                                     size: 18,
-                                    color: Theme.of(context).colorScheme.onPrimary,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onPrimary,
                                   ),
                                 ),
                               ),
@@ -220,13 +237,17 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                     AppTextField(
                       label: 'first_name'.tr(),
                       controller: _firstNameController,
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'error_required'.tr() : null,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'error_required'.tr()
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     AppTextField(
                       label: 'last_name'.tr(),
                       controller: _lastNameController,
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'error_required'.tr() : null,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'error_required'.tr()
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     AppTextField(
@@ -237,7 +258,10 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                     const SizedBox(height: 24),
                     Align(
                       alignment: Alignment.centerLeft,
-                      child: Text('address'.tr(), style: Theme.of(context).textTheme.labelLarge),
+                      child: Text(
+                        'address'.tr(),
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     AppTextField(
@@ -271,18 +295,28 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                     const SizedBox(height: 24),
                     Align(
                       alignment: Alignment.centerLeft,
-                      child: Text('location'.tr(), style: Theme.of(context).textTheme.labelLarge),
+                      child: Text(
+                        'location'.tr(),
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     OutlinedButton.icon(
-                      onPressed: _isFetchingLocation ? null : _useCurrentLocation,
+                      onPressed: _isFetchingLocation
+                          ? null
+                          : _useCurrentLocation,
                       icon: _isFetchingLocation
                           ? const SizedBox(
-                              height: 16, width: 16,
+                              height: 16,
+                              width: 16,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.my_location),
-                      label: Text(_isFetchingLocation ? 'fetching_location'.tr() : 'use_current_location'.tr()),
+                      label: Text(
+                        _isFetchingLocation
+                            ? 'fetching_location'.tr()
+                            : 'use_current_location'.tr(),
+                      ),
                     ),
                     if (_locationText != null) ...[
                       const SizedBox(height: 8),
@@ -298,11 +332,16 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                       const SizedBox(height: 8),
                       Text(
                         _locationError!,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 24),
-                    Text('language'.tr(), style: Theme.of(context).textTheme.labelLarge),
+                    Text(
+                      'language'.tr(),
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
                     const SizedBox(height: 8),
                     SegmentedButton<String>(
                       segments: const [
@@ -311,13 +350,16 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                         ButtonSegment(value: 'ta', label: Text('TA')),
                       ],
                       selected: {_preferredLanguage},
-                      onSelectionChanged: (s) => setState(() => _preferredLanguage = s.first),
+                      onSelectionChanged: (s) =>
+                          setState(() => _preferredLanguage = s.first),
                     ),
                     if (_errorMessage != null) ...[
                       const SizedBox(height: 12),
                       Text(
                         _errorMessage!,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 24),
@@ -325,7 +367,8 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                       onPressed: _isSubmitting ? null : _submit,
                       child: _isSubmitting
                           ? const SizedBox(
-                              height: 20, width: 20,
+                              height: 20,
+                              width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : Text('save'.tr()),

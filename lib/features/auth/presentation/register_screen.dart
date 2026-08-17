@@ -38,7 +38,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       _errorMessage = null;
     });
     try {
-      await ref.read(authServiceProvider).signUpWithEmail(
+      await ref
+          .read(authServiceProvider)
+          .signUpWithEmail(
             email: _emailController.text.trim(),
             password: _passwordController.text,
           );
@@ -76,7 +78,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     // this screen is popped. So: as soon as a session appears (email/pw
     // success, or returning from the Google OAuth redirect), pop back to
     // AuthGate's route so the already-correct screen becomes visible.
-    ref.listen<AsyncValue<AuthState>>(authStateChangesProvider, (previous, next) {
+    ref.listen<AsyncValue<AuthState>>(authStateChangesProvider, (
+      previous,
+      next,
+    ) {
       final session = next.maybeWhen(
         data: (authState) => authState.session,
         orElse: () => null,
@@ -119,8 +124,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       controller: _passwordController,
                       obscureText: true,
                       validator: (value) {
-                        if (value == null || value.isEmpty) return 'error_required'.tr();
-                        if (value.length < 8) return 'error_password_too_short'.tr();
+                        if (value == null || value.isEmpty) {
+                          return 'error_required'.tr();
+                        }
+                        if (value.length < 8) {
+                          return 'error_password_too_short'.tr();
+                        }
                         return null;
                       },
                     ),
@@ -140,7 +149,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       const SizedBox(height: 12),
                       Text(
                         _errorMessage!,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 24),
@@ -148,7 +159,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       onPressed: _isSubmitting ? null : _submit,
                       child: _isSubmitting
                           ? const SizedBox(
-                              height: 20, width: 20,
+                              height: 20,
+                              width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : Text('register'.tr()),

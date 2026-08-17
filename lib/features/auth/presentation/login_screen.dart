@@ -35,7 +35,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _errorMessage = null;
     });
     try {
-      await ref.read(authServiceProvider).signInWithEmail(
+      await ref
+          .read(authServiceProvider)
+          .signInWithEmail(
             email: _emailController.text.trim(),
             password: _passwordController.text,
           );
@@ -96,14 +98,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       label: 'password'.tr(),
                       controller: _passwordController,
                       obscureText: true,
-                      validator: (value) =>
-                          (value == null || value.isEmpty) ? 'error_required'.tr() : null,
+                      validator: (value) => (value == null || value.isEmpty)
+                          ? 'error_required'.tr()
+                          : null,
                     ),
                     if (_errorMessage != null) ...[
                       const SizedBox(height: 12),
                       Text(
                         _errorMessage!,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 24),
@@ -111,7 +116,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       onPressed: _isSubmitting ? null : _submit,
                       child: _isSubmitting
                           ? const SizedBox(
-                              height: 20, width: 20,
+                              height: 20,
+                              width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : Text('login'.tr()),
@@ -136,7 +142,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 24),
                     TextButton(
                       onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const RegisterScreen(),
+                        ),
                       ),
                       child: Text('no_account'.tr()),
                     ),

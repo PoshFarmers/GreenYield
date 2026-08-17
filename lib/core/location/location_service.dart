@@ -50,7 +50,10 @@ class LocationService {
       ),
     );
 
-    final point = GeoPoint(latitude: position.latitude, longitude: position.longitude);
+    final point = GeoPoint(
+      latitude: position.latitude,
+      longitude: position.longitude,
+    );
     final displayText = await _reverseGeocode(point);
     return LocationResult(point: point, displayText: displayText);
   }
@@ -63,9 +66,11 @@ class LocationService {
       );
       if (placemarks.isEmpty) return _fallbackText(point);
       final p = placemarks.first;
-      final parts = [p.locality, p.administrativeArea, p.country]
-          .where((s) => s != null && s.isNotEmpty)
-          .join(', ');
+      final parts = [
+        p.locality,
+        p.administrativeArea,
+        p.country,
+      ].where((s) => s != null && s.isNotEmpty).join(', ');
       return parts.isEmpty ? _fallbackText(point) : parts;
     } catch (_) {
       // Reverse geocoding can fail independently of the GPS fix (e.g. no

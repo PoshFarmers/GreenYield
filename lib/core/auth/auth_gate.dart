@@ -19,7 +19,8 @@ class AuthGate extends ConsumerWidget {
     final authState = ref.watch(authStateChangesProvider);
 
     return authState.when(
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(body: Center(child: Text('$error'))),
       data: (_) {
         final authService = ref.watch(authServiceProvider);
@@ -29,7 +30,8 @@ class AuthGate extends ConsumerWidget {
 
         final profileAsync = ref.watch(ownProfileProvider);
         return profileAsync.when(
-          loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+          loading: () =>
+              const Scaffold(body: Center(child: CircularProgressIndicator())),
           error: (error, _) => Scaffold(body: Center(child: Text('$error'))),
           data: (profile) {
             if (profile == null) {

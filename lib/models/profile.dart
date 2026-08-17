@@ -26,11 +26,11 @@ class Address {
   }
 
   Map<String, dynamic> toMap() => {
-        'line1': line1,
-        'line2': line2,
-        'city': city,
-        'postal_code': postalCode,
-      };
+    'line1': line1,
+    'line2': line2,
+    'city': city,
+    'postal_code': postalCode,
+  };
 }
 
 /// A single lat/lng pair, used for `profile.location_point`
@@ -46,7 +46,10 @@ class GeoPoint {
   /// with the default representation.
   factory GeoPoint.fromGeoJson(Map<String, dynamic> json) {
     final coords = (json['coordinates'] as List).cast<num>();
-    return GeoPoint(longitude: coords[0].toDouble(), latitude: coords[1].toDouble());
+    return GeoPoint(
+      longitude: coords[0].toDouble(),
+      latitude: coords[1].toDouble(),
+    );
   }
 
   /// EWKT text — Postgres casts this straight to `geography` on insert,
@@ -102,14 +105,14 @@ class Profile {
   /// `active_role` is intentionally never sent here — it stays null until
   /// role-specific profile tables exist and a role-selection flow is built.
   Map<String, dynamic> toInsertMap() => {
-        'id': id,
-        'first_name': firstName,
-        'last_name': lastName,
-        if (!address.isEmpty) 'address': address.toMap(),
-        if (phone != null && phone!.isNotEmpty) 'phone': phone,
-        if (avatarUrl != null) 'avatar_url': avatarUrl,
-        'preferred_language': preferredLanguage,
-        if (locationText != null) 'location_text': locationText,
-        if (locationPoint != null) 'location_point': locationPoint!.toEwkt(),
-      };
+    'id': id,
+    'first_name': firstName,
+    'last_name': lastName,
+    if (!address.isEmpty) 'address': address.toMap(),
+    if (phone != null && phone!.isNotEmpty) 'phone': phone,
+    if (avatarUrl != null) 'avatar_url': avatarUrl,
+    'preferred_language': preferredLanguage,
+    if (locationText != null) 'location_text': locationText,
+    if (locationPoint != null) 'location_point': locationPoint!.toEwkt(),
+  };
 }
