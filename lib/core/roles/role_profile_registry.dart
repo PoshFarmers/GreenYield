@@ -1,5 +1,8 @@
 import 'package:flutter/widgets.dart';
 
+import '../../features/profile/farmer/farmer_profile_service.dart';
+import '../../features/profile/farmer/presentation/farmer_complete_profile_screen.dart';
+import '../../features/profile/farmer/presentation/farmer_profile_view_screen.dart';
 import '../../features/profile/driver/driver_profile_service.dart';
 import '../../features/profile/driver/presentation/driver_complete_profile_screen.dart';
 import '../../features/profile/driver/presentation/driver_profile_view_screen.dart';
@@ -23,6 +26,13 @@ class RoleScreens {
 /// One entry per role ('farmer' | 'buyer' | 'driver'), registered by
 /// that role's own feature module
 final Map<String, RoleScreens> roleScreensRegistry = {
+  'farmer': RoleScreens(
+    hasCompletedProfile: (profileId) =>
+        FarmerProfileService().hasProfile(profileId),
+    completeProfileBuilder: (context) => const FarmerCompleteProfileScreen(),
+    viewBuilder: (context) => const FarmerProfileViewScreen(),
+    editBuilder: (context) => const FarmerProfileViewScreen(),
+  ),
   'driver': RoleScreens(
     hasCompletedProfile: (profileId) =>
         DriverProfileService().hasProfile(profileId),
