@@ -11,5 +11,6 @@
   "error_required": "இந்தப் புலம் தேவை",
   "error_invalid_email": "சரியான மின்னஞ்சல் முகவரியை உள்ளிடவும்",
   "error_password_too_short": "கடவுச்சொல் குறைந்தது 8 எழுத்துகள் இருக்க வேண்டும்",
-  "error_passwords_dont_match": "கடவுச்சொற்கள் பொருந்தவில்லை"
+  "error_passwords_dont_match": "கடவுச்சொற்கள் பொருந்தவில்லை",
+  "my_profile": "எனது சுயவிவரம்"
 }
