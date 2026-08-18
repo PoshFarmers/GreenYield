@@ -1,0 +1,15 @@
+{
+  "driver_profile_title": "Driver Profile",
+  "vehicle_type": "Vehicle type",
+  "vehicle_type_three_wheeler": "Three-wheeler",
+  "vehicle_type_van": "Van",
+  "vehicle_type_lorry": "Lorry",
+  "vehicle_type_truck": "Truck",
+  "vehicle_type_tractor": "Tractor",
+  "plate_number": "Plate number",
+  "max_load_kg": "Max load (kg)",
+  "preferred_min_load_kg": "Preferred minimum load (kg)",
+  "error_max_load_positive": "Max load must be greater than 0",
+  "error_min_load_exceeds_max": "Preferred minimum load can't exceed max load",
+  "edit_profile": "Edit profile"
+}

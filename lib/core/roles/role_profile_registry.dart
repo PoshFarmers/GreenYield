@@ -3,6 +3,9 @@ import 'package:flutter/widgets.dart';
 import '../../features/profile/farmer/farmer_profile_service.dart';
 import '../../features/profile/farmer/presentation/farmer_complete_profile_screen.dart';
 import '../../features/profile/farmer/presentation/farmer_profile_view_screen.dart';
+import '../../features/profile/driver/driver_profile_service.dart';
+import '../../features/profile/driver/presentation/driver_complete_profile_screen.dart';
+import '../../features/profile/driver/presentation/driver_profile_view_screen.dart';
 
 /// The screens/checks a role must supply so AuthGate can route to it
 /// without knowing anything role-specific itself.
@@ -29,5 +32,12 @@ final Map<String, RoleScreens> roleScreensRegistry = {
     completeProfileBuilder: (context) => const FarmerCompleteProfileScreen(),
     viewBuilder: (context) => const FarmerProfileViewScreen(),
     editBuilder: (context) => const FarmerProfileViewScreen(),
+  ),
+  'driver': RoleScreens(
+    hasCompletedProfile: (profileId) =>
+        DriverProfileService().hasProfile(profileId),
+    completeProfileBuilder: (context) => const DriverCompleteProfileScreen(),
+    viewBuilder: (context) => const DriverProfileViewScreen(),
+    editBuilder: (context) => const DriverProfileViewScreen(),
   ),
 };

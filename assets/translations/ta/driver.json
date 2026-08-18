@@ -1,0 +1,15 @@
+{
+  "driver_profile_title": "ஓட்டுநர் சுயவிவரம்",
+  "vehicle_type": "வாகன வகை",
+  "vehicle_type_three_wheeler": "முச்சக்கர வண்டி",
+  "vehicle_type_van": "வேன்",
+  "vehicle_type_lorry": "லாரி",
+  "vehicle_type_truck": "டிரக்",
+  "vehicle_type_tractor": "டிராக்டர்",
+  "plate_number": "வாகன எண்",
+  "max_load_kg": "அதிகபட்ச சுமை (kg)",
+  "preferred_min_load_kg": "விருப்பமான குறைந்தபட்ச சுமை (kg)",
+  "error_max_load_positive": "அதிகபட்ச சுமை 0ஐ விட அதிகமாக இருக்க வேண்டும்",
+  "error_min_load_exceeds_max": "குறைந்தபட்ச சுமை அதிகபட்ச சுமையை மிஞ்சக்கூடாது",
+  "edit_profile": "சுயவிவரத்தைத் திருத்து"
+}

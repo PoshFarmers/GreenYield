@@ -1,0 +1,15 @@
+{
+  "driver_profile_title": "රියදුරු පැතිකඩ",
+  "vehicle_type": "වාහන වර්ගය",
+  "vehicle_type_three_wheeler": "ත්‍රිරෝද රථය",
+  "vehicle_type_van": "වෑන් රථය",
+  "vehicle_type_lorry": "ලොරි රථය",
+  "vehicle_type_truck": "ට්‍රක් රථය",
+  "vehicle_type_tractor": "ට්‍රැක්ටරය",
+  "plate_number": "වාහන අංකය",
+  "max_load_kg": "උපරිම බර (kg)",
+  "preferred_min_load_kg": "කැමති අවම බර (kg)",
+  "error_max_load_positive": "උපරිම බර 0ට වඩා වැඩි විය යුතුය",
+  "error_min_load_exceeds_max": "කැමති අවම බර උපරිම බරට වඩා විය නොහැක",
+  "edit_profile": "පැතිකඩ සංස්කරණය කරන්න"
+}
