@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/roles/role_profile_registry.dart';
 import '../../../core/storage/avatar_service.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../models/profile.dart';
 
-/// Landing page for every signed-in user. Shows the profile's name and
-/// avatar, plus the existing theme/language controls.
+/// Placeholder landing page for every signed-in user, regardless of role.
+/// Also provides access to the role-specific profile, theme, and language
+/// settings.
 class HomeScreen extends ConsumerStatefulWidget {
   final Profile profile;
 
@@ -31,13 +33,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _loadAvatar() async {
     final path = widget.profile.avatarUrl;
+
     if (path == null) return;
+
     try {
       final url = await _avatarService.signedUrl(path);
-      if (mounted) setState(() => _avatarSignedUrl = url);
+
+      if (mounted) {
+        setState(() {
+          _avatarSignedUrl = url;
+        });
+      }
     } catch (_) {
-      // Avatar failing to load isn't fatal — just fall back to the
-      // placeholder icon below.
+      // Avatar loading failure isn't fatal.
+      // The placeholder icon will be displayed instead.
     }
   }
 
@@ -45,6 +54,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
     final profile = widget.profile;
+
+    final roleScreens = profile.activeRole != null
+        ? roleScreensRegistry[profile.activeRole]
+        : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -73,17 +86,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ? const Icon(Icons.person, size: 48)
                       : null,
                 ),
+
                 const SizedBox(height: 16),
+
                 Text(
-                  '${profile.firstName} ${profile.lastName}',
+                  'welcome'.tr(),
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
+
+                const SizedBox(height: 8),
+
+                Text(
+                  '${'signed_in_as'.tr()}: '
+                  '${profile.firstName} ${profile.lastName}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+
+                if (roleScreens != null) ...[
+                  const SizedBox(height: 16),
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(
+                      context,
+                    ).push(MaterialPageRoute(builder: roleScreens.viewBuilder)),
+                    child: Text('my_profile'.tr()),
+                  ),
+                ],
+
                 const SizedBox(height: 32),
+
                 Text(
                   'toggle_theme'.tr(),
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
+
                 const SizedBox(height: 8),
+
                 SegmentedButton<ThemeMode>(
                   segments: const [
                     ButtonSegment(
@@ -107,12 +144,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       .read(themeModeProvider.notifier)
                       .setThemeMode(s.first),
                 ),
+
                 const SizedBox(height: 24),
+
                 Text(
                   'language'.tr(),
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
+
                 const SizedBox(height: 8),
+
                 DropdownButton<Locale>(
                   value: context.locale,
                   items: context.supportedLocales
@@ -124,7 +165,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       )
                       .toList(),
                   onChanged: (locale) {
-                    if (locale != null) context.setLocale(locale);
+                    if (locale != null) {
+                      context.setLocale(locale);
+                    }
                   },
                 ),
               ],
