@@ -66,6 +66,14 @@ class AuthService {
     await supabase.from('profile').insert(profile.toInsertMap());
   }
 
+  // Updates own profile
+  Future<void> updateOwnProfile(Profile profile) async {
+    await supabase
+        .from('profile')
+        .update(profile.toInsertMap())
+        .eq('id', profile.id);
+  }
+
   /// Grants a role to the current user (inserts into profile_role).
   Future<void> addRole(String role) async {
     final userId = currentUser!.id;
