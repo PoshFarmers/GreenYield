@@ -57,3 +57,18 @@ Other notes: averages are per order item (not quantity-weighted); `order_count` 
 
 `crop_price_bounds.dart` is static, client-only guidance; this pipeline is observed data. See [pricing-rules.md](pricing-rules.md).
 
+## 7. Edge cases
+
+- Empty tables: `getForCrop` returns null; UI must handle it.
+- `price_history_recent` syncs unbounded history to every device.
+- Re-running for the same date is idempotent (upserts).
+
+## 8. How to modify safely
+
+- To make analytics meaningful, decide which status counts (`delivered` vs `completed`), then change either the function's filter or add the missing transition.
+- Change the cron to run for `current_date - 1` (or loop over recent days).
+- If history grows, prune server-side (`delete ... where price_date < ...`) instead of filtering in the stream (`now()` math is unsupported there).
+
+## Source files
+
+`lib/features/pricing/market_price_service.dart`; `lib/models/market_price.dart`, `price_trend.dart`, `price_history.dart`; sync-config YAML; migrations `20260827094740_pricing_and_market_intelligence`, `20260915165125_schedule_market_price_refresh`, `20260827093223_orders` (status enum), `20260827094000_delivery_and_assignment`, `20260916050308_wallet_payment_and_payout`.
