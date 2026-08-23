@@ -13,27 +13,23 @@ final authStateChangesProvider = StreamProvider<AuthState>((ref) {
 });
 
 /// The signed-in user's generic profile row, or null if one hasn't
-/// been created yet. Automatically re-fetches whenever the auth
-/// state changes (sign-in, sign-out, switching accounts) — Riverpod
-/// handles the caching/re-fetch bookkeeping that AuthGate used to do
-/// by hand with a StatefulWidget.
-///
-/// After CompleteProfileScreen creates the row, call
-/// `ref.invalidate(ownProfileProvider)` to force a re-fetch rather
-/// than tracking a manual "reload" callback.
-final ownProfileProvider = FutureProvider<Profile?>((ref) async {
+/// been created yet. Backed by a PowerSync watch stream, so it now
+/// updates live whenever the local `profile` row changes — no manual
+/// invalidation needed after a write, on this device or synced in
+/// from another.
+final ownProfileProvider = StreamProvider<Profile?>((ref) {
   ref.watch(authStateChangesProvider); // rebuild whenever auth state changes
   final authService = ref.watch(authServiceProvider);
-  if (!authService.isSignedIn) return null;
-  return authService.fetchOwnProfile();
+  if (!authService.isSignedIn) return Stream.value(null);
+  return authService.watchOwnProfile();
 });
 
 /// Every role ('farmer'/'buyer'/'driver') the current user currently
-/// holds. Empty until they complete RoleSelectionScreen at least once.
-/// Invalidate this after adding a role so AuthGate re-checks it.
-final ownRolesProvider = FutureProvider<List<String>>((ref) async {
+/// holds. Also stream-backed — updates automatically once addRole()
+/// writes to profile_role, without needing an explicit invalidate.
+final ownRolesProvider = StreamProvider<List<String>>((ref) {
   ref.watch(authStateChangesProvider);
   final authService = ref.watch(authServiceProvider);
-  if (!authService.isSignedIn) return [];
-  return authService.fetchOwnRoles();
+  if (!authService.isSignedIn) return Stream.value([]);
+  return authService.watchOwnRoles();
 });
