@@ -9,6 +9,7 @@ import '../../../models/cart_item.dart';
 import '../../../models/marketplace_listing.dart';
 import '../../../models/profile.dart';
 import '../../marketplace/marketplace_service.dart';
+import '../../orders/presentation/checkout_screen.dart';
 import '../cart_service.dart';
 
 /// Sprint 2 — Task 3.1: Cart Management (buyer "Cart" tab).
@@ -156,9 +157,11 @@ class _CartScreenState extends State<CartScreen> {
         _CartSummaryBar(
           grandTotal: _grandTotal,
           hasUnavailableItems: _items.any((item) => item.isUnavailable),
-          onCheckout: () => ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('checkout_coming_soon'.tr()))),
+          onCheckout: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => CheckoutScreen(buyerProfile: widget.profile),
+            ),
+          ),
           theme: theme,
         ),
       ],
