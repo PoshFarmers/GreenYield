@@ -39,6 +39,11 @@ class SupabaseConnector extends PowerSyncBackendConnector {
       final pkColumn = _pkColumnOverrides[op.table] ?? 'id';
       final opData = _decodeJsonbColumns(op.table, op.opData);
 
+      if (op.table == 'farmer_crop') {
+        await _uploadFarmerCrop(table, op, opData);
+        continue;
+      }
+
       switch (op.op) {
         case UpdateType.put:
           await table.upsert({pkColumn: op.id, ...?opData});
@@ -49,6 +54,38 @@ class SupabaseConnector extends PowerSyncBackendConnector {
       }
     }
     await transaction.complete();
+  }
+
+  Future<void> _uploadFarmerCrop(
+    dynamic table,
+    dynamic op,
+    Map<String, dynamic>? opData,
+  ) async {
+    final key = op.id.split(':');
+    if (key.length != 2) {
+      throw FormatException('Invalid farmer_crop key: ${op.id}');
+    }
+
+    final farmerProfileId = key[0];
+    final cropId = key[1];
+
+    switch (op.op) {
+      case UpdateType.put:
+        await table.upsert({
+          'farmer_profile_id': farmerProfileId,
+          'crop_id': cropId,
+        });
+      case UpdateType.patch:
+        await table
+            .update(opData!)
+            .eq('farmer_profile_id', farmerProfileId)
+            .eq('crop_id', cropId);
+      case UpdateType.delete:
+        await table
+            .delete()
+            .eq('farmer_profile_id', farmerProfileId)
+            .eq('crop_id', cropId);
+    }
   }
 
   /// Decodes any column listed in [_jsonbColumns] for [table] from its
