@@ -22,30 +22,26 @@ class _FarmerProfileViewScreenState
   final _service = FarmerProfileService();
   final _avatarService = AvatarService();
 
-  late Future<Profile?> _profileFuture;
-  late Future<FarmerProfile?> _farmerProfileFuture;
+  late final Stream<Profile?> _profileStream;
+  late final Stream<FarmerProfile?> _farmerProfileStream;
 
   String? _avatarSignedUrl;
+  String? _avatarLoadedFor;
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
-  }
-
-  void _loadProfile() {
     final userId = ref.read(authServiceProvider).currentUser!.id;
-
-    _profileFuture = ref.read(authServiceProvider).fetchOwnProfile();
-    _farmerProfileFuture = _service.fetchOwnProfile(userId);
+    _profileStream = ref.read(authServiceProvider).watchOwnProfile();
+    _farmerProfileStream = _service.watchOwnProfile(userId);
   }
 
   Future<void> _loadAvatar(String? path) async {
-    if (path == null || path.isEmpty) return;
+    if (path == null || path.isEmpty || path == _avatarLoadedFor) return;
+    _avatarLoadedFor = path;
 
     try {
       final url = await _avatarService.signedUrl(path);
-
       if (mounted) {
         setState(() {
           _avatarSignedUrl = url;
@@ -69,10 +65,10 @@ class _FarmerProfileViewScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('farmer_profile_title'.tr())),
-      body: FutureBuilder<Profile?>(
-        future: _profileFuture,
+      body: StreamBuilder<Profile?>(
+        stream: _profileStream,
         builder: (context, profileSnapshot) {
-          if (profileSnapshot.connectionState == ConnectionState.waiting) {
+          if (!profileSnapshot.hasData && !profileSnapshot.hasError) {
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -86,15 +82,14 @@ class _FarmerProfileViewScreenState
             return const Center(child: Text('Profile not found'));
           }
 
-          // Load the avatar once the generic profile has been fetched.
-          if (_avatarSignedUrl == null && profile.avatarUrl != null) {
+          if (profile.avatarUrl != null) {
             _loadAvatar(profile.avatarUrl);
           }
 
-          return FutureBuilder<FarmerProfile?>(
-            future: _farmerProfileFuture,
+          return StreamBuilder<FarmerProfile?>(
+            stream: _farmerProfileStream,
             builder: (context, farmerSnapshot) {
-              if (farmerSnapshot.connectionState == ConnectionState.waiting) {
+              if (!farmerSnapshot.hasData && !farmerSnapshot.hasError) {
                 return const Center(child: CircularProgressIndicator());
               }
 
@@ -115,7 +110,6 @@ class _FarmerProfileViewScreenState
                     child: ListView(
                       padding: const EdgeInsets.all(24),
                       children: [
-                        // Avatar
                         Center(
                           child: CircleAvatar(
                             radius: 48,
@@ -127,10 +121,7 @@ class _FarmerProfileViewScreenState
                                 : null,
                           ),
                         ),
-
                         const SizedBox(height: 16),
-
-                        // Name
                         Center(
                           child: Text(
                             '${profile.firstName} ${profile.lastName}',
@@ -138,17 +129,12 @@ class _FarmerProfileViewScreenState
                             textAlign: TextAlign.center,
                           ),
                         ),
-
                         const SizedBox(height: 24),
-
-                        // Phone
                         ListTile(
                           leading: const Icon(Icons.phone),
                           title: Text('phone'.tr()),
                           subtitle: Text(profile.phone ?? '-'),
                         ),
-
-                        // Address
                         ListTile(
                           leading: const Icon(Icons.home),
                           title: Text('address'.tr()),
@@ -158,16 +144,12 @@ class _FarmerProfileViewScreenState
                                 : _formatAddress(profile.address),
                           ),
                         ),
-
-                        // Location
                         if (profile.locationText != null)
                           ListTile(
                             leading: const Icon(Icons.location_on),
                             title: Text('location'.tr()),
                             subtitle: Text(profile.locationText!),
                           ),
-
-                        // Preferred language
                         ListTile(
                           leading: const Icon(Icons.language),
                           title: Text('preferred_language'.tr()),
@@ -175,10 +157,7 @@ class _FarmerProfileViewScreenState
                             profile.preferredLanguage.toUpperCase(),
                           ),
                         ),
-
                         const Divider(height: 32),
-
-                        // Crops grown
                         ListTile(
                           leading: const Icon(Icons.grass),
                           title: Text('crops_grown'.tr()),
@@ -198,20 +177,16 @@ class _FarmerProfileViewScreenState
                                   ),
                                 ),
                         ),
-
                         const SizedBox(height: 24),
-
                         ElevatedButton(
-                          onPressed: () async {
-                            await Navigator.of(context).push(
+                          onPressed: () {
+                            Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => FarmerProfileEditScreen(
                                   profile: farmerProfile,
                                 ),
                               ),
                             );
-
-                            setState(_loadProfile);
                           },
                           child: Text('edit_profile'.tr()),
                         ),

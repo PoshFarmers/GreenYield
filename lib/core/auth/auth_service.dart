@@ -2,14 +2,10 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../supabase/client.dart';
+import '../local_db/powersync.dart'; // exposes `db`
 import '../../models/profile.dart';
 
-/// Every bit of auth logic goes through this class — screens should
-/// never call `supabase.auth.*` directly
 class AuthService {
-  /// Custom scheme registered in AndroidManifest.xml / Info.plist so
-  /// the OAuth browser flow can redirect back into the app on mobile.
-  /// Not needed on web — the browser flow redirects in-page there.
   static const _mobileRedirect = 'io.supabase.greenyield://login-callback';
 
   Stream<AuthState> get authStateChanges => supabase.auth.onAuthStateChange;
@@ -32,10 +28,6 @@ class AuthService {
     return supabase.auth.signInWithPassword(email: email, password: password);
   }
 
-  /// Opens the system browser for Google's OAuth consent screen and
-  /// redirects back into the app on success. Auth state changes are
-  /// picked up via [authStateChanges] — this method doesn't return a
-  /// session directly.
   Future<void> signInWithGoogle() {
     return supabase.auth.signInWithOAuth(
       OAuthProvider.google,
@@ -45,60 +37,54 @@ class AuthService {
 
   Future<void> signOut() => supabase.auth.signOut();
 
-  /// Returns the current user's generic profile row, or null if one
-  /// hasn't been created yet.
-  Future<Profile?> fetchOwnProfile() async {
+  Stream<Profile?> watchOwnProfile() {
     final user = currentUser;
-    if (user == null) return null;
-
-    final row = await supabase
-        .from('profile_read')
-        .select()
-        .eq('id', user.id)
-        .maybeSingle();
-
-    if (row == null) return null;
-    return Profile.fromMap(row);
+    if (user == null) return Stream.value(null);
+    return db
+        .watch('SELECT * FROM profile WHERE id = ?', parameters: [user.id])
+        .map((rows) => rows.isEmpty ? null : Profile.fromMap(rows.first));
   }
 
-  /// Creates the generic profile row for the signed-in user.
   Future<void> createOwnProfile(Profile profile) async {
-    await supabase.from('profile').insert(profile.toInsertMap());
+    final map = profile.toInsertMap();
+    await db.execute(
+      'INSERT INTO profile (id, ${map.keys.join(', ')}) VALUES (?, ${map.keys.map((_) => '?').join(', ')})',
+      [profile.id, ...map.values],
+    );
   }
 
-  // Updates own profile
   Future<void> updateOwnProfile(Profile profile) async {
-    await supabase
-        .from('profile')
-        .update(profile.toInsertMap())
-        .eq('id', profile.id);
+    final map = profile.toInsertMap();
+    final setClause = map.keys.map((k) => '$k = ?').join(', ');
+    await db.execute('UPDATE profile SET $setClause WHERE id = ?', [
+      ...map.values,
+      profile.id,
+    ]);
   }
 
-  /// Grants a role to the current user (inserts into profile_role).
   Future<void> addRole(String role) async {
     final userId = currentUser!.id;
-    await supabase.from('profile_role').insert({
-      'profile_id': userId,
-      'role': role,
-    });
+    await db.execute(
+      'INSERT INTO profile_role (id, profile_id, role) VALUES (uuid(), ?, ?)',
+      [userId, role],
+    );
   }
 
-  /// Returns every role the current user currently holds.
-  Future<List<String>> fetchOwnRoles() async {
+  Stream<List<String>> watchOwnRoles() {
     final userId = currentUser!.id;
-    final rows = await supabase
-        .from('profile_role')
-        .select('role')
-        .eq('profile_id', userId);
-    return rows.map((row) => row['role'] as String).toList();
+    return db
+        .watch(
+          'SELECT role FROM profile_role WHERE profile_id = ?',
+          parameters: [userId],
+        )
+        .map((rows) => rows.map((r) => r['role'] as String).toList());
   }
 
-  /// Which role's UI is currently shown.
   Future<void> setActiveRole(String role) async {
     final userId = currentUser!.id;
-    await supabase
-        .from('profile')
-        .update({'active_role': role})
-        .eq('id', userId);
+    await db.execute('UPDATE profile SET active_role = ? WHERE id = ?', [
+      role,
+      userId,
+    ]);
   }
 }

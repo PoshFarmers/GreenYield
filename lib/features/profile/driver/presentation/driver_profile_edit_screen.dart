@@ -86,7 +86,7 @@ class _DriverProfileEditScreenState
   Future<void> _loadGenericProfile() async {
     try {
       final authService = ref.read(authServiceProvider);
-      final profile = await authService.fetchOwnProfile();
+      final profile = await authService.watchOwnProfile().first;
 
       if (!mounted || profile == null) return;
 

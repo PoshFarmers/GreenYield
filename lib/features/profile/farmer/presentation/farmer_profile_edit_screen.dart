@@ -43,7 +43,7 @@ class _FarmerProfileEditScreenState
 
   String _preferredLanguage = 'en';
 
-  late Future<List<Crop>> _cropsFuture;
+  late final Stream<List<Crop>> _cropsStream;
   late Set<String> _selectedCropIds;
 
   Uint8List? _avatarBytes;
@@ -64,7 +64,7 @@ class _FarmerProfileEditScreenState
     super.initState();
 
     _selectedCropIds = widget.profile.crops.map((c) => c.id).toSet();
-    _cropsFuture = _farmerService.fetchAllCrops();
+    _cropsStream = _farmerService.watchAllCrops();
 
     _loadGenericProfile();
   }
@@ -72,7 +72,7 @@ class _FarmerProfileEditScreenState
   Future<void> _loadGenericProfile() async {
     try {
       final authService = ref.read(authServiceProvider);
-      final profile = await authService.fetchOwnProfile();
+      final profile = await authService.watchOwnProfile().first;
 
       if (!mounted || profile == null) return;
 
@@ -535,8 +535,8 @@ class _FarmerProfileEditScreenState
 
                     const SizedBox(height: 8),
 
-                    FutureBuilder<List<Crop>>(
-                      future: _cropsFuture,
+                    StreamBuilder<List<Crop>>(
+                      stream: _cropsStream,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {

@@ -1,59 +1,66 @@
-import '../../../core/supabase/client.dart';
+import '../../../core/local_db/powersync.dart';
 import '../../../models/driver_profile.dart';
 
 class DriverProfileService {
   Future<bool> hasProfile(String profileId) async {
-    final row = await supabase
-        .from('driver_profile')
-        .select('profile_id')
-        .eq('profile_id', profileId)
-        .maybeSingle();
+    final row = await db.getOptional(
+      'SELECT profile_id FROM driver_profile WHERE profile_id = ?',
+      [profileId],
+    );
     return row != null;
   }
 
-  // A driver can register several vehicles over time (a "My Vehicles"
-  // flow, outside the scope of these screens), but only the first one —
-  // created alongside driver_profile at registration — is surfaced here.
-  Future<DriverProfile?> fetchOwnProfile(String profileId) async {
-    final profileRow = await supabase
-        .from('driver_profile')
-        .select('profile_id')
-        .eq('profile_id', profileId)
-        .maybeSingle();
-    if (profileRow == null) return null;
-
-    final vehicleRow = await supabase
-        .from('vehicle')
-        .select()
-        .eq('driver_profile_id', profileId)
-        .order('created_at')
-        .limit(1)
-        .maybeSingle();
-
-    return DriverProfile(
-      profileId: profileId,
-      primaryVehicle: vehicleRow == null ? null : Vehicle.fromMap(vehicleRow),
-    );
+  Stream<DriverProfile?> watchOwnProfile(String profileId) {
+    return db
+        .watch(
+          'SELECT * FROM vehicle WHERE driver_profile_id = ? ORDER BY id LIMIT 1',
+          parameters: [profileId],
+        )
+        .map((rows) {
+          return DriverProfile(
+            profileId: profileId,
+            primaryVehicle: rows.isEmpty ? null : Vehicle.fromMap(rows.first),
+          );
+        });
   }
 
   Future<void> createProfile(String profileId, Vehicle vehicle) async {
-    await supabase.from('driver_profile').insert({'profile_id': profileId});
-    await supabase.from('vehicle').insert(vehicle.toInsertMap());
+    await db.execute(
+      'INSERT INTO driver_profile (id, profile_id) VALUES (?, ?)',
+      [profileId, profileId],
+    );
+    await _insertVehicle(profileId, vehicle);
   }
 
-  Future<void> addVehicle(Vehicle vehicle) async {
-    await supabase.from('vehicle').insert(vehicle.toInsertMap());
+  Future<void> addVehicle(Vehicle vehicle) =>
+      _insertVehicle(vehicle.driverProfileId, vehicle);
+
+  Future<void> _insertVehicle(String driverProfileId, Vehicle vehicle) {
+    return db.execute(
+      '''
+      INSERT INTO vehicle (id, driver_profile_id, vehicle_type, plate_number, max_load_kg, preferred_min_load_kg)
+      VALUES (uuid(), ?, ?, ?, ?, ?)
+      ''',
+      [
+        driverProfileId,
+        vehicle.vehicleType,
+        vehicle.plateNumber,
+        vehicle.maxLoadKg,
+        vehicle.preferredMinLoadKg,
+      ],
+    );
   }
 
-  Future<void> updateVehicle(String vehicleId, Vehicle vehicle) async {
-    await supabase
-        .from('vehicle')
-        .update({
-          'vehicle_type': vehicle.vehicleType,
-          'plate_number': vehicle.plateNumber,
-          'max_load_kg': vehicle.maxLoadKg,
-          'preferred_min_load_kg': vehicle.preferredMinLoadKg,
-        })
-        .eq('id', vehicleId);
+  Future<void> updateVehicle(String vehicleId, Vehicle vehicle) {
+    return db.execute(
+      'UPDATE vehicle SET vehicle_type = ?, plate_number = ?, max_load_kg = ?, preferred_min_load_kg = ? WHERE id = ?',
+      [
+        vehicle.vehicleType,
+        vehicle.plateNumber,
+        vehicle.maxLoadKg,
+        vehicle.preferredMinLoadKg,
+        vehicleId,
+      ],
+    );
   }
 }
