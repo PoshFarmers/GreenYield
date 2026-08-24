@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_service.dart';
+import '../local_db/powersync.dart';
 import '../../models/profile.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
@@ -13,20 +14,19 @@ final authStateChangesProvider = StreamProvider<AuthState>((ref) {
 });
 
 /// The signed-in user's generic profile row, or null if one hasn't
-/// been created yet. Backed by a PowerSync watch stream, so it now
-/// updates live whenever the local `profile` row changes — no manual
-/// invalidation needed after a write, on this device or synced in
-/// from another.
-final ownProfileProvider = StreamProvider<Profile?>((ref) {
-  ref.watch(authStateChangesProvider); // rebuild whenever auth state changes
+/// been created yet. Backed by a PowerSync watch stream.
+final ownProfileProvider = StreamProvider<Profile?>((ref) async* {
+  ref.watch(authStateChangesProvider);
   final authService = ref.watch(authServiceProvider);
-  if (!authService.isSignedIn) return Stream.value(null);
-  return authService.watchOwnProfile();
+  if (!authService.isSignedIn) {
+    yield null;
+    return;
+  }
+  await db.waitForFirstSync();
+  yield* authService.watchOwnProfile();
 });
 
-/// Every role ('farmer'/'buyer'/'driver') the current user currently
-/// holds. Also stream-backed — updates automatically once addRole()
-/// writes to profile_role, without needing an explicit invalidate.
+/// Every role ('farmer'/'buyer'/'driver') the current user holds.
 final ownRolesProvider = StreamProvider<List<String>>((ref) {
   ref.watch(authStateChangesProvider);
   final authService = ref.watch(authServiceProvider);
