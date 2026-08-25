@@ -56,4 +56,16 @@ const schema = Schema([
     Column.text('origin_location'),
     Column.text('destination_location'),
   ]),
+  Table('cart', [
+    Column.text('buyer_profile_id'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  Table('cart_item', [
+    Column.text('cart_id'),
+    Column.text('produce_listing_id'),
+    Column.real('quantity_kg'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
 ]);

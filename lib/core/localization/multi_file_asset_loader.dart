@@ -15,6 +15,7 @@ class MultiFileAssetLoader extends AssetLoader {
     'driver',
     'listings',
     'marketplace',
+    'cart',
   ];
 
   const MultiFileAssetLoader();

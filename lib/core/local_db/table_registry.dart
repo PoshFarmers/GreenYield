@@ -35,8 +35,10 @@ final Map<String, TableConfig> tableRegistry = {
   'driver_route_preference': const TableConfig(
     tableName: 'driver_route_preference',
   ),
+  'cart': const TableConfig(tableName: 'cart'),
+  'cart_item': const TableConfig(tableName: 'cart_item'),
 
-  // --- add new tables here as marketplace/orders/delivery/wallet land ---
+  // --- add new tables here as orders/delivery/wallet land ---
   // 'listing': TableConfig(tableName: 'listing', remotePkColumn: 'id'),
 };
 
