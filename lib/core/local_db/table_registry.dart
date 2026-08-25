@@ -42,7 +42,15 @@ final Map<String, TableConfig> tableRegistry = {
     jsonbColumns: {'payload'},
   ),
 
-  // --- add new tables here as orders/delivery/wallet land ---
+  // --- Sprint 2 / Task 3.2 — Order Creation & Checkout Flow ---
+  'orders': const TableConfig(
+    tableName: 'orders',
+    jsonbColumns: {'delivery_address'},
+  ),
+  'order_item': const TableConfig(tableName: 'order_item'),
+  'payment': const TableConfig(tableName: 'payment'),
+
+  // --- add new tables here as delivery/wallet land ---
   // 'listing': TableConfig(tableName: 'listing', remotePkColumn: 'id'),
 };
 
