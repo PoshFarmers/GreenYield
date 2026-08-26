@@ -1,16 +1,24 @@
-import '../../../core/local_db/powersync.dart';
+import '../../../core/local_db/powersync.dart'; // exposes `db`
+import '../../../core/local_db/repository.dart';
+import '../../../core/local_db/table_registry.dart';
 import '../../../models/farmer_profile.dart';
 
 class FarmerProfileService {
-  Stream<List<Crop>> watchAllCrops() {
-    return db
-        .watch('SELECT * FROM crop ORDER BY name')
-        .map((rows) => rows.map((r) => Crop.fromMap(r)).toList());
-  }
+  // crop is a read-only reference table for the client (RLS only grants
+  // select) — Repository is still useful here purely for watchAll, so
+  // toInsertMap is never actually invoked.
+  final _crops = Repository<Crop>(
+    table: 'crop',
+    fromMap: Crop.fromMap,
+    toInsertMap: (_) =>
+        throw UnsupportedError('crop is read-only from the client'),
+  );
+
+  Stream<List<Crop>> watchAllCrops() => _crops.watchAll(orderBy: 'name');
 
   Future<bool> hasProfile(String profileId) async {
     final row = await db.getOptional(
-      'SELECT profile_id FROM farmer_profile WHERE profile_id = ?',
+      'SELECT id FROM farmer_profile WHERE profile_id = ?',
       [profileId],
     );
     return row != null;
@@ -28,7 +36,7 @@ class FarmerProfileService {
           parameters: [profileId],
         )
         .map((rows) {
-          final crops = rows.map((r) => Crop.fromMap(r)).toList();
+          final crops = rows.map(Crop.fromMap).toList();
           return FarmerProfile(profileId: profileId, crops: crops);
         });
   }
@@ -38,22 +46,26 @@ class FarmerProfileService {
       'INSERT INTO farmer_profile (id, profile_id) VALUES (?, ?)',
       [profileId, profileId],
     );
-    for (final cropId in cropIds) {
-      await db.execute(
-        'INSERT INTO farmer_crop (id, farmer_profile_id, crop_id) VALUES (?, ?, ?)',
-        ['$profileId:$cropId', profileId, cropId],
-      );
-    }
+    await _addCrops(profileId, cropIds);
   }
 
   Future<void> updateCrops(String profileId, List<String> cropIds) async {
     await db.execute('DELETE FROM farmer_crop WHERE farmer_profile_id = ?', [
       profileId,
     ]);
+    await _addCrops(profileId, cropIds);
+  }
+
+  /// Builds each row's composite id via the registry's CompositeKey
+  /// instead of hand-interpolating "$profileId:$cropId" — same idea
+  /// the connector now uses on the way back out to Supabase.
+  Future<void> _addCrops(String profileId, List<String> cropIds) async {
+    final compositeKey = configFor('farmer_crop').compositeKey!;
     for (final cropId in cropIds) {
+      final id = compositeKey.buildId([profileId, cropId]);
       await db.execute(
         'INSERT INTO farmer_crop (id, farmer_profile_id, crop_id) VALUES (?, ?, ?)',
-        ['$profileId:$cropId', profileId, cropId],
+        [id, profileId, cropId],
       );
     }
   }

@@ -3,10 +3,22 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../supabase/client.dart';
 import '../local_db/powersync.dart'; // exposes `db`
+import '../local_db/repository.dart';
 import '../../models/profile.dart';
 
 class AuthService {
   static const _mobileRedirect = 'io.supabase.greenyield://login-callback';
+
+  // Repository.insert always supplies the local id separately, so
+  // Profile.toInsertMap()'s own 'id' entry has to be stripped here —
+  // the previous hand-written SQL passed profile.id AND
+  // toInsertMap()['id'] into the same INSERT, producing a duplicate
+  // 'id' column. This fixes that as a side effect of the refactor.
+  final _profiles = Repository<Profile>(
+    table: 'profile',
+    fromMap: Profile.fromMap,
+    toInsertMap: (p) => p.toInsertMap()..remove('id'),
+  );
 
   Stream<AuthState> get authStateChanges => supabase.auth.onAuthStateChange;
 
@@ -40,28 +52,18 @@ class AuthService {
   Stream<Profile?> watchOwnProfile() {
     final user = currentUser;
     if (user == null) return Stream.value(null);
-    return db
-        .watch('SELECT * FROM profile WHERE id = ?', parameters: [user.id])
-        .map((rows) => rows.isEmpty ? null : Profile.fromMap(rows.first));
+    return _profiles.watchOne(user.id);
   }
 
-  Future<void> createOwnProfile(Profile profile) async {
-    final map = profile.toInsertMap();
-    await db.execute(
-      'INSERT INTO profile (id, ${map.keys.join(', ')}) VALUES (?, ${map.keys.map((_) => '?').join(', ')})',
-      [profile.id, ...map.values],
-    );
-  }
+  Future<void> createOwnProfile(Profile profile) =>
+      _profiles.insert(profile.id, profile);
 
-  Future<void> updateOwnProfile(Profile profile) async {
-    final map = profile.toInsertMap();
-    final setClause = map.keys.map((k) => '$k = ?').join(', ');
-    await db.execute('UPDATE profile SET $setClause WHERE id = ?', [
-      ...map.values,
-      profile.id,
-    ]);
-  }
+  Future<void> updateOwnProfile(Profile profile) =>
+      _profiles.update(profile.id, profile);
 
+  /// profile_role rows have no real model to speak of (just a role
+  /// string) and use a PowerSync-generated id, same as before — left
+  /// as a direct db call rather than forcing it through `Repository<T>`.
   Future<void> addRole(String role) async {
     final userId = currentUser!.id;
     await db.execute(
