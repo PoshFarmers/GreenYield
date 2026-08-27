@@ -17,6 +17,15 @@ class Address {
       (city == null || city!.isEmpty) &&
       (postalCode == null || postalCode!.isEmpty);
 
+  /// Comma-joined, skipping empty parts — the display format used
+  /// across every profile view screen.
+  String get formatted => [
+    line1,
+    line2,
+    city,
+    postalCode,
+  ].where((value) => value != null && value.isNotEmpty).join(', ');
+
   factory Address.fromMap(Map<String, dynamic>? map) {
     if (map == null) return const Address();
     return Address(
