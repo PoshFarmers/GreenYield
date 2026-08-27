@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:powersync/powersync.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../supabase/client.dart';
 import 'table_registry.dart';
@@ -11,7 +12,7 @@ class SupabaseConnector extends PowerSyncBackendConnector {
     final session = supabase.auth.currentSession;
     if (session == null) return null;
     return PowerSyncCredentials(
-      endpoint: 'https://6a8aec61a77ca1231d221bdb.powersync.journeyapps.com',
+      endpoint: dotenv.env['POWERSYNC_URL']!,
       token: session.accessToken,
     );
   }
