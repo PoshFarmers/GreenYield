@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -6,48 +6,44 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/auth/auth_providers.dart';
-import '../../../core/location/location_service.dart';
-import '../../../core/storage/avatar_service.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../models/profile.dart';
 
-/// Shown exactly once, right after a session exists but no `profile` row.
-/// Collects every column on `profile` except `active_role`, which stays
-/// null until role-specific profile tables exist.
+/// First step of the common (role-agnostic) profile setup flow.
+/// Collects the fields every user needs regardless of role, then inserts
+/// the `profile` row. AuthGate watches `ownProfileProvider` (a PowerSync
+/// stream), so as soon as the insert lands it swaps this screen out on
+/// its own — `onComplete` just tells it to re-check now instead of
+/// waiting on the next stream tick.
 class CompleteProfileScreen extends ConsumerStatefulWidget {
-  final VoidCallback onComplete;
-
   const CompleteProfileScreen({super.key, required this.onComplete});
+
+  final VoidCallback onComplete;
 
   @override
   ConsumerState<CompleteProfileScreen> createState() =>
       _CompleteProfileScreenState();
 }
 
-class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
+class _CompleteProfileScreenState
+    extends ConsumerState<CompleteProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _addressLine1Controller = TextEditingController();
-  final _addressLine2Controller = TextEditingController();
+  final _line1Controller = TextEditingController();
+  final _line2Controller = TextEditingController();
   final _cityController = TextEditingController();
   final _postalCodeController = TextEditingController();
 
-  final _locationService = LocationService();
-  final _avatarService = AvatarService();
-  final _imagePicker = ImagePicker();
+  static const _languages = [
+    ('en', 'English'),
+    ('si', 'සිංහල'),
+    ('ta', 'தமிழ்'),
+  ];
 
   String _preferredLanguage = 'en';
-
-  Uint8List? _avatarBytes;
-  String? _avatarFileName;
-
-  GeoPoint? _locationPoint;
-  String? _locationText;
-  bool _isFetchingLocation = false;
-  String? _locationError;
-
+  File? _avatarFile;
   bool _isSubmitting = false;
   String? _errorMessage;
 
@@ -56,47 +52,43 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _phoneController.dispose();
-    _addressLine1Controller.dispose();
-    _addressLine2Controller.dispose();
+    _line1Controller.dispose();
+    _line2Controller.dispose();
     _cityController.dispose();
     _postalCodeController.dispose();
     super.dispose();
   }
 
   Future<void> _pickAvatar(ImageSource source) async {
-    final picked = await _imagePicker.pickImage(
+    final picked = await ImagePicker().pickImage(
       source: source,
       maxWidth: 1024,
-      maxHeight: 1024,
       imageQuality: 85,
     );
-    if (picked == null) return;
-    final bytes = await picked.readAsBytes();
-    setState(() {
-      _avatarBytes = bytes;
-      _avatarFileName = picked.name;
-    });
+    if (picked != null) {
+      setState(() => _avatarFile = File(picked.path));
+    }
   }
 
-  void _showAvatarSourceSheet() {
+  void _showAvatarOptions() {
     showModalBottomSheet(
       context: context,
-      builder: (sheetContext) => SafeArea(
+      builder: (context) => SafeArea(
         child: Wrap(
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_camera),
+              leading: const Icon(Icons.photo_camera_outlined),
               title: Text('take_photo'.tr()),
               onTap: () {
-                Navigator.of(sheetContext).pop();
+                Navigator.of(context).pop();
                 _pickAvatar(ImageSource.camera);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library),
+              leading: const Icon(Icons.photo_library_outlined),
               title: Text('choose_from_gallery'.tr()),
               onTap: () {
-                Navigator.of(sheetContext).pop();
+                Navigator.of(context).pop();
                 _pickAvatar(ImageSource.gallery);
               },
             ),
@@ -104,26 +96,6 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _useCurrentLocation() async {
-    setState(() {
-      _isFetchingLocation = true;
-      _locationError = null;
-    });
-    try {
-      final result = await _locationService.fetchCurrentLocation();
-      setState(() {
-        _locationPoint = result.point;
-        _locationText = result.displayText;
-      });
-    } on LocationException catch (e) {
-      setState(() => _locationError = e.code.tr());
-    } catch (e) {
-      setState(() => _locationError = 'error_location_unknown'.tr());
-    } finally {
-      if (mounted) setState(() => _isFetchingLocation = false);
-    }
   }
 
   Future<void> _submit() async {
@@ -136,43 +108,29 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
       final authService = ref.read(authServiceProvider);
       final userId = authService.currentUser!.id;
 
-      String? avatarPath;
-      if (_avatarBytes != null) {
-        avatarPath = await _avatarService.upload(
-          userId: userId,
-          bytes: _avatarBytes!,
-          fileName: _avatarFileName ?? 'avatar.jpg',
-        );
+      String? avatarUrl;
+      if (_avatarFile != null) {
+        avatarUrl = await authService.uploadAvatar(_avatarFile!);
       }
 
-      await authService.createOwnProfile(
-        Profile(
-          id: userId,
-          firstName: _firstNameController.text.trim(),
-          lastName: _lastNameController.text.trim(),
-          phone: _phoneController.text.trim().isEmpty
-              ? null
-              : _phoneController.text.trim(),
-          address: Address(
-            line1: _addressLine1Controller.text.trim().isEmpty
-                ? null
-                : _addressLine1Controller.text.trim(),
-            line2: _addressLine2Controller.text.trim().isEmpty
-                ? null
-                : _addressLine2Controller.text.trim(),
-            city: _cityController.text.trim().isEmpty
-                ? null
-                : _cityController.text.trim(),
-            postalCode: _postalCodeController.text.trim().isEmpty
-                ? null
-                : _postalCodeController.text.trim(),
-          ),
-          avatarUrl: avatarPath,
-          preferredLanguage: _preferredLanguage,
-          locationText: _locationText,
-          locationPoint: _locationPoint,
+      final profile = Profile(
+        id: userId,
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        phone: _phoneController.text.trim().isEmpty
+            ? null
+            : _phoneController.text.trim(),
+        avatarUrl: avatarUrl,
+        preferredLanguage: _preferredLanguage,
+        address: Address(
+          line1: _line1Controller.text.trim(),
+          line2: _line2Controller.text.trim(),
+          city: _cityController.text.trim(),
+          postalCode: _postalCodeController.text.trim(),
         ),
       );
+
+      await authService.createOwnProfile(profile);
       widget.onComplete();
     } catch (e) {
       setState(() => _errorMessage = e.toString());
@@ -183,8 +141,10 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      appBar: AppBar(title: Text('complete_profile_title'.tr())),
+      appBar: AppBar(title: Text('complete_profile'.tr())),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -197,47 +157,46 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Center(
-                      child: Stack(
-                        children: [
-                          CircleAvatar(
-                            radius: 48,
-                            backgroundImage: _avatarBytes != null
-                                ? MemoryImage(_avatarBytes!)
-                                : null,
-                            child: _avatarBytes == null
-                                ? const Icon(Icons.person, size: 48)
-                                : null,
-                          ),
-                          Positioned(
-                            right: 0,
-                            bottom: 0,
-                            child: Material(
-                              color: Theme.of(context).colorScheme.primary,
-                              shape: const CircleBorder(),
-                              child: InkWell(
-                                customBorder: const CircleBorder(),
-                                onTap: _showAvatarSourceSheet,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(6),
-                                  child: Icon(
-                                    Icons.edit,
-                                    size: 18,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onPrimary,
-                                  ),
+                      child: GestureDetector(
+                        onTap: _showAvatarOptions,
+                        child: Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 48,
+                              backgroundColor: theme.colorScheme.secondary,
+                              backgroundImage: _avatarFile != null
+                                  ? FileImage(_avatarFile!)
+                                  : null,
+                              child: _avatarFile == null
+                                  ? Icon(
+                                      Icons.person_outline,
+                                      size: 40,
+                                      color: theme.colorScheme.primary,
+                                    )
+                                  : null,
+                            ),
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: CircleAvatar(
+                                radius: 16,
+                                backgroundColor: theme.colorScheme.primary,
+                                child: const Icon(
+                                  Icons.edit,
+                                  size: 16,
+                                  color: Colors.white,
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
                     AppTextField(
                       label: 'first_name'.tr(),
                       controller: _firstNameController,
-                      validator: (v) => (v == null || v.trim().isEmpty)
+                      validator: (value) => (value == null || value.trim().isEmpty)
                           ? 'error_required'.tr()
                           : null,
                     ),
@@ -245,7 +204,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                     AppTextField(
                       label: 'last_name'.tr(),
                       controller: _lastNameController,
-                      validator: (v) => (v == null || v.trim().isEmpty)
+                      validator: (value) => (value == null || value.trim().isEmpty)
                           ? 'error_required'.tr()
                           : null,
                     ),
@@ -256,22 +215,16 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                       keyboardType: TextInputType.phone,
                     ),
                     const SizedBox(height: 24),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'address'.tr(),
-                        style: Theme.of(context).textTheme.labelLarge,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                    Text('address'.tr(), style: theme.textTheme.labelLarge),
+                    const SizedBox(height: 12),
                     AppTextField(
                       label: 'address_line1'.tr(),
-                      controller: _addressLine1Controller,
+                      controller: _line1Controller,
                     ),
                     const SizedBox(height: 16),
                     AppTextField(
                       label: 'address_line2'.tr(),
-                      controller: _addressLine2Controller,
+                      controller: _line2Controller,
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -293,85 +246,42 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'location'.tr(),
-                        style: Theme.of(context).textTheme.labelLarge,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: _isFetchingLocation
-                          ? null
-                          : _useCurrentLocation,
-                      icon: _isFetchingLocation
-                          ? const SizedBox(
-                              height: 16,
-                              width: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.my_location),
-                      label: Text(
-                        _isFetchingLocation
-                            ? 'fetching_location'.tr()
-                            : 'use_current_location'.tr(),
-                      ),
-                    ),
-                    if (_locationText != null) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.place, size: 18),
-                          const SizedBox(width: 6),
-                          Expanded(child: Text(_locationText!)),
-                        ],
-                      ),
-                    ],
-                    if (_locationError != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        _locationError!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    Text(
-                      'language'.tr(),
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment(value: 'en', label: Text('EN')),
-                        ButtonSegment(value: 'si', label: Text('SI')),
-                        ButtonSegment(value: 'ta', label: Text('TA')),
-                      ],
-                      selected: {_preferredLanguage},
-                      onSelectionChanged: (s) =>
-                          setState(() => _preferredLanguage = s.first),
+                    Text('language'.tr(), style: theme.textTheme.labelLarge),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      children: _languages.map((entry) {
+                        final (code, label) = entry;
+                        return ChoiceChip(
+                          label: Text(label),
+                          selected: _preferredLanguage == code,
+                          onSelected: (_) =>
+                              setState(() => _preferredLanguage = code),
+                        );
+                      }).toList(),
                     ),
                     if (_errorMessage != null) ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       Text(
                         _errorMessage!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
                         ),
                       ),
                     ],
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 28),
                     ElevatedButton(
                       onPressed: _isSubmitting ? null : _submit,
                       child: _isSubmitting
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
-                          : Text('save'.tr()),
+                          : Text('continue'.tr()),
                     ),
                   ],
                 ),

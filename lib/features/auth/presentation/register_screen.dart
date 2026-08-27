@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/widgets/app_text_field.dart';
+import '../../../core/widgets/google_glyph.dart';
 
 /// Only handles Supabase Auth sign-up (credentials)
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -72,6 +73,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     // RegisterScreen is pushed on top of AuthGate's route. AuthGate itself
     // reacts to auth state and swaps its own content correctly, but that
     // swap happens *underneath* this pushed screen and stays hidden until
@@ -149,8 +152,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       const SizedBox(height: 12),
                       Text(
                         _errorMessage!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
                         ),
                       ),
                     ],
@@ -161,7 +164,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
                           : Text('register'.tr()),
                     ),
@@ -171,7 +177,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         const Expanded(child: Divider()),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Text('or_divider'.tr()),
+                          child: Text(
+                            'or_divider'.tr(),
+                            style: theme.textTheme.bodySmall,
+                          ),
                         ),
                         const Expanded(child: Divider()),
                       ],
@@ -179,7 +188,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     const SizedBox(height: 16),
                     OutlinedButton.icon(
                       onPressed: _isSubmitting ? null : _submitGoogle,
-                      icon: const Icon(Icons.g_mobiledata, size: 28),
+                      icon: const GoogleGlyph(),
                       label: Text('continue_with_google'.tr()),
                     ),
                     const SizedBox(height: 24),
