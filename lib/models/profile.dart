@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'dart:convert';
+
 /// Mirrors the `address_type` composite type in Postgres.
 class Address {
   final String? line1;
@@ -88,31 +90,41 @@ class Profile {
       id: map['id'] as String,
       firstName: map['first_name'] as String,
       lastName: map['last_name'] as String,
-      address: Address.fromMap(map['address'] as Map<String, dynamic>?),
+      address: Address.fromMap(_decodeJson(map['address'])),
       phone: map['phone'] as String?,
       avatarUrl: map['avatar_url'] as String?,
       preferredLanguage: map['preferred_language'] as String? ?? 'en',
       activeRole: map['active_role'] as String?,
       locationText: map['location_text'] as String?,
-      locationPoint: map['location_point'] == null
+      locationPoint: map['location_geojson'] == null
           ? null
-          : GeoPoint.fromGeoJson(map['location_point'] as Map<String, dynamic>),
+          : GeoPoint.fromGeoJson(_decodeJson(map['location_geojson'])!),
     );
   }
 
   /// For insert into the `profile` table.
-  ///
   /// `active_role` is intentionally never sent here — it stays null until
   /// role-specific profile tables exist and a role-selection flow is built.
   Map<String, dynamic> toInsertMap() => {
     'id': id,
     'first_name': firstName,
     'last_name': lastName,
-    if (!address.isEmpty) 'address': address.toMap(),
+    if (!address.isEmpty) 'address': jsonEncode(address.toMap()),
     if (phone != null && phone!.isNotEmpty) 'phone': phone,
     if (avatarUrl != null) 'avatar_url': avatarUrl,
     'preferred_language': preferredLanguage,
     if (locationText != null) 'location_text': locationText,
     if (locationPoint != null) 'location_point': locationPoint!.toEwkt(),
   };
+
+  static Map<String, dynamic>? _decodeJson(dynamic v) {
+    if (v == null) return null;
+    if (v is Map<String, dynamic>) {
+      return v;
+    } // e.g. if ever read via raw postgrest
+    if (v is String && v.isNotEmpty) {
+      return jsonDecode(v) as Map<String, dynamic>;
+    }
+    return null;
+  }
 }

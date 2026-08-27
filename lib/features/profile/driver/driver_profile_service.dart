@@ -1,59 +1,52 @@
-import '../../../core/supabase/client.dart';
+import '../../../core/local_db/powersync.dart'; // exposes `db`
+import '../../../core/local_db/repository.dart';
 import '../../../models/driver_profile.dart';
 
 class DriverProfileService {
+  final _vehicles = Repository<Vehicle>(
+    table: 'vehicle',
+    fromMap: Vehicle.fromMap,
+    toInsertMap: (v) => v.toInsertMap(),
+  );
+
   Future<bool> hasProfile(String profileId) async {
-    final row = await supabase
-        .from('driver_profile')
-        .select('profile_id')
-        .eq('profile_id', profileId)
-        .maybeSingle();
+    final row = await db.getOptional(
+      'SELECT id FROM driver_profile WHERE profile_id = ?',
+      [profileId],
+    );
     return row != null;
   }
 
-  // A driver can register several vehicles over time (a "My Vehicles"
-  // flow, outside the scope of these screens), but only the first one —
-  // created alongside driver_profile at registration — is surfaced here.
-  Future<DriverProfile?> fetchOwnProfile(String profileId) async {
-    final profileRow = await supabase
-        .from('driver_profile')
-        .select('profile_id')
-        .eq('profile_id', profileId)
-        .maybeSingle();
-    if (profileRow == null) return null;
-
-    final vehicleRow = await supabase
-        .from('vehicle')
-        .select()
-        .eq('driver_profile_id', profileId)
-        .order('created_at')
-        .limit(1)
-        .maybeSingle();
-
-    return DriverProfile(
-      profileId: profileId,
-      primaryVehicle: vehicleRow == null ? null : Vehicle.fromMap(vehicleRow),
-    );
+  Stream<DriverProfile?> watchOwnProfile(String profileId) {
+    return _vehicles
+        .watchAll(
+          where: 'driver_profile_id = ?',
+          parameters: [profileId],
+          orderBy: 'id',
+          limit: 1,
+        )
+        .map(
+          (vehicles) => DriverProfile(
+            profileId: profileId,
+            primaryVehicle: vehicles.isEmpty ? null : vehicles.first,
+          ),
+        );
   }
 
+  /// driver_profile is a marker row (profile_id only, no other columns
+  /// worth modeling) — not worth a full `Repository<T>`, so it stays a
+  /// direct db call, same as before.
   Future<void> createProfile(String profileId, Vehicle vehicle) async {
-    await supabase.from('driver_profile').insert({'profile_id': profileId});
-    await supabase.from('vehicle').insert(vehicle.toInsertMap());
+    await db.execute(
+      'INSERT INTO driver_profile (id, profile_id) VALUES (?, ?)',
+      [profileId, profileId],
+    );
+    await _vehicles.insertGenerated(vehicle);
   }
 
-  Future<void> addVehicle(Vehicle vehicle) async {
-    await supabase.from('vehicle').insert(vehicle.toInsertMap());
-  }
+  Future<void> addVehicle(Vehicle vehicle) =>
+      _vehicles.insertGenerated(vehicle);
 
-  Future<void> updateVehicle(String vehicleId, Vehicle vehicle) async {
-    await supabase
-        .from('vehicle')
-        .update({
-          'vehicle_type': vehicle.vehicleType,
-          'plate_number': vehicle.plateNumber,
-          'max_load_kg': vehicle.maxLoadKg,
-          'preferred_min_load_kg': vehicle.preferredMinLoadKg,
-        })
-        .eq('id', vehicleId);
-  }
+  Future<void> updateVehicle(String vehicleId, Vehicle vehicle) =>
+      _vehicles.update(vehicleId, vehicle);
 }

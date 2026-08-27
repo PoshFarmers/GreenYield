@@ -18,7 +18,7 @@ class _FarmerCompleteProfileScreenState
     extends ConsumerState<FarmerCompleteProfileScreen> {
   final _service = FarmerProfileService();
 
-  late Future<List<Crop>> _cropsFuture;
+  late final Stream<List<Crop>> _cropsStream;
   final Set<String> _selectedCropIds = {};
 
   bool _isSubmitting = false;
@@ -27,7 +27,7 @@ class _FarmerCompleteProfileScreenState
   @override
   void initState() {
     super.initState();
-    _cropsFuture = _service.fetchAllCrops();
+    _cropsStream = _service.watchAllCrops();
   }
 
   Future<void> _submit() async {
@@ -44,9 +44,6 @@ class _FarmerCompleteProfileScreenState
     try {
       final userId = ref.read(authServiceProvider).currentUser!.id;
       await _service.createProfile(userId, _selectedCropIds.toList());
-      // AuthGate watches ownProfileProvider and re-checks
-      // roleScreensRegistry['farmer'].hasCompletedProfile on rebuild —
-      // invalidating here is what actually triggers the move to Home.
       ref.invalidate(ownProfileProvider);
     } catch (e) {
       setState(() => _errorMessage = e.toString());
@@ -96,10 +93,10 @@ class _FarmerCompleteProfileScreenState
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
-            child: FutureBuilder<List<Crop>>(
-              future: _cropsFuture,
+            child: StreamBuilder<List<Crop>>(
+              stream: _cropsStream,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+                if (!snapshot.hasData && !snapshot.hasError) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
