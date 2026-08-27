@@ -11,6 +11,7 @@ import '../../../models/marketplace_listing.dart';
 import '../../../models/profile.dart';
 import '../../cart/cart_service.dart';
 import '../../navigation/presentation/app_nav_shell.dart';
+import '../../pricing/presentation/widgets/price_breakdown_card.dart';
 import '../marketplace_service.dart';
 
 /// Full detail for one listing, with the quantity stepper and the entry
@@ -193,8 +194,6 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   }
 
   Widget _buildContent(ThemeData theme, MarketplaceListing listing) {
-    final subtotal = _quantity * listing.pricePerKg;
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
@@ -370,17 +369,10 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('subtotal'.tr(), style: theme.textTheme.bodyMedium),
-                    Text(
-                      '${'currency_prefix'.tr()} ${subtotal.toStringAsFixed(2)}',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                PriceBreakdownCard(
+                  pricePerKg: listing.pricePerKg,
+                  quantityKg: _quantity,
+                  distanceKm: listing.distanceKm,
                 ),
                 const SizedBox(height: 12),
                 SizedBox(
