@@ -8,9 +8,10 @@ import '../../../core/storage/avatar_service.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../models/profile.dart';
 
-/// Placeholder landing page for every signed-in user, regardless of role.
-/// Also provides access to the role-specific profile, theme, and language
-/// settings.
+/// Home tab shown inside each role's nav shell (see
+/// `core/roles/role_nav_shell_registry.dart`). The nav bar itself
+/// owns Chat/Cart/Orders/etc — this screen only owns the Home tab's
+/// own content, plus a single profile icon and theme/language settings.
 class HomeScreen extends ConsumerStatefulWidget {
   final Profile profile;
 
@@ -50,6 +51,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  void _openProfile(BuildContext context, RoleScreens? roleScreens) {
+    if (roleScreens == null) return;
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: roleScreens.viewBuilder));
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
@@ -63,6 +70,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         title: Text('home_title'.tr()),
         actions: [
+          // Single icon -> role's profile screen.
+          IconButton(
+            tooltip: 'my_profile'.tr(),
+            onPressed: () => _openProfile(context, roleScreens),
+            icon: CircleAvatar(
+              radius: 16,
+              backgroundImage: _avatarSignedUrl != null
+                  ? NetworkImage(_avatarSignedUrl!)
+                  : null,
+              child: _avatarSignedUrl == null
+                  ? const Icon(Icons.person, size: 18)
+                  : null,
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'logout'.tr(),
@@ -77,18 +98,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircleAvatar(
-                  radius: 48,
-                  backgroundImage: _avatarSignedUrl != null
-                      ? NetworkImage(_avatarSignedUrl!)
-                      : null,
-                  child: _avatarSignedUrl == null
-                      ? const Icon(Icons.person, size: 48)
-                      : null,
-                ),
-
-                const SizedBox(height: 16),
-
                 Text(
                   'welcome'.tr(),
                   style: Theme.of(context).textTheme.headlineSmall,
@@ -101,16 +110,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   '${profile.firstName} ${profile.lastName}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
-
-                if (roleScreens != null) ...[
-                  const SizedBox(height: 16),
-                  OutlinedButton(
-                    onPressed: () => Navigator.of(
-                      context,
-                    ).push(MaterialPageRoute(builder: roleScreens.viewBuilder)),
-                    child: Text('my_profile'.tr()),
-                  ),
-                ],
 
                 const SizedBox(height: 32),
 
