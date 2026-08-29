@@ -12,5 +12,20 @@
   "error_invalid_email": "Enter a valid email address",
   "error_password_too_short": "Password must be at least 8 characters",
   "error_passwords_dont_match": "Passwords don't match",
-  "my_profile": "My Profile"
+  "my_profile": "My Profile",
+  "take_photo": "Take photo",
+  "choose_from_gallery": "Choose from gallery",
+  "address": "Address",
+  "address_line1": "Address line 1",
+  "address_line2": "Address line 2",
+  "city": "City",
+  "postal_code": "Postal code",
+  "location": "Location",
+  "use_current_location": "Use current location",
+  "fetching_location": "Fetching location...",
+  "location_services_disabled": "Location services are disabled",
+  "location_permission_denied": "Location permission denied",
+  "location_permission_denied_forever": "Location permission permanently denied. Enable it from app settings.",
+  "error_location_unknown": "Couldn't determine your location",
+  "preferred_language": "Preferred language"
 }

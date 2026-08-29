@@ -4,56 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/roles/role_profile_registry.dart';
-import '../../../core/storage/avatar_service.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/widgets/avatar_image.dart';
 import '../../../models/profile.dart';
 
-/// Placeholder landing page for every signed-in user, regardless of role.
-/// Also provides access to the role-specific profile, theme, and language
-/// settings.
-class HomeScreen extends ConsumerStatefulWidget {
+class HomeScreen extends ConsumerWidget {
   final Profile profile;
 
   const HomeScreen({super.key, required this.profile});
 
   @override
-  ConsumerState<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends ConsumerState<HomeScreen> {
-  final _avatarService = AvatarService();
-
-  String? _avatarSignedUrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAvatar();
-  }
-
-  Future<void> _loadAvatar() async {
-    final path = widget.profile.avatarUrl;
-
-    if (path == null) return;
-
-    try {
-      final url = await _avatarService.signedUrl(path);
-
-      if (mounted) {
-        setState(() {
-          _avatarSignedUrl = url;
-        });
-      }
-    } catch (_) {
-      // Avatar loading failure isn't fatal.
-      // The placeholder icon will be displayed instead.
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
-    final profile = widget.profile;
 
     final roleScreens = profile.activeRole != null
         ? roleScreensRegistry[profile.activeRole]
@@ -63,6 +25,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         title: Text('home_title'.tr()),
         actions: [
+          if (roleScreens != null)
+            IconButton(
+              tooltip: 'my_profile'.tr(),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      roleScreens.viewBuilder(context, profile),
+                ),
+              ),
+              icon: AvatarImage(path: profile.avatarUrl, radius: 16),
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'logout'.tr(),
@@ -77,15 +50,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircleAvatar(
-                  radius: 48,
-                  backgroundImage: _avatarSignedUrl != null
-                      ? NetworkImage(_avatarSignedUrl!)
-                      : null,
-                  child: _avatarSignedUrl == null
-                      ? const Icon(Icons.person, size: 48)
-                      : null,
-                ),
+                AvatarImage(path: profile.avatarUrl),
 
                 const SizedBox(height: 16),
 
@@ -101,16 +66,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   '${profile.firstName} ${profile.lastName}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
-
-                if (roleScreens != null) ...[
-                  const SizedBox(height: 16),
-                  OutlinedButton(
-                    onPressed: () => Navigator.of(
-                      context,
-                    ).push(MaterialPageRoute(builder: roleScreens.viewBuilder)),
-                    child: Text('my_profile'.tr()),
-                  ),
-                ],
 
                 const SizedBox(height: 32),
 
