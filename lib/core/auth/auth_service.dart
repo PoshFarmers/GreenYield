@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -8,6 +10,7 @@ import '../../models/profile.dart';
 
 class AuthService {
   static const _mobileRedirect = 'io.supabase.greenyield://login-callback';
+  static const _avatarBucket = 'avatars';
 
   // Repository.insert always supplies the local id separately, so
   // Profile.toInsertMap()'s own 'id' entry has to be stripped here —
@@ -61,6 +64,26 @@ class AuthService {
   Future<void> updateOwnProfile(Profile profile) =>
       _profiles.update(profile.id, profile);
 
+  /// Uploads straight to Supabase Storage (this is the one write in the
+  /// whole profile-completion flow that doesn't go through PowerSync —
+  /// file blobs aren't something PowerSync syncs). Returns the public
+  /// URL to store in `profile.avatar_url`.
+  ///
+  /// Requires a public `avatars` bucket in the Supabase project, and
+  /// a storage policy that lets a user write to their own `{user.id}/*`
+  /// path.
+  Future<String> uploadAvatar(File file) async {
+    final userId = currentUser!.id;
+    final ext = file.path.split('.').last;
+    final path = '$userId/avatar.$ext';
+
+    await supabase.storage
+        .from(_avatarBucket)
+        .upload(path, file, fileOptions: const FileOptions(upsert: true));
+
+    return supabase.storage.from(_avatarBucket).getPublicUrl(path);
+  }
+
   /// profile_role rows have no real model to speak of (just a role
   /// string) and use a PowerSync-generated id, same as before — left
   /// as a direct db call rather than forcing it through `Repository<T>`.
@@ -88,5 +111,28 @@ class AuthService {
       role,
       userId,
     ]);
+  }
+
+  Future<void> updateProfileLocation({
+    required GeoPoint locationPoint,
+    required String locationText,
+  }) async {
+    final userId = currentUser!.id;
+
+    final latitude = locationPoint.latitude;
+    final longitude = locationPoint.longitude;
+
+    final locationWkt = 'POINT($longitude $latitude)';
+    final geoJson = '{"type":"Point","coordinates":[$longitude,$latitude]}';
+
+    await db.execute(
+      'UPDATE profile SET location_point = ?, location_geojson = ?, location_text = ? WHERE id = ?',
+      [
+        locationWkt,
+        geoJson,
+        locationText,
+        userId,
+      ],
+    );
   }
 }
