@@ -6,7 +6,7 @@ import '../roles/role_profile_registry.dart';
 import '../../features/auth/presentation/complete_profile_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/role_selection_screen.dart';
-import '../../features/home/presentation/home_screen.dart';
+import '../roles/role_nav_shell_registry.dart';
 
 /// Root of the app's navigation. Routes through, in order:
 ///   no session                -> LoginScreen
@@ -81,7 +81,7 @@ class AuthGate extends ConsumerWidget {
                     if (!snapshot.data!) {
                       return roleScreens.completeProfileBuilder(context);
                     }
-                    return HomeScreen(profile: profile);
+                    return buildNavShellForRole(profile, activeRole);
                   },
                 );
               },

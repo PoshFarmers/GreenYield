@@ -25,6 +25,17 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text('home_title'.tr()),
         actions: [
+          if (roleScreens != null)
+            IconButton(
+              tooltip: 'my_profile'.tr(),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      roleScreens.viewBuilder(context, profile),
+                ),
+              ),
+              icon: AvatarImage(path: profile.avatarUrl, radius: 16),
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'logout'.tr(),
@@ -55,19 +66,6 @@ class HomeScreen extends ConsumerWidget {
                   '${profile.firstName} ${profile.lastName}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
-
-                if (roleScreens != null) ...[
-                  const SizedBox(height: 16),
-                  OutlinedButton(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            roleScreens.viewBuilder(context, profile),
-                      ),
-                    ),
-                    child: Text('my_profile'.tr()),
-                  ),
-                ],
 
                 const SizedBox(height: 32),
 
