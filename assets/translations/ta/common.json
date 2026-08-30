@@ -13,6 +13,7 @@
   "error_password_too_short": "கடவுச்சொல் குறைந்தது 8 எழுத்துகள் இருக்க வேண்டும்",
   "error_passwords_dont_match": "கடவுச்சொற்கள் பொருந்தவில்லை",
   "my_profile": "எனது சுயவிவரம்",
+  "notifications": "அறிவிப்புகள்",
   "take_photo": "புகைப்படம் எடு",
   "choose_from_gallery": "தொகுப்பிலிருந்து தேர்ந்தெடு",
   "address": "முகவரி",
@@ -27,5 +28,6 @@
   "location_permission_denied": "இருப்பிட அனுமதி மறுக்கப்பட்டது",
   "location_permission_denied_forever": "இருப்பிட அனுமதி நிரந்தரமாக மறுக்கப்பட்டது. பயன்பாட்டு அமைப்புகளில் இருந்து இதை இயக்கவும்.",
   "error_location_unknown": "உங்கள் இருப்பிடத்தைக் கண்டறிய முடியவில்லை",
-  "preferred_language": "விருப்பமான மொழி"
+  "preferred_language": "விருப்பமான மொழி",
+  "continue": "தொடரவும்"
 }

@@ -22,6 +22,7 @@ final Map<String, TableConfig> tableRegistry = {
     compositeKey: CompositeKey(['farmer_profile_id', 'crop_id']),
   ),
   'crop': const TableConfig(tableName: 'crop'),
+  'produce_listing': const TableConfig(tableName: 'produce_listing'),
   'buyer_profile': const TableConfig(
     tableName: 'buyer_profile',
     remotePkColumn: 'profile_id',

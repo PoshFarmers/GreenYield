@@ -2,9 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/auth/auth_providers.dart';
-import '../../../core/roles/role_profile_registry.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/avatar_image.dart';
 import '../../../models/profile.dart';
 
@@ -17,32 +16,8 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
 
-    final roleScreens = profile.activeRole != null
-        ? roleScreensRegistry[profile.activeRole]
-        : null;
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text('home_title'.tr()),
-        actions: [
-          if (roleScreens != null)
-            IconButton(
-              tooltip: 'my_profile'.tr(),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) =>
-                      roleScreens.viewBuilder(context, profile),
-                ),
-              ),
-              icon: AvatarImage(path: profile.avatarUrl, radius: 16),
-            ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'logout'.tr(),
-            onPressed: () => ref.read(authServiceProvider).signOut(),
-          ),
-        ],
-      ),
+      appBar: AppHeader(profile: profile),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
