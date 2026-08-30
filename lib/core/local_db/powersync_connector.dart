@@ -16,6 +16,7 @@ const _pkColumnOverrides = {
 /// text locally (SQLite/PowerSync has no native object column type).
 const _jsonbColumns = {
   'profile': {'address'},
+  'notification': {'payload'},
 };
 
 class SupabaseConnector extends PowerSyncBackendConnector {

@@ -7,6 +7,7 @@ import '../../../core/roles/role_profile_registry.dart';
 import '../../../core/storage/avatar_service.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../models/profile.dart';
+import '../../notifications/presentation/widgets/notification_badge_widget.dart';
 
 /// Placeholder landing page for every signed-in user, regardless of role.
 /// Also provides access to the role-specific profile, theme, and language
@@ -63,6 +64,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         title: Text('home_title'.tr()),
         actions: [
+          const NotificationBadgeWidget(),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'logout'.tr(),

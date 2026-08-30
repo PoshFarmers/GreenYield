@@ -38,4 +38,15 @@ const schema = Schema([
     Column.text('origin_location'),
     Column.text('destination_location'),
   ]),
+  Table('notification', [
+    Column.text('profile_id'),
+    Column.text('type'),
+    Column.text('title'),
+    Column.text('body'),
+    Column.text('payload'),
+    Column.text('source_table'),
+    Column.text('source_id'),
+    Column.text('read_at'),
+    Column.text('created_at'),
+  ]),
 ]);
