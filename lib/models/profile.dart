@@ -93,6 +93,10 @@ class Profile {
   final String? locationText;
   final GeoPoint? locationPoint;
 
+  /// Set by the database default on insert — read-only from the client
+  /// (never sent in toInsertMap). Used for "member since" display.
+  final DateTime? createdAt;
+
   const Profile({
     required this.id,
     required this.firstName,
@@ -104,6 +108,7 @@ class Profile {
     this.activeRole,
     this.locationText,
     this.locationPoint,
+    this.createdAt,
   });
 
   /// Only used to build the object handed to `createOwnProfile` on the
@@ -119,9 +124,11 @@ class Profile {
     String? activeRole,
     String? locationText,
     GeoPoint? locationPoint,
+    DateTime? createdAt,
   }) {
     return Profile(
       id: id,
+      createdAt: createdAt ?? this.createdAt,
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
       address: address ?? this.address,
@@ -148,6 +155,9 @@ class Profile {
       locationPoint: map['location_geojson'] == null
           ? null
           : GeoPoint.fromGeoJson(_decodeJson(map['location_geojson'])!),
+      createdAt: map['created_at'] == null
+          ? null
+          : DateTime.tryParse(map['created_at'] as String),
     );
   }
 

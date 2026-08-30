@@ -133,9 +133,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           child: Text(
                             'forgot_password'.tr(),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ),
                       ],
@@ -261,10 +259,8 @@ class _FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text.toUpperCase(),
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            letterSpacing: 0.5,
-            fontWeight: FontWeight.w600,
-          ),
+      style: Theme.of(context).textTheme.labelSmall
+          ?.copyWith(letterSpacing: 0.5, fontWeight: FontWeight.w600),
     );
   }
 }
@@ -292,4 +288,3 @@ class _AppLogo extends StatelessWidget {
     );
   }
 }
-

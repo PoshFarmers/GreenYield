@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/storage/avatar_service.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../models/profile.dart';
 
@@ -25,8 +26,7 @@ class CompleteProfileScreen extends ConsumerStatefulWidget {
       _CompleteProfileScreenState();
 }
 
-class _CompleteProfileScreenState
-    extends ConsumerState<CompleteProfileScreen> {
+class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -43,7 +43,8 @@ class _CompleteProfileScreenState
   ];
 
   String _preferredLanguage = 'en';
-  File? _avatarFile;
+  Uint8List? _avatarBytes;
+  String? _avatarFileName;
   bool _isSubmitting = false;
   String? _errorMessage;
 
@@ -65,9 +66,12 @@ class _CompleteProfileScreenState
       maxWidth: 1024,
       imageQuality: 85,
     );
-    if (picked != null) {
-      setState(() => _avatarFile = File(picked.path));
-    }
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    setState(() {
+      _avatarBytes = bytes;
+      _avatarFileName = picked.name;
+    });
   }
 
   void _showAvatarOptions() {
@@ -109,8 +113,12 @@ class _CompleteProfileScreenState
       final userId = authService.currentUser!.id;
 
       String? avatarUrl;
-      if (_avatarFile != null) {
-        avatarUrl = await authService.uploadAvatar(_avatarFile!);
+      if (_avatarBytes != null) {
+        avatarUrl = await AvatarService().upload(
+          userId: userId,
+          bytes: _avatarBytes!,
+          fileName: _avatarFileName ?? 'avatar.jpg',
+        );
       }
 
       final profile = Profile(
@@ -164,10 +172,10 @@ class _CompleteProfileScreenState
                             CircleAvatar(
                               radius: 48,
                               backgroundColor: theme.colorScheme.secondary,
-                              backgroundImage: _avatarFile != null
-                                  ? FileImage(_avatarFile!)
+                              backgroundImage: _avatarBytes != null
+                                  ? MemoryImage(_avatarBytes!)
                                   : null,
-                              child: _avatarFile == null
+                              child: _avatarBytes == null
                                   ? Icon(
                                       Icons.person_outline,
                                       size: 40,
@@ -196,7 +204,8 @@ class _CompleteProfileScreenState
                     AppTextField(
                       label: 'first_name'.tr(),
                       controller: _firstNameController,
-                      validator: (value) => (value == null || value.trim().isEmpty)
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty)
                           ? 'error_required'.tr()
                           : null,
                     ),
@@ -204,7 +213,8 @@ class _CompleteProfileScreenState
                     AppTextField(
                       label: 'last_name'.tr(),
                       controller: _lastNameController,
-                      validator: (value) => (value == null || value.trim().isEmpty)
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty)
                           ? 'error_required'.tr()
                           : null,
                     ),

@@ -6,19 +6,18 @@ import '../../../../core/auth/auth_providers.dart';
 import '../../../../core/storage/avatar_cache_service.dart';
 import '../../../../core/storage/avatar_service.dart';
 import '../../../../core/widgets/generic_profile_form.dart';
-import '../../../../models/farmer_profile.dart';
 import '../../../../models/profile.dart';
-import '../farmer_profile_service.dart';
 
+/// Edits the farmer's personal/profile details only.
+///
+/// Crops are deliberately not editable here — each crop is managed
+/// individually from the Crops Grown section of the profile view, since
+/// it carries its own photo/description/price rather than being a plain
+/// selection.
 class FarmerProfileEditScreen extends ConsumerStatefulWidget {
   final Profile genericProfile;
-  final FarmerProfile profile;
 
-  const FarmerProfileEditScreen({
-    super.key,
-    required this.genericProfile,
-    required this.profile,
-  });
+  const FarmerProfileEditScreen({super.key, required this.genericProfile});
 
   @override
   ConsumerState<FarmerProfileEditScreen> createState() =>
@@ -30,10 +29,6 @@ class _FarmerProfileEditScreenState
   final _formKey = GlobalKey<FormState>();
   final _genericController = GenericProfileFormController();
   final _avatarService = AvatarService();
-  final _farmerService = FarmerProfileService();
-
-  late final Stream<List<Crop>> _cropsStream;
-  late Set<String> _selectedCropIds;
 
   bool _isSubmitting = false;
   String? _errorMessage;
@@ -41,10 +36,6 @@ class _FarmerProfileEditScreenState
   @override
   void initState() {
     super.initState();
-
-    _selectedCropIds = widget.profile.crops.map((c) => c.id).toSet();
-    _cropsStream = _farmerService.watchAllCrops();
-
     _genericController.loadFrom(widget.genericProfile);
   }
 
@@ -56,11 +47,6 @@ class _FarmerProfileEditScreenState
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-
-    if (_selectedCropIds.isEmpty) {
-      setState(() => _errorMessage = 'error_select_at_least_one_crop'.tr());
-      return;
-    }
 
     setState(() {
       _isSubmitting = true;
@@ -81,10 +67,9 @@ class _FarmerProfileEditScreenState
         _genericController.existingAvatarUrl = avatarPath;
       }
 
-      final genericProfile = _genericController.buildProfile(userId);
-      await authService.updateOwnProfile(genericProfile);
-
-      await _farmerService.updateCrops(userId, _selectedCropIds.toList());
+      await authService.updateOwnProfile(
+        _genericController.buildProfile(userId),
+      );
 
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
@@ -92,39 +77,6 @@ class _FarmerProfileEditScreenState
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
-  }
-
-  Widget _buildCropSection(
-    BuildContext context, {
-    required String titleKey,
-    required List<Crop> crops,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(titleKey.tr(), style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: crops
-              .map(
-                (crop) => FilterChip(
-                  label: Text(crop.name),
-                  selected: _selectedCropIds.contains(crop.id),
-                  onSelected: (selected) => setState(() {
-                    if (selected) {
-                      _selectedCropIds.add(crop.id);
-                    } else {
-                      _selectedCropIds.remove(crop.id);
-                    }
-                  }),
-                ),
-              )
-              .toList(),
-        ),
-      ],
-    );
   }
 
   @override
@@ -143,57 +95,6 @@ class _FarmerProfileEditScreenState
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     GenericProfileFormSection(controller: _genericController),
-
-                    const SizedBox(height: 24),
-
-                    Text(
-                      'crops_grown'.tr(),
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    StreamBuilder<List<Crop>>(
-                      stream: _cropsStream,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                            child: Center(child: CircularProgressIndicator()),
-                          );
-                        }
-
-                        if (snapshot.hasError) {
-                          return Text(snapshot.error.toString());
-                        }
-
-                        final crops = snapshot.data ?? [];
-                        final vegetables = crops
-                            .where((c) => c.category == 'vegetable')
-                            .toList();
-                        final fruits = crops
-                            .where((c) => c.category == 'fruit')
-                            .toList();
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildCropSection(
-                              context,
-                              titleKey: 'crop_category_vegetable',
-                              crops: vegetables,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildCropSection(
-                              context,
-                              titleKey: 'crop_category_fruit',
-                              crops: fruits,
-                            ),
-                          ],
-                        );
-                      },
-                    ),
 
                     if (_errorMessage != null) ...[
                       const SizedBox(height: 12),

@@ -4,11 +4,11 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart' as ll;
 
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/location/location_service.dart';
 import '../../../models/profile.dart';
 
 /// Step 3 of profile setup — shared by every role, but the copy shown
@@ -30,7 +30,6 @@ class LocationSetupScreen extends ConsumerStatefulWidget {
 
 class _LocationSetupScreenState extends ConsumerState<LocationSetupScreen> {
   static const _defaultCenter = ll.LatLng(7.8731, 80.7718); // Sri Lanka
-  static const _searchDebounce = Duration(milliseconds: 500);
 
   final _mapController = MapController();
   final _searchController = TextEditingController();
@@ -65,8 +64,10 @@ class _LocationSetupScreenState extends ConsumerState<LocationSetupScreen> {
   void _selectPoint(ll.LatLng point, {String? label}) {
     setState(() {
       _picked = point;
-      _pickedLabel = label ?? '${point.latitude.toStringAsFixed(5)}, '
-          '${point.longitude.toStringAsFixed(5)}';
+      _pickedLabel =
+          label ??
+          '${point.latitude.toStringAsFixed(5)}, '
+              '${point.longitude.toStringAsFixed(5)}';
       if (label != null) _searchController.text = label;
     });
     _mapController.move(point, 15);
@@ -75,19 +76,15 @@ class _LocationSetupScreenState extends ConsumerState<LocationSetupScreen> {
   Future<void> _useCurrentLocation() async {
     setState(() => _isLocating = true);
     try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        setState(() => _errorMessage = 'error_location_permission'.tr());
-        return;
-      }
-      final position = await Geolocator.getCurrentPosition();
-      _selectPoint(ll.LatLng(position.latitude, position.longitude));
+      final result = await LocationService().fetchCurrentLocation();
+      _selectPoint(
+        ll.LatLng(result.point.latitude, result.point.longitude),
+        label: result.displayText,
+      );
+    } on LocationException catch (e) {
+      setState(() => _errorMessage = e.code.tr());
     } catch (e) {
-      setState(() => _errorMessage = e.toString());
+      setState(() => _errorMessage = 'error_location_unknown'.tr());
     } finally {
       if (mounted) setState(() => _isLocating = false);
     }
@@ -169,10 +166,7 @@ class _LocationSetupScreenState extends ConsumerState<LocationSetupScreen> {
           style: TextStyle(color: colors.primary, fontWeight: FontWeight.w600),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.help_outline),
-            onPressed: () {},
-          ),
+          IconButton(icon: const Icon(Icons.help_outline), onPressed: () {}),
         ],
       ),
       body: SafeArea(
@@ -249,8 +243,7 @@ class _LocationSetupScreenState extends ConsumerState<LocationSetupScreen> {
                         ),
                         children: [
                           TileLayer(
-                            urlTemplate:
-                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                             userAgentPackageName: 'com.greenyield.app',
                           ),
                           if (_picked != null)
