@@ -26,6 +26,18 @@ class Address {
     postalCode,
   ].where((value) => value != null && value.isNotEmpty).join(', ');
 
+  Address copyWith({
+    String? line1,
+    String? line2,
+    String? city,
+    String? postalCode,
+  }) => Address(
+    line1: line1 ?? this.line1,
+    line2: line2 ?? this.line2,
+    city: city ?? this.city,
+    postalCode: postalCode ?? this.postalCode,
+  );
+
   factory Address.fromMap(Map<String, dynamic>? map) {
     if (map == null) return const Address();
     return Address(
@@ -81,6 +93,10 @@ class Profile {
   final String? locationText;
   final GeoPoint? locationPoint;
 
+  /// Set by the database default on insert — read-only from the client
+  /// (never sent in toInsertMap). Used for "member since" display.
+  final DateTime? createdAt;
+
   const Profile({
     required this.id,
     required this.firstName,
@@ -92,7 +108,38 @@ class Profile {
     this.activeRole,
     this.locationText,
     this.locationPoint,
+    this.createdAt,
   });
+
+  /// Only used to build the object handed to `createOwnProfile` on the
+  /// first completion screen and for the odd local UI tweak — the
+  /// source of truth after that is always the PowerSync-backed row.
+  Profile copyWith({
+    String? firstName,
+    String? lastName,
+    Address? address,
+    String? phone,
+    String? avatarUrl,
+    String? preferredLanguage,
+    String? activeRole,
+    String? locationText,
+    GeoPoint? locationPoint,
+    DateTime? createdAt,
+  }) {
+    return Profile(
+      id: id,
+      createdAt: createdAt ?? this.createdAt,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      address: address ?? this.address,
+      phone: phone ?? this.phone,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      preferredLanguage: preferredLanguage ?? this.preferredLanguage,
+      activeRole: activeRole ?? this.activeRole,
+      locationText: locationText ?? this.locationText,
+      locationPoint: locationPoint ?? this.locationPoint,
+    );
+  }
 
   factory Profile.fromMap(Map<String, dynamic> map) {
     return Profile(
@@ -108,6 +155,9 @@ class Profile {
       locationPoint: map['location_geojson'] == null
           ? null
           : GeoPoint.fromGeoJson(_decodeJson(map['location_geojson'])!),
+      createdAt: map['created_at'] == null
+          ? null
+          : DateTime.tryParse(map['created_at'] as String),
     );
   }
 

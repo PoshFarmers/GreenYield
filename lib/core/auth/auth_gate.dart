@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_providers.dart';
 import '../roles/role_profile_registry.dart';
 import '../../features/auth/presentation/complete_profile_screen.dart';
+import '../../features/auth/presentation/location_setup_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/role_selection_screen.dart';
 import '../roles/role_nav_shell_registry.dart';
@@ -12,7 +13,8 @@ import '../roles/role_nav_shell_registry.dart';
 ///   no session                -> LoginScreen
 ///   session, no profile row   -> CompleteProfileScreen
 ///   profile exists, no roles  -> RoleSelectionScreen
-///   role exists, no role-specific profile row yet
+///   roles exist, no location  -> LocationSetupScreen
+///   location exists, role exists, no role-specific profile row yet
 ///                              -> that role's completeProfileBuilder
 ///                                 (from roleScreensRegistry)
 ///   everything exists         -> HomeScreen
@@ -58,6 +60,16 @@ class AuthGate extends ConsumerWidget {
                 }
 
                 final activeRole = profile.activeRole ?? roles.first;
+
+                // Location lives on the common `profile` row, not a
+                // role table, so it's checked here — after a role
+                // exists (the prompt copy depends on it) but before
+                // any role-specific screens.
+                if (profile.locationText == null ||
+                    profile.locationPoint == null) {
+                  return LocationSetupScreen(profile: profile);
+                }
+
                 final roleScreens = roleScreensRegistry[activeRole];
 
                 if (roleScreens == null) {

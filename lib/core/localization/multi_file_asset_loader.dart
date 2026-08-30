@@ -7,7 +7,16 @@ import 'package:flutter/services.dart' show rootBundle;
 /// Loads translations from several JSON files per locale and merges
 /// them, instead of easy_localization's default one-file-per-locale.
 class MultiFileAssetLoader extends AssetLoader {
-  static const _files = ['common', 'auth', 'farmer', 'buyer', 'driver'];
+  static const _files = [
+    'common',
+    'auth',
+    'farmer',
+    'buyer',
+    'driver',
+    'notifications',
+    'listings',
+    'marketplace',
+  ];
 
   const MultiFileAssetLoader();
 

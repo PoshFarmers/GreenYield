@@ -89,4 +89,22 @@ class AuthService {
       userId,
     ]);
   }
+
+  Future<void> updateProfileLocation({
+    required GeoPoint locationPoint,
+    required String locationText,
+  }) async {
+    final userId = currentUser!.id;
+
+    final latitude = locationPoint.latitude;
+    final longitude = locationPoint.longitude;
+
+    final locationWkt = 'POINT($longitude $latitude)';
+    final geoJson = '{"type":"Point","coordinates":[$longitude,$latitude]}';
+
+    await db.execute(
+      'UPDATE profile SET location_point = ?, location_geojson = ?, location_text = ? WHERE id = ?',
+      [locationWkt, geoJson, locationText, userId],
+    );
+  }
 }

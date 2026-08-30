@@ -22,6 +22,7 @@ final Map<String, TableConfig> tableRegistry = {
     compositeKey: CompositeKey(['farmer_profile_id', 'crop_id']),
   ),
   'crop': const TableConfig(tableName: 'crop'),
+  'produce_listing': const TableConfig(tableName: 'produce_listing'),
   'buyer_profile': const TableConfig(
     tableName: 'buyer_profile',
     remotePkColumn: 'profile_id',
@@ -33,6 +34,10 @@ final Map<String, TableConfig> tableRegistry = {
   'vehicle': const TableConfig(tableName: 'vehicle'),
   'driver_route_preference': const TableConfig(
     tableName: 'driver_route_preference',
+  ),
+  'notification': const TableConfig(
+    tableName: 'notification',
+    jsonbColumns: {'payload'},
   ),
 
   // --- add new tables here as marketplace/orders/delivery/wallet land ---
