@@ -13,6 +13,7 @@
   "error_password_too_short": "Password must be at least 8 characters",
   "error_passwords_dont_match": "Passwords don't match",
   "my_profile": "My Profile",
+  "notifications": "Notifications",
   "take_photo": "Take photo",
   "choose_from_gallery": "Choose from gallery",
   "address": "Address",
@@ -27,5 +28,6 @@
   "location_permission_denied": "Location permission denied",
   "location_permission_denied_forever": "Location permission permanently denied. Enable it from app settings.",
   "error_location_unknown": "Couldn't determine your location",
-  "preferred_language": "Preferred language"
+  "preferred_language": "Preferred language",
+  "continue": "Continue"
 }

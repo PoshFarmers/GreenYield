@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/listings/presentation/my_listings_screen.dart';
+import '../../features/marketplace/presentation/marketplace_screen.dart';
 import '../../features/navigation/presentation/app_nav_shell.dart';
 import '../../models/profile.dart';
 import '../widgets/coming_soon_screen.dart';
@@ -15,7 +17,16 @@ import '../widgets/coming_soon_screen.dart';
 /// Chat, until the messaging branch merges — are `ComingSoonScreen`
 /// placeholders. Swap those out in place; the shell itself never needs
 /// to change.
-Widget buildNavShellForRole(Profile profile, String activeRole) {
+Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
+  // AuthGate falls back to `roles.first` when profile.active_role is
+  // null, but that fallback lived only in its local variable — anything
+  // downstream reading profile.activeRole (e.g. AppHeader resolving the
+  // profile screen) would still see null and silently render nothing.
+  // Stamping it on here keeps the whole subtree consistent.
+  final profile = rawProfile.activeRole == null
+      ? rawProfile.copyWith(activeRole: activeRole)
+      : rawProfile;
+
   final homeTab = NavTab(
     label: 'Home',
     icon: Icons.home_outlined,
@@ -35,7 +46,7 @@ Widget buildNavShellForRole(Profile profile, String activeRole) {
           NavTab(
             label: 'Harvest',
             icon: Icons.grass_outlined,
-            builder: (_) => const ComingSoonScreen(title: 'Harvest'),
+            builder: (_) => MyListingsScreen(profile: profile),
           ),
           NavTab(
             label: 'Orders',
@@ -49,7 +60,13 @@ Widget buildNavShellForRole(Profile profile, String activeRole) {
     case 'buyer':
       return AppNavShell(
         tabs: [
-          homeTab,
+          // The buyer's "home" is the marketplace, not the shared
+          // HomeScreen the other roles still use.
+          NavTab(
+            label: 'Home',
+            icon: Icons.home_outlined,
+            builder: (_) => MarketplaceScreen(profile: profile),
+          ),
           NavTab(
             label: 'Cart',
             icon: Icons.shopping_cart_outlined,
