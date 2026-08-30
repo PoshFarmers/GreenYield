@@ -9,6 +9,7 @@ import '../../../core/storage/crop_photo_service.dart';
 import '../../../core/widgets/media_image.dart';
 import '../../../models/farmer_profile.dart';
 import '../../../models/profile.dart';
+import '../../pricing/presentation/widgets/market_price_comparison_card.dart';
 import '../../profile/farmer/crop_price_bounds.dart';
 import '../../profile/farmer/farmer_profile_service.dart';
 import '../produce_listing_service.dart';
@@ -549,6 +550,13 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
             ],
           ),
         ),
+        if (_crop != null) ...[
+          const SizedBox(height: 12),
+          MarketPriceComparisonCard(
+            cropId: _crop!.cropId,
+            farmerPricePerKg: _price,
+          ),
+        ],
         const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
