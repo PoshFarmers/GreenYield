@@ -1,66 +1,52 @@
-import '../../../core/local_db/powersync.dart';
+import '../../../core/local_db/powersync.dart'; // exposes `db`
+import '../../../core/local_db/repository.dart';
 import '../../../models/driver_profile.dart';
 
 class DriverProfileService {
+  final _vehicles = Repository<Vehicle>(
+    table: 'vehicle',
+    fromMap: Vehicle.fromMap,
+    toInsertMap: (v) => v.toInsertMap(),
+  );
+
   Future<bool> hasProfile(String profileId) async {
     final row = await db.getOptional(
-      'SELECT profile_id FROM driver_profile WHERE profile_id = ?',
+      'SELECT id FROM driver_profile WHERE profile_id = ?',
       [profileId],
     );
     return row != null;
   }
 
   Stream<DriverProfile?> watchOwnProfile(String profileId) {
-    return db
-        .watch(
-          'SELECT * FROM vehicle WHERE driver_profile_id = ? ORDER BY id LIMIT 1',
+    return _vehicles
+        .watchAll(
+          where: 'driver_profile_id = ?',
           parameters: [profileId],
+          orderBy: 'id',
+          limit: 1,
         )
-        .map((rows) {
-          return DriverProfile(
+        .map(
+          (vehicles) => DriverProfile(
             profileId: profileId,
-            primaryVehicle: rows.isEmpty ? null : Vehicle.fromMap(rows.first),
-          );
-        });
+            primaryVehicle: vehicles.isEmpty ? null : vehicles.first,
+          ),
+        );
   }
 
+  /// driver_profile is a marker row (profile_id only, no other columns
+  /// worth modeling) — not worth a full `Repository<T>`, so it stays a
+  /// direct db call, same as before.
   Future<void> createProfile(String profileId, Vehicle vehicle) async {
     await db.execute(
       'INSERT INTO driver_profile (id, profile_id) VALUES (?, ?)',
       [profileId, profileId],
     );
-    await _insertVehicle(profileId, vehicle);
+    await _vehicles.insertGenerated(vehicle);
   }
 
   Future<void> addVehicle(Vehicle vehicle) =>
-      _insertVehicle(vehicle.driverProfileId, vehicle);
+      _vehicles.insertGenerated(vehicle);
 
-  Future<void> _insertVehicle(String driverProfileId, Vehicle vehicle) {
-    return db.execute(
-      '''
-      INSERT INTO vehicle (id, driver_profile_id, vehicle_type, plate_number, max_load_kg, preferred_min_load_kg)
-      VALUES (uuid(), ?, ?, ?, ?, ?)
-      ''',
-      [
-        driverProfileId,
-        vehicle.vehicleType,
-        vehicle.plateNumber,
-        vehicle.maxLoadKg,
-        vehicle.preferredMinLoadKg,
-      ],
-    );
-  }
-
-  Future<void> updateVehicle(String vehicleId, Vehicle vehicle) {
-    return db.execute(
-      'UPDATE vehicle SET vehicle_type = ?, plate_number = ?, max_load_kg = ?, preferred_min_load_kg = ? WHERE id = ?',
-      [
-        vehicle.vehicleType,
-        vehicle.plateNumber,
-        vehicle.maxLoadKg,
-        vehicle.preferredMinLoadKg,
-        vehicleId,
-      ],
-    );
-  }
+  Future<void> updateVehicle(String vehicleId, Vehicle vehicle) =>
+      _vehicles.update(vehicleId, vehicle);
 }

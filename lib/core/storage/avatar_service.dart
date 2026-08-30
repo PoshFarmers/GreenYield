@@ -1,23 +1,34 @@
 import 'dart:typed_data';
 
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../media/media_service.dart';
 
-import '../supabase/client.dart';
-
-/// Uploads the signed-in user's avatar to the `avatars` storage bucket
-/// and returns the object path to store in `profile.avatar_url`.
+/// Avatars are just one "purpose" of the generic media queue now — this
+/// class only knows the avatar-specific bucket/path convention;
+/// everything else (offline queuing, retry, caching) lives in
+/// MediaService / MediaQueueDb / MediaUploader.
 ///
-/// The bucket is private (see the accompanying storage migration) — each
-/// user can only read/write objects under their own `<uid>/` prefix, so
-/// `avatar_url` stores an object path rather than a public URL.
+/// Public API (`upload`) is unchanged from before, so
+/// complete_profile_screen.dart and the buyer/driver/farmer edit
+/// screens don't need any changes.
 class AvatarService {
   static const _bucket = 'avatars';
+  final MediaService _media;
 
+  AvatarService({MediaService? media})
+    : _media = media ?? MediaService.instance;
+
+  /// Enqueues the avatar locally and returns immediately — works fully
+  /// offline. The actual bytes upload happens in the background via
+  /// MediaUploader once connectivity is available. Previously this
+  /// awaited a live Supabase Storage call directly, so if it threw
+  /// while offline, the whole profile-save aborted (see AuthService/
+  /// *ProfileService calls in each edit screen's _submit()) — that
+  /// failure mode is gone now.
   Future<String> upload({
     required String userId,
     required Uint8List bytes,
     required String fileName,
-  }) async {
+  }) {
     final ext = fileName.contains('.')
         ? fileName.split('.').last.toLowerCase()
         : 'jpg';
@@ -28,20 +39,13 @@ class AvatarService {
       _ => 'image/jpeg',
     };
 
-    await supabase.storage
-        .from(_bucket)
-        .uploadBinary(
-          path,
-          bytes,
-          fileOptions: FileOptions(contentType: contentType, upsert: true),
-        );
-
-    return path;
-  }
-
-  /// Signed URL good for [expiresIn] seconds — use this to actually
-  /// display an avatar stored under a private bucket.
-  Future<String> signedUrl(String path, {int expiresIn = 3600}) {
-    return supabase.storage.from(_bucket).createSignedUrl(path, expiresIn);
+    return _media.enqueueUpload(
+      bucket: _bucket,
+      remotePath: path,
+      bytes: bytes,
+      contentType: contentType,
+      purpose: 'avatar',
+      ownerId: userId,
+    );
   }
 }

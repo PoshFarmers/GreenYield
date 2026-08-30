@@ -1,0 +1,844 @@
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../../core/storage/crop_photo_service.dart';
+import '../../../core/widgets/media_image.dart';
+import '../../../models/farmer_profile.dart';
+import '../../../models/profile.dart';
+import '../../profile/farmer/crop_price_bounds.dart';
+import '../../profile/farmer/farmer_profile_service.dart';
+import '../produce_listing_service.dart';
+
+/// Multi-step "post produce for sale" flow — writes one `produce_listing`
+/// row (see CROP_AND_LISTING_DESIGN.md §2 step 3). The crop must already
+/// be on the farmer's `farmer_crop` menu; description/price/photo all
+/// pre-fill from it and can be overridden per batch.
+class AddHarvestScreen extends ConsumerStatefulWidget {
+  final Profile profile;
+
+  const AddHarvestScreen({super.key, required this.profile});
+
+  @override
+  ConsumerState<AddHarvestScreen> createState() => _AddHarvestScreenState();
+}
+
+class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
+  static const _stepCount = 4;
+
+  final _farmerService = FarmerProfileService();
+  final _listingService = ProduceListingService();
+
+  final _quantityController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _searchController = TextEditingController();
+
+  late final Stream<FarmerProfile?> _farmerProfileStream;
+
+  int _step = 0;
+  String _search = '';
+  FarmerCrop? _crop;
+  DateTime? _harvestedOn;
+  Uint8List? _photoBytes;
+  String? _photoFileName;
+  bool _isPublishing = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _farmerProfileStream = _farmerService.watchOwnProfile(widget.profile.id);
+  }
+
+  @override
+  void dispose() {
+    _quantityController.dispose();
+    _priceController.dispose();
+    _descriptionController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  double get _quantity => double.tryParse(_quantityController.text) ?? 0;
+  double get _price => double.tryParse(_priceController.text) ?? 0;
+
+  ({double min, double max}) get _bounds =>
+      priceBoundsFor(_crop?.cropName ?? '');
+
+  void _selectCrop(FarmerCrop crop) {
+    setState(() {
+      _crop = crop;
+      _descriptionController.text = crop.description ?? '';
+      _priceController.text = (crop.defaultPricePerKg ?? _bounds.min)
+          .toStringAsFixed(0);
+    });
+  }
+
+  /// Bounds are re-checked here (not just trusted from crop setup)
+  /// because the allowed range can change between then and now.
+  String? get _blockingError {
+    switch (_step) {
+      case 0:
+        return _crop == null ? 'error_select_a_crop'.tr() : null;
+      case 1:
+        if (_quantity <= 0) return 'error_enter_quantity'.tr();
+        if (_price < _bounds.min || _price > _bounds.max) {
+          return 'error_price_out_of_range'.tr(
+            namedArgs: {
+              'min': _bounds.min.toStringAsFixed(0),
+              'max': _bounds.max.toStringAsFixed(0),
+            },
+          );
+        }
+        return null;
+      default:
+        return null;
+    }
+  }
+
+  void _next() {
+    final error = _blockingError;
+    if (error != null) {
+      setState(() => _errorMessage = error);
+      return;
+    }
+    setState(() {
+      _errorMessage = null;
+      _step++;
+    });
+  }
+
+  void _back() => setState(() {
+    _errorMessage = null;
+    _step--;
+  });
+
+  Future<void> _pickPhoto(ImageSource source) async {
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    setState(() {
+      _photoBytes = bytes;
+      _photoFileName = picked.name;
+    });
+  }
+
+  Future<void> _pickHarvestedOn() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _harvestedOn ?? now,
+      firstDate: now.subtract(const Duration(days: 90)),
+      lastDate: now,
+    );
+    if (picked != null) setState(() => _harvestedOn = picked);
+  }
+
+  Future<void> _publish() async {
+    final crop = _crop;
+    if (crop == null) return;
+
+    setState(() {
+      _isPublishing = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final listingId = const Uuid().v4();
+      final userId = widget.profile.id;
+
+      // Only set when the farmer picked a batch-specific photo — left
+      // null otherwise so display falls back to the farmer_crop photo.
+      String? imageUrl;
+      if (_photoBytes != null) {
+        imageUrl = await CropPhotoService().uploadListingPhoto(
+          userId: userId,
+          listingId: listingId,
+          bytes: _photoBytes!,
+          fileName: _photoFileName ?? 'photo.jpg',
+        );
+      }
+
+      final description = _descriptionController.text.trim();
+      await _listingService.createListing(
+        listingId: listingId,
+        farmerProfileId: userId,
+        cropId: crop.cropId,
+        pricePerKg: _price,
+        quantityKg: _quantity,
+        description: description.isEmpty ? null : description,
+        imageUrl: imageUrl,
+        harvestedOn: _harvestedOn,
+      );
+
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      setState(() => _errorMessage = e.toString());
+    } finally {
+      if (mounted) setState(() => _isPublishing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: BackButton(
+          onPressed: _step == 0 ? () => Navigator.of(context).pop() : _back,
+        ),
+        title: Text(
+          'add_harvest'.tr(),
+          style: TextStyle(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        actions: [
+          IconButton(icon: const Icon(Icons.help_outline), onPressed: () {}),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'step_of'.tr(
+                        namedArgs: {
+                          'current': '${_step + 1}',
+                          'total': '$_stepCount',
+                        },
+                      ),
+                      style: theme.textTheme.labelMedium,
+                    ),
+                    Text(
+                      _stepTitles[_step].tr(),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: (_step + 1) / _stepCount,
+                    minHeight: 6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: switch (_step) {
+                      0 => _buildCropStep(),
+                      1 => _buildQuantityPriceStep(),
+                      2 => _buildPhotoStep(),
+                      _ => _buildReviewStep(),
+                    },
+                  ),
+                ),
+                _buildBottomBar(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static const _stepTitles = [
+    'step_crop',
+    'step_quantity_price',
+    'step_photo_details',
+    'step_review',
+  ];
+
+  Widget _buildBottomBar() {
+    final theme = Theme.of(context);
+    final isReview = _step == _stepCount - 1;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_errorMessage != null) ...[
+            Text(
+              _errorMessage!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+          ],
+          Row(
+            children: [
+              if (_step > 0) ...[
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isPublishing ? null : _back,
+                    child: Text('back'.tr()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: _isPublishing
+                      ? null
+                      : (isReview ? _publish : _next),
+                  child: _isPublishing
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          isReview ? 'publish_listing'.tr() : 'continue'.tr(),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCropStep() {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'what_are_you_harvesting'.tr(),
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'what_are_you_harvesting_subtitle'.tr(),
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _searchController,
+          decoration: InputDecoration(
+            hintText: 'search_crops'.tr(),
+            prefixIcon: const Icon(Icons.search),
+          ),
+          onChanged: (value) => setState(() => _search = value),
+        ),
+        const SizedBox(height: 16),
+        StreamBuilder<FarmerProfile?>(
+          stream: _farmerProfileStream,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData && !snapshot.hasError) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final crops = snapshot.data?.crops ?? [];
+            if (crops.isEmpty) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: Text(
+                  'no_registered_crops'.tr(),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium,
+                ),
+              );
+            }
+
+            final filtered = crops
+                .where(
+                  (c) =>
+                      _search.isEmpty ||
+                      c.cropName.toLowerCase().contains(_search.toLowerCase()),
+                )
+                .toList();
+
+            return GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.3,
+              children: filtered.map(_buildCropCard).toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCropCard(FarmerCrop crop) {
+    final theme = Theme.of(context);
+    final isSelected = _crop?.cropId == crop.cropId;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => _selectCrop(crop),
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outlineVariant,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ClipOval(
+              child: SizedBox(
+                height: 48,
+                width: 48,
+                child: MediaImage(
+                  path: crop.imageUrl,
+                  bucket: 'crop-photos',
+                  placeholder: Container(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: Icon(
+                      crop.category == 'fruit' ? Icons.apple : Icons.eco,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              crop.cropName,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuantityPriceStep() {
+    final theme = Theme.of(context);
+    final bounds = _bounds;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'how_much_listing'.tr(),
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _FieldCard(
+          label: 'total_harvest_quantity'.tr(),
+          child: TextField(
+            controller: _quantityController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+            ],
+            decoration: InputDecoration(hintText: '0', suffixText: 'kg'.tr()),
+            onChanged: (_) => setState(() {}),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'set_your_price'.tr(),
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _FieldCard(
+          label: 'price_per_unit_kg'.tr(),
+          child: TextField(
+            controller: _priceController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+            ],
+            decoration: const InputDecoration(prefixText: 'Rs ', hintText: '0'),
+            onChanged: (_) => setState(() {}),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.trending_up,
+                size: 18,
+                color: theme.colorScheme.onSecondaryContainer,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'market_range'.tr(),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'market_range_hint'.tr(
+                        namedArgs: {
+                          'min': bounds.min.toStringAsFixed(0),
+                          'max': bounds.max.toStringAsFixed(0),
+                          'crop': _crop?.cropName ?? '',
+                        },
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'estimated_total_value'.tr(),
+              style: theme.textTheme.bodyMedium,
+            ),
+            Text(
+              'Rs ${(_quantity * _price).toStringAsFixed(2)}',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhotoStep() {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'add_photos'.tr(),
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text('add_photos_subtitle'.tr(), style: theme.textTheme.bodyMedium),
+        const SizedBox(height: 16),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: SizedBox(
+            height: 180,
+            width: double.infinity,
+            child: _photoBytes != null
+                ? Image.memory(_photoBytes!, fit: BoxFit.cover)
+                : MediaImage(
+                    path: _crop?.imageUrl,
+                    bucket: 'crop-photos',
+                    placeholder: Container(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      child: Icon(
+                        Icons.image_outlined,
+                        size: 40,
+                        color: theme.colorScheme.outline,
+                      ),
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _photoBytes != null
+              ? 'using_new_photo'.tr()
+              : (_crop?.imageUrl != null
+                    ? 'using_crop_photo'.tr()
+                    : 'no_photo_yet'.tr()),
+          style: theme.textTheme.bodySmall,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _pickPhoto(ImageSource.camera),
+                icon: const Icon(Icons.photo_camera_outlined),
+                label: Text('take_photo'.tr()),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _pickPhoto(ImageSource.gallery),
+                icon: const Icon(Icons.photo_library_outlined),
+                label: Text('choose_from_gallery'.tr()),
+              ),
+            ),
+          ],
+        ),
+        if (_photoBytes != null) ...[
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => setState(() {
+              _photoBytes = null;
+              _photoFileName = null;
+            }),
+            child: Text('revert_to_crop_photo'.tr()),
+          ),
+        ],
+        const SizedBox(height: 20),
+        TextField(
+          controller: _descriptionController,
+          maxLines: 3,
+          maxLength: 200,
+          decoration: InputDecoration(
+            labelText: 'batch_description'.tr(),
+            hintText: 'batch_description_hint'.tr(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _pickHarvestedOn,
+          icon: const Icon(Icons.event_outlined),
+          label: Text(
+            _harvestedOn == null
+                ? 'set_harvest_date'.tr()
+                : '${'harvested_on'.tr()}: ${_formatDate(_harvestedOn!)}',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReviewStep() {
+    final theme = Theme.of(context);
+    final crop = _crop;
+    final description = _descriptionController.text.trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'review_your_listing'.tr(),
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 160,
+                child: _photoBytes != null
+                    ? Image.memory(_photoBytes!, fit: BoxFit.cover)
+                    : MediaImage(
+                        path: crop?.imageUrl,
+                        bucket: 'crop-photos',
+                        placeholder: Container(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          child: Icon(
+                            Icons.image_outlined,
+                            size: 40,
+                            color: theme.colorScheme.outline,
+                          ),
+                        ),
+                      ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      crop?.cropName ?? '',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (description.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(description, style: theme.textTheme.bodySmall),
+                    ],
+                    const Divider(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _ReviewField(
+                            label: 'total_quantity'.tr(),
+                            value: '${_quantity.toStringAsFixed(0)} kg',
+                          ),
+                        ),
+                        Expanded(
+                          child: _ReviewField(
+                            label: 'price_per_kg'.tr(),
+                            value: 'Rs ${_price.toStringAsFixed(2)}',
+                            highlight: true,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _ReviewField(
+                            label: 'harvested_on'.tr(),
+                            value: _harvestedOn == null
+                                ? '—'
+                                : _formatDate(_harvestedOn!),
+                          ),
+                        ),
+                        Expanded(
+                          child: _ReviewField(
+                            label: 'estimated_total_value'.tr(),
+                            value:
+                                'Rs ${(_quantity * _price).toStringAsFixed(2)}',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatDate(DateTime date) =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
+}
+
+class _FieldCard extends StatelessWidget {
+  final String label;
+  final Widget child;
+
+  const _FieldCard({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewField extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool highlight;
+
+  const _ReviewField({
+    required this.label,
+    required this.value,
+    this.highlight = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label.toUpperCase(), style: theme.textTheme.labelSmall),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: highlight ? theme.colorScheme.primary : null,
+          ),
+        ),
+      ],
+    );
+  }
+}

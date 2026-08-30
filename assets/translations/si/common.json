@@ -12,5 +12,22 @@
   "error_invalid_email": "වලංගු විද්‍යුත් තැපැල් ලිපිනයක් ඇතුළත් කරන්න",
   "error_password_too_short": "මුරපදයේ අවම වශයෙන් අක්ෂර 8ක් තිබිය යුතුය",
   "error_passwords_dont_match": "මුරපද නොගැලපේ",
-  "my_profile": "මගේ පැතිකඩ"
+  "my_profile": "මගේ පැතිකඩ",
+  "notifications": "දැනුම්දීම්",
+  "take_photo": "ඡායාරූපයක් ගන්න",
+  "choose_from_gallery": "ගැලරියෙන් තෝරන්න",
+  "address": "ලිපිනය",
+  "address_line1": "ලිපිනය පේළිය 1",
+  "address_line2": "ලිපිනය පේළිය 2",
+  "city": "නගරය",
+  "postal_code": "තැපැල් කේතය",
+  "location": "ස්ථානය",
+  "use_current_location": "වත්මන් ස්ථානය භාවිත කරන්න",
+  "fetching_location": "ස්ථානය ලබාගනිමින්...",
+  "location_services_disabled": "ස්ථාන සේවාවන් අක්‍රියයි",
+  "location_permission_denied": "ස්ථාන අවසරය ප්‍රතික්ෂේප විය",
+  "location_permission_denied_forever": "ස්ථාන අවසරය ස්ථිරවම ප්‍රතික්ෂේප කර ඇත. යෙදුම් සැකසුම් වලින් එය සක්‍රීය කරන්න.",
+  "error_location_unknown": "ඔබගේ ස්ථානය තීරණය කළ නොහැක",
+  "preferred_language": "කැමති භාෂාව",
+  "continue": "ඉදිරියට"
 }

@@ -1,23 +1,10 @@
 import 'dart:convert';
 
 import 'package:powersync/powersync.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../supabase/client.dart';
-
-/// Tables whose real Supabase primary key column differs from the
-/// local `id` PowerSync uses internally.
-const _pkColumnOverrides = {
-  'farmer_profile': 'profile_id',
-  'buyer_profile': 'profile_id',
-  'driver_profile': 'profile_id',
-};
-
-/// Columns that are `jsonb` in Postgres but are stored as JSON-encoded
-/// text locally (SQLite/PowerSync has no native object column type).
-const _jsonbColumns = {
-  'profile': {'address'},
-  'notification': {'payload'},
-};
+import 'table_registry.dart';
 
 class SupabaseConnector extends PowerSyncBackendConnector {
   @override
@@ -25,7 +12,7 @@ class SupabaseConnector extends PowerSyncBackendConnector {
     final session = supabase.auth.currentSession;
     if (session == null) return null;
     return PowerSyncCredentials(
-      endpoint: 'https://6a8aec61a77ca1231d221bdb.powersync.journeyapps.com',
+      endpoint: dotenv.env['POWERSYNC_URL']!,
       token: session.accessToken,
     );
   }
@@ -36,72 +23,69 @@ class SupabaseConnector extends PowerSyncBackendConnector {
     if (transaction == null) return;
 
     for (final op in transaction.crud) {
-      final table = supabase.from(op.table);
-      final pkColumn = _pkColumnOverrides[op.table] ?? 'id';
-      final opData = _decodeJsonbColumns(op.table, op.opData);
+      final config = configFor(op.table);
+      final table = supabase.from(config.tableName);
+      final opData = _decodeJsonbColumns(config, op.opData);
 
-      if (op.table == 'farmer_crop') {
-        await _uploadFarmerCrop(table, op, opData);
+      if (config.hasCompositeKey) {
+        await _uploadCompositeKeyRow(table, config, op, opData);
         continue;
       }
 
       switch (op.op) {
         case UpdateType.put:
-          await table.upsert({pkColumn: op.id, ...?opData});
+          await table.upsert({config.remotePkColumn: op.id, ...?opData});
         case UpdateType.patch:
-          await table.update(opData!).eq(pkColumn, op.id);
+          await table.update(opData!).eq(config.remotePkColumn, op.id);
         case UpdateType.delete:
-          await table.delete().eq(pkColumn, op.id);
+          await table.delete().eq(config.remotePkColumn, op.id);
       }
     }
     await transaction.complete();
   }
 
-  Future<void> _uploadFarmerCrop(
+  /// Handles any table registered with a [CompositeKey] generically —
+  /// e.g. farmer_crop's `"<farmerProfileId>:<cropId>"` local id. Adding
+  /// a second composite-key table (an order_item, a delivery_stop, ...)
+  /// only needs a `TableConfig(compositeKey: ...)` entry in the
+  /// registry — no new branch here, unlike the old `_uploadFarmerCrop`.
+  Future<void> _uploadCompositeKeyRow(
     dynamic table,
+    TableConfig config,
     dynamic op,
     Map<String, dynamic>? opData,
   ) async {
-    final key = op.id.split(':');
-    if (key.length != 2) {
-      throw FormatException('Invalid farmer_crop key: ${op.id}');
-    }
-
-    final farmerProfileId = key[0];
-    final cropId = key[1];
+    final keyColumns = config.compositeKey!.splitId(op.id);
 
     switch (op.op) {
       case UpdateType.put:
-        await table.upsert({
-          'farmer_profile_id': farmerProfileId,
-          'crop_id': cropId,
-        });
+        await table.upsert({...keyColumns, ...?opData});
       case UpdateType.patch:
-        await table
-            .update(opData!)
-            .eq('farmer_profile_id', farmerProfileId)
-            .eq('crop_id', cropId);
+        var query = table.update(opData!);
+        for (final entry in keyColumns.entries) {
+          query = query.eq(entry.key, entry.value);
+        }
+        await query;
       case UpdateType.delete:
-        await table
-            .delete()
-            .eq('farmer_profile_id', farmerProfileId)
-            .eq('crop_id', cropId);
+        var query = table.delete();
+        for (final entry in keyColumns.entries) {
+          query = query.eq(entry.key, entry.value);
+        }
+        await query;
     }
   }
 
-  /// Decodes any column listed in [_jsonbColumns] for [table] from its
-  /// locally-stored JSON string back into a real Map/List, so Supabase
-  /// writes it into the jsonb column as an object rather than a string.
+  /// Decodes any column listed as jsonb in [config] from its locally
+  /// stored JSON string back into a real Map/List, so Supabase writes
+  /// it into the jsonb column as an object rather than a string.
   Map<String, dynamic>? _decodeJsonbColumns(
-    String table,
+    TableConfig config,
     Map<String, dynamic>? data,
   ) {
-    if (data == null) return null;
-    final cols = _jsonbColumns[table];
-    if (cols == null) return data;
+    if (data == null || config.jsonbColumns.isEmpty) return data;
 
     final result = Map<String, dynamic>.from(data);
-    for (final col in cols) {
+    for (final col in config.jsonbColumns) {
       final value = result[col];
       if (value is String) {
         result[col] = jsonDecode(value);

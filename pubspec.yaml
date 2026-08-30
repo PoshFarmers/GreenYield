@@ -46,6 +46,13 @@ dependencies:
   path_provider: ^2.1.6
   path: ^1.9.1
   url_launcher: ^6.3.2
+  flutter_map: ^7.0.0
+  latlong2: ^0.9.1
+  http: ^1.2.0
+  flutter_cache_manager: ^3.4.2
+  connectivity_plus: ^7.3.1
+  sqflite: ^2.4.3
+  uuid: ^4.6.0
 
 dev_dependencies:
   flutter_test:

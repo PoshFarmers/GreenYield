@@ -14,6 +14,8 @@ class MultiFileAssetLoader extends AssetLoader {
     'buyer',
     'driver',
     'notifications',
+    'listings',
+    'marketplace',
   ];
 
   const MultiFileAssetLoader();
