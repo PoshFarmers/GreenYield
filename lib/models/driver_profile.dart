@@ -128,9 +128,7 @@ class RoutePreference {
       driverProfileId: map['driver_profile_id'] as String,
       originLocation: map['origin_location'] as String,
       destinationLocation: map['destination_location'] as String,
-      direction: routeDirectionFromDb(
-        (map['direction'] as String?) ?? 'both',
-      ),
+      direction: routeDirectionFromDb((map['direction'] as String?) ?? 'both'),
       activeDaysMask: (map['active_days'] as num?)?.toInt() ?? 0,
       isActive: ((map['is_active'] as num?)?.toInt() ?? 1) == 1,
     );

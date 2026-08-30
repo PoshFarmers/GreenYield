@@ -21,8 +21,7 @@ class DriverRouteSetupScreen extends StatefulWidget {
   });
 
   @override
-  State<DriverRouteSetupScreen> createState() =>
-      _DriverRouteSetupScreenState();
+  State<DriverRouteSetupScreen> createState() => _DriverRouteSetupScreenState();
 }
 
 class _DriverRouteSetupScreenState extends State<DriverRouteSetupScreen> {
@@ -95,17 +94,15 @@ class _DriverRouteSetupScreenState extends State<DriverRouteSetupScreen> {
                 children: [
                   Text(
                     'where_do_you_usually_drive'.tr(),
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     'add_frequent_routes_hint'.tr(),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: Theme.of(context).colorScheme.onSurface
+                          .withValues(alpha: 0.6),
                     ),
                   ),
                   const SizedBox(height: 20),

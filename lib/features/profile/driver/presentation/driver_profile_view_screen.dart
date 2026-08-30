@@ -782,10 +782,7 @@ class _PreferredRoutesSection extends StatelessWidget {
               onTap: () => _openManageRoutes(context),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.add_road,
-                    color: theme.colorScheme.primary,
-                  ),
+                  Icon(Icons.add_road, color: theme.colorScheme.primary),
                   const SizedBox(width: 12),
                   Expanded(child: Text('no_routes_added'.tr())),
                   Icon(
@@ -859,9 +856,7 @@ class _PreferredRoutesSection extends StatelessWidget {
                           const SizedBox(height: 8),
                           Text(
                             'plus_n_more_routes'.tr(
-                              namedArgs: {
-                                'count': '${routes.length - 1}',
-                              },
+                              namedArgs: {'count': '${routes.length - 1}'},
                             ),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.primary,

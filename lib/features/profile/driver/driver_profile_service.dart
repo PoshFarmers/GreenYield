@@ -56,20 +56,14 @@ class DriverProfileService {
 
     controller = StreamController<DriverProfile?>(
       onListen: () {
-        vehicleSub = vehicleStream.listen(
-          (v) {
-            lastVehicles = v;
-            emit();
-          },
-          onError: controller.addError,
-        );
-        routeSub = routeStream.listen(
-          (r) {
-            lastRoutes = r;
-            emit();
-          },
-          onError: controller.addError,
-        );
+        vehicleSub = vehicleStream.listen((v) {
+          lastVehicles = v;
+          emit();
+        }, onError: controller.addError);
+        routeSub = routeStream.listen((r) {
+          lastRoutes = r;
+          emit();
+        }, onError: controller.addError);
       },
       onCancel: () async {
         await vehicleSub?.cancel();

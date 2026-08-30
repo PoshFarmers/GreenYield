@@ -105,9 +105,8 @@ class _DriverManageRoutesScreenState extends State<DriverManageRoutesScreen> {
                     Text(
                       'edit_or_remove_routes_hint'.tr(),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: Theme.of(context).colorScheme.onSurface
+                            .withValues(alpha: 0.6),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -238,7 +237,9 @@ class _SavedRouteCard extends StatelessWidget {
             Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: [for (final day in activeDays) RouteDayPill(dayKey: day)],
+              children: [
+                for (final day in activeDays) RouteDayPill(dayKey: day),
+              ],
             ),
           const Divider(height: 24),
           Row(
