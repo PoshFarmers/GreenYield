@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../roles/role_profile_registry.dart';
+import '../../features/notifications/presentation/widgets/notification_badge_widget.dart';
 import '../../models/profile.dart';
 import 'avatar_image.dart';
 
@@ -56,15 +57,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
-        IconButton(
-          tooltip: 'notifications'.tr(),
-          onPressed: onNotificationsTap,
-          icon: Badge(
-            isLabelVisible: hasUnreadNotifications,
-            smallSize: 8,
-            child: const Icon(Icons.notifications_outlined),
-          ),
-        ),
+        const NotificationBadgeWidget(),
         if (roleScreens != null)
           IconButton(
             tooltip: 'my_profile'.tr(),

@@ -37,6 +37,10 @@ final Map<String, TableConfig> tableRegistry = {
   ),
   'cart': const TableConfig(tableName: 'cart'),
   'cart_item': const TableConfig(tableName: 'cart_item'),
+  'notification': const TableConfig(
+    tableName: 'notification',
+    jsonbColumns: {'payload'},
+  ),
 
   // --- add new tables here as orders/delivery/wallet land ---
   // 'listing': TableConfig(tableName: 'listing', remotePkColumn: 'id'),
