@@ -18,9 +18,8 @@ class NotificationBadgeWidget extends ConsumerWidget {
 
     return IconButton(
       tooltip: 'Notifications',
-      onPressed: () => Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => const NotificationScreen())),
+      onPressed: () => Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const NotificationScreen())),
       icon: Badge(
         isLabelVisible: count > 0,
         label: Text(count > 99 ? '99+' : '$count'),

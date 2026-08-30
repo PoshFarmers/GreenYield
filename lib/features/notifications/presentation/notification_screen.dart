@@ -10,8 +10,7 @@ class NotificationScreen extends ConsumerStatefulWidget {
   const NotificationScreen({super.key});
 
   @override
-  ConsumerState<NotificationScreen> createState() =>
-      _NotificationScreenState();
+  ConsumerState<NotificationScreen> createState() => _NotificationScreenState();
 }
 
 class _NotificationScreenState extends ConsumerState<NotificationScreen> {
@@ -41,7 +40,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(notificationListProvider);
     final controller = ref.read(notificationListProvider.notifier);
-    final unreadCount = ref.watch(unreadNotificationCountProvider).asData?.value ?? 0;
+    final unreadCount =
+        ref.watch(unreadNotificationCountProvider).asData?.value ?? 0;
 
     return Scaffold(
       backgroundColor: AppColors.cream,
