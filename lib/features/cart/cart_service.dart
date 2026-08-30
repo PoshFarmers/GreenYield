@@ -127,7 +127,14 @@ class CartService {
       'INSERT INTO cart_item '
       '(id, cart_id, produce_listing_id, quantity_kg, created_at, updated_at) '
       'VALUES (?, ?, ?, ?, ?, ?)',
-      [_uuid.v4(), cartId, produceListingId, _clamp(quantityKg, maxQty), now, now],
+      [
+        _uuid.v4(),
+        cartId,
+        produceListingId,
+        _clamp(quantityKg, maxQty),
+        now,
+        now,
+      ],
     );
   }
 
@@ -148,7 +155,11 @@ class CartService {
     final maxQty = await _availableStock(row['produce_listing_id'] as String);
     await db.execute(
       'UPDATE cart_item SET quantity_kg = ?, updated_at = ? WHERE id = ?',
-      [_clamp(quantityKg, maxQty), DateTime.now().toIso8601String(), cartItemId],
+      [
+        _clamp(quantityKg, maxQty),
+        DateTime.now().toIso8601String(),
+        cartItemId,
+      ],
     );
   }
 
