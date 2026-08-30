@@ -55,6 +55,9 @@ const schema = Schema([
     Column.text('driver_profile_id'),
     Column.text('origin_location'),
     Column.text('destination_location'),
+    Column.text('direction'), // outbound|return|both
+    Column.integer('active_days'), // bitmask, bit0=Mon .. bit6=Sun
+    Column.integer('is_active'), // 0/1 — PowerSync has no bool column
   ]),
   Table('notification', [
     Column.text('profile_id'),

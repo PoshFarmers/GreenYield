@@ -6,6 +6,7 @@ import '../../../../core/auth/auth_providers.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../models/driver_profile.dart';
 import '../driver_profile_service.dart';
+import 'widgets/route_draft_editor.dart';
 
 const _vehicleTypes = ['three_wheeler', 'van', 'lorry', 'truck', 'tractor'];
 
@@ -25,6 +26,13 @@ class _DriverCompleteProfileScreenState
   final _preferredMinLoadController = TextEditingController();
   final _service = DriverProfileService();
 
+  // Preferred routes are optional at setup time (mandatory fields are
+  // vehicle type / plate / max load above) — `_routeDrafts` always has
+  // at least one blank draft card so the section isn't empty, but a
+  // draft only gets persisted if the user actually fills in both
+  // endpoints. See RouteDraft.isFilled.
+  final List<RouteDraft> _routeDrafts = [RouteDraft()];
+
   String _vehicleType = _vehicleTypes.first;
   bool _isSubmitting = false;
   String? _errorMessage;
@@ -34,10 +42,26 @@ class _DriverCompleteProfileScreenState
     _plateNumberController.dispose();
     _maxLoadController.dispose();
     _preferredMinLoadController.dispose();
+    for (final draft in _routeDrafts) {
+      draft.dispose();
+    }
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  void _addRouteDraft() => setState(() => _routeDrafts.add(RouteDraft()));
+
+  void _removeRouteDraft(int index) {
+    setState(() {
+      _routeDrafts[index].dispose();
+      _routeDrafts.removeAt(index);
+      if (_routeDrafts.isEmpty) _routeDrafts.add(RouteDraft());
+    });
+  }
+
+  /// [includeRoutes] is false for the "Skip" button — the vehicle form
+  /// is still mandatory and gets saved either way, only the routes step
+  /// is skippable (and can always be added later from the profile).
+  Future<void> _submit({required bool includeRoutes}) async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -48,6 +72,13 @@ class _DriverCompleteProfileScreenState
     try {
       final userId = ref.read(authServiceProvider).currentUser!.id;
       final preferredMinLoadText = _preferredMinLoadController.text.trim();
+
+      final routes = includeRoutes
+          ? [
+              for (final draft in _routeDrafts)
+                if (draft.isFilled) draft.toRoutePreference(userId),
+            ]
+          : <RoutePreference>[];
 
       await _service.createProfile(
         userId,
@@ -60,6 +91,7 @@ class _DriverCompleteProfileScreenState
               ? null
               : double.parse(preferredMinLoadText),
         ),
+        routes: routes,
       );
       // AuthGate watches ownProfileProvider and re-checks
       // roleScreensRegistry['driver'].hasCompletedProfile on rebuild —
@@ -161,6 +193,44 @@ class _DriverCompleteProfileScreenState
                         return null;
                       },
                     ),
+                    const SizedBox(height: 28),
+                    Text(
+                      'where_do_you_usually_drive'.tr(),
+                      style: Theme.of(context).textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'add_frequent_routes_hint'.tr(),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    for (var i = 0; i < _routeDrafts.length; i++) ...[
+                      RouteDraftCard(
+                        draft: _routeDrafts[i],
+                        onRemove: _routeDrafts.length > 1
+                            ? () => _removeRouteDraft(i)
+                            : null,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    OutlinedButton.icon(
+                      onPressed: _addRouteDraft,
+                      icon: const Icon(Icons.add),
+                      label: Text('add_another_route'.tr()),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                          style: BorderStyle.solid,
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
                     if (_errorMessage != null) ...[
                       const SizedBox(height: 12),
                       Text(
@@ -171,15 +241,35 @@ class _DriverCompleteProfileScreenState
                       ),
                     ],
                     const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _isSubmitting ? null : _submit,
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text('save'.tr()),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _isSubmitting
+                                ? null
+                                : () => _submit(includeRoutes: false),
+                            child: Text('skip'.tr()),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: _isSubmitting
+                                ? null
+                                : () => _submit(includeRoutes: true),
+                            child: _isSubmitting
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text('continue'.tr()),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

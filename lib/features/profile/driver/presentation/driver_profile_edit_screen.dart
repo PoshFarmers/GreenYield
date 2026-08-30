@@ -10,6 +10,7 @@ import '../../../../core/widgets/generic_profile_form.dart';
 import '../../../../models/driver_profile.dart';
 import '../../../../models/profile.dart';
 import '../driver_profile_service.dart';
+import 'driver_manage_routes_screen.dart';
 
 const _vehicleTypes = ['three_wheeler', 'van', 'lorry', 'truck', 'tractor'];
 
@@ -228,6 +229,22 @@ class _DriverProfileEditScreenState
                     ],
 
                     const SizedBox(height: 24),
+
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => DriverManageRoutesScreen(
+                              driverProfileId: widget.profile.profileId,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.alt_route),
+                      label: Text('preferred_routes'.tr()),
+                    ),
+
+                    const SizedBox(height: 12),
 
                     ElevatedButton(
                       onPressed: _isSubmitting ? null : _submit,

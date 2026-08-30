@@ -10,20 +10,24 @@ import '../../../../features/navigation/presentation/app_nav_shell.dart';
 import '../../../../models/driver_profile.dart';
 import '../../../../models/profile.dart';
 import '../driver_profile_service.dart';
+import 'driver_manage_routes_screen.dart';
 import 'driver_profile_edit_screen.dart';
+import 'widgets/route_draft_editor.dart'; // weekdayKeys, RouteDayPill
 
 /// Driver's profile screen — mirrors the Figma "Profile" design.
 ///
 /// Data notes:
 /// * Name, phone, avatar, and vehicle come straight from PowerSync
 ///   ([Profile] / [DriverProfile]), same as before.
-/// * Rating, completion %, lifetime earnings, wallet balance, preferred
-///   routes, and bank/payout details aren't modelled anywhere in the
-///   schema yet (no `rating`, `wallet`, `route`, or `payout` tables/
-///   columns exist as of this branch). Those sections render clearly
-///   marked placeholder data below so the screen matches the Figma
-///   pixel-for-pixel; swap `_DriverStats.placeholder()` etc. for real
-///   providers once that backend work lands.
+/// * Preferred routes are now real, backed by `driver_route_preference`
+///   via [DriverProfileService.watchRoutes] — see [_PreferredRoutesSection].
+/// * Rating, completion %, lifetime earnings, wallet balance, and
+///   bank/payout details still aren't modelled anywhere in the schema
+///   (no `rating`, `wallet`, or `payout` tables/columns exist as of this
+///   branch). Those sections render clearly marked placeholder data
+///   below so the screen matches the Figma pixel-for-pixel; swap
+///   `_DriverStats.placeholder()` etc. for real providers once that
+///   backend work lands.
 class DriverProfileViewScreen extends ConsumerStatefulWidget {
   final Profile? initialProfile;
 
@@ -214,7 +218,10 @@ class _ProfileBody extends ConsumerWidget {
               const SizedBox(height: 24),
               _VehiclesSection(vehicle: vehicle, onEdit: onEditVehicle),
               const SizedBox(height: 24),
-              const _PreferredRoutesSection(),
+              _PreferredRoutesSection(
+                driverProfileId: driverProfile.profileId,
+                routes: driverProfile.routePreferences,
+              ),
               const SizedBox(height: 24),
               const _FinancialDetailsSection(),
               const SizedBox(height: 24),
@@ -733,14 +740,31 @@ class _VehicleCard extends StatelessWidget {
 // --- Preferred routes -------------------------------------------------
 
 class _PreferredRoutesSection extends StatelessWidget {
-  const _PreferredRoutesSection();
+  final String driverProfileId;
+  final List<RoutePreference> routes;
+
+  const _PreferredRoutesSection({
+    required this.driverProfileId,
+    required this.routes,
+  });
+
+  void _openManageRoutes(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            DriverManageRoutesScreen(driverProfileId: driverProfileId),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Placeholder — no schedule/route provider wired up on this screen
-    // yet (the `journey_route` tables exist in Supabase, but there's
-    // no Dart repository/service for them yet).
+    final activeRoutes = routes.where((r) => r.isActive).toList();
+    final displayRoute = activeRoutes.isNotEmpty
+        ? activeRoutes.first
+        : (routes.isNotEmpty ? routes.first : null);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -749,116 +773,152 @@ class _PreferredRoutesSection extends StatelessWidget {
           action: IconButton(
             visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.edit_outlined, size: 20),
-            onPressed: () {},
+            onPressed: () => _openManageRoutes(context),
           ),
         ),
-        _CardShell(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'route'.tr().toUpperCase(),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.55,
-                        ),
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            'Colombo',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Icon(
-                          Icons.sync_alt,
-                          size: 18,
-                          color: theme.colorScheme.primary,
-                        ),
-                        Flexible(
-                          child: Text(
-                            'Dambulla',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final day in ['MON', 'WED', 'FRI'])
-                          _DayChip(label: day),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                mainAxisSize: MainAxisSize.min,
+        if (displayRoute == null)
+          _CardShell(
+            child: InkWell(
+              onTap: () => _openManageRoutes(context),
+              child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.14),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.sync_alt,
-                      color: theme.colorScheme.primary,
-                      size: 18,
-                    ),
+                  Icon(
+                    Icons.add_road,
+                    color: theme.colorScheme.primary,
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'outbound_and_return'.tr(),
-                    textAlign: TextAlign.right,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text('no_routes_added'.tr())),
+                  Icon(
+                    Icons.chevron_right,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
                   ),
                 ],
               ),
-            ],
+            ),
+          )
+        else
+          _CardShell(
+            child: InkWell(
+              onTap: () => _openManageRoutes(context),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'route'.tr().toUpperCase(),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.55,
+                            ),
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                displayRoute.originLocation,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Icon(
+                              Icons.sync_alt,
+                              size: 18,
+                              color: theme.colorScheme.primary,
+                            ),
+                            Flexible(
+                              child: Text(
+                                displayRoute.destinationLocation,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        if (displayRoute.activeDayKeys.isNotEmpty)
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              for (final day in weekdayKeys)
+                                if (displayRoute.activeDayKeys.contains(day))
+                                  RouteDayPill(dayKey: day),
+                            ],
+                          ),
+                        if (routes.length > 1) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'plus_n_more_routes'.tr(
+                              namedArgs: {
+                                'count': '${routes.length - 1}',
+                              },
+                            ),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withValues(
+                            alpha: 0.14,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.sync_alt,
+                          color: theme.colorScheme.primary,
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _directionKey(displayRoute.direction).tr(),
+                        textAlign: TextAlign.right,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
       ],
     );
   }
-}
 
-class _DayChip extends StatelessWidget {
-  final String label;
-
-  const _DayChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.secondary,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(label, style: theme.textTheme.labelSmall),
-    );
+  String _directionKey(RouteDirection direction) {
+    switch (direction) {
+      case RouteDirection.outbound:
+        return 'outbound';
+      case RouteDirection.returnTrip:
+        return 'return_trip';
+      case RouteDirection.both:
+        return 'outbound_and_return';
+    }
   }
 }
 
