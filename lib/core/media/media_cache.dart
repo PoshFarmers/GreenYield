@@ -46,16 +46,21 @@ class MediaCache {
   Future<File> getFile({
     required String bucket,
     required String remotePath,
+    bool public = false,
     int signedUrlExpiresIn = 3600,
   }) async {
     final key = _cacheKey(bucket, remotePath);
     final cached = await _manager.getFileFromCache(key);
     if (cached != null) return cached.file;
 
-    final signedUrl = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(remotePath, signedUrlExpiresIn);
-    final fileInfo = await _manager.downloadFile(signedUrl, key: key);
+    // Public buckets skip the createSignedUrl round-trip entirely --
+    // getPublicUrl is a local string build, no network call.
+    final url = public
+        ? supabase.storage.from(bucket).getPublicUrl(remotePath)
+        : await supabase.storage
+              .from(bucket)
+              .createSignedUrl(remotePath, signedUrlExpiresIn);
+    final fileInfo = await _manager.downloadFile(url, key: key);
     return fileInfo.file;
   }
 

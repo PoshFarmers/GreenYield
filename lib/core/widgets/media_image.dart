@@ -13,6 +13,7 @@ class MediaImage extends StatefulWidget {
   final String bucket;
   final Widget placeholder;
   final BoxFit fit;
+  final bool public;
 
   const MediaImage({
     super.key,
@@ -20,6 +21,7 @@ class MediaImage extends StatefulWidget {
     required this.bucket,
     required this.placeholder,
     this.fit = BoxFit.cover,
+    this.public = false,
   });
 
   @override
@@ -55,6 +57,7 @@ class _MediaImageState extends State<MediaImage> {
       final file = await MediaService.instance.getDisplayFile(
         bucket: widget.bucket,
         remotePath: path,
+        public: widget.public,
       );
       if (mounted) setState(() => _file = file);
     } catch (_) {
