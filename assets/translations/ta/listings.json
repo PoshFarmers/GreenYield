@@ -53,5 +53,14 @@
   "harvested_on": "அறுவடை செய்த தேதி",
 
   "review_your_listing": "உங்கள் பட்டியலை மதிப்பாய்வு செய்யவும்",
-  "total_quantity": "மொத்த அளவு"
+  "total_quantity": "மொத்த அளவு",
+
+  "market_average_unavailable": "இந்தப் பயிருக்கு போதுமான சந்தைத் தரவு இன்னும் இல்லை",
+  "market_average_label": "சந்தை சராசரி",
+  "price_comparison_above": "உங்கள் விலை சந்தை சராசரியை விட {percent}% அதிகம்",
+  "price_comparison_below": "உங்கள் விலை சந்தை சராசரியை விட {percent}% குறைவு",
+  "price_comparison_at_market": "உங்கள் விலை சந்தை சராசரியுடன் பொருந்துகிறது",
+  "price_trend_hint": "கடந்த {days} நாட்களில் விலைகள் {percent}% மாறியுள்ளன",
+  "vs_market": "சந்தையுடன் ஒப்பிடுகையில்",
+  "at_market": "சந்தை விலையில்"
 }
