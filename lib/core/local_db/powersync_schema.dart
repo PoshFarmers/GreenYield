@@ -24,8 +24,6 @@ const schema = Schema([
     Column.text('image_url'),
   ]),
   Table('crop', [Column.text('name'), Column.text('category')]),
-  // `status` is a Postgres enum, so only its `status_text` mirror is
-  // synced (see the powersync_compat_view migration).
   Table('produce_listing', [
     Column.text('farmer_profile_id'),
     Column.text('crop_id'),
@@ -55,9 +53,9 @@ const schema = Schema([
     Column.text('driver_profile_id'),
     Column.text('origin_location'),
     Column.text('destination_location'),
-    Column.text('direction'), // outbound|return|both
-    Column.integer('active_days'), // bitmask, bit0=Mon .. bit6=Sun
-    Column.integer('is_active'), // 0/1 — PowerSync has no bool column
+    Column.text('direction'),
+    Column.integer('active_days'),
+    Column.integer('is_active'),
   ]),
   Table('notification', [
     Column.text('profile_id'),
@@ -82,10 +80,7 @@ const schema = Schema([
     Column.text('created_at'),
     Column.text('updated_at'),
   ]),
-  // market_price and price_trend are keyed by crop_id in Postgres (no
-  // separate `id` column there) — the PowerSync sync-rules stream
-  // aliases crop_id AS id for both. See the sync-rules note in this
-  // branch's instructions if that alias isn't in place yet.
+  // From branch 7.1
   Table('market_price', [
     Column.text('crop_id'),
     Column.real('avg_price_per_kg'),
@@ -96,14 +91,11 @@ const schema = Schema([
   ]),
   Table('price_trend', [
     Column.text('crop_id'),
-    Column.text('trend_direction'), // 'up' | 'down' | 'stable'
+    Column.text('trend_direction'),
     Column.real('change_percent'),
     Column.integer('period_days'),
     Column.text('computed_at'),
   ]),
-  // price_history has a real `id` PK in Postgres already, so no id
-  // aliasing needed in the sync-rules stream (`price_history_recent`
-  // already does a plain `SELECT * FROM price_history`).
   Table('price_history', [
     Column.text('crop_id'),
     Column.text('price_date'),
@@ -111,6 +103,18 @@ const schema = Schema([
     Column.real('min_price_per_kg'),
     Column.real('max_price_per_kg'),
     Column.integer('order_count'),
+    Column.text('created_at'),
+  ]),
+  // no client insert/update RLS policy exists for this table.
+  Table('pricing_rule', [
+    Column.text('name'),
+    Column.real('base_fee'),
+    Column.real('per_km_rate'),
+    Column.real('min_fee'),
+    Column.real('max_fee'),
+    Column.text('effective_from'),
+    Column.text('effective_to'),
+    Column.integer('is_active'),
     Column.text('created_at'),
   ]),
 ]);
