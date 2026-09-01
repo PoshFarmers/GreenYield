@@ -70,4 +70,47 @@ const schema = Schema([
     Column.text('read_at'),
     Column.text('created_at'),
   ]),
+  Table('cart', [
+    Column.text('buyer_profile_id'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  Table('cart_item', [
+    Column.text('cart_id'),
+    Column.text('produce_listing_id'),
+    Column.real('quantity_kg'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  // market_price and price_trend are keyed by crop_id in Postgres (no
+  // separate `id` column there) — the PowerSync sync-rules stream
+  // aliases crop_id AS id for both. See the sync-rules note in this
+  // branch's instructions if that alias isn't in place yet.
+  Table('market_price', [
+    Column.text('crop_id'),
+    Column.real('avg_price_per_kg'),
+    Column.real('min_price_per_kg'),
+    Column.real('max_price_per_kg'),
+    Column.text('as_of_date'),
+    Column.text('updated_at'),
+  ]),
+  Table('price_trend', [
+    Column.text('crop_id'),
+    Column.text('trend_direction'), // 'up' | 'down' | 'stable'
+    Column.real('change_percent'),
+    Column.integer('period_days'),
+    Column.text('computed_at'),
+  ]),
+  // price_history has a real `id` PK in Postgres already, so no id
+  // aliasing needed in the sync-rules stream (`price_history_recent`
+  // already does a plain `SELECT * FROM price_history`).
+  Table('price_history', [
+    Column.text('crop_id'),
+    Column.text('price_date'),
+    Column.real('avg_price_per_kg'),
+    Column.real('min_price_per_kg'),
+    Column.real('max_price_per_kg'),
+    Column.integer('order_count'),
+    Column.text('created_at'),
+  ]),
 ]);

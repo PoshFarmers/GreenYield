@@ -109,6 +109,22 @@ class _BuyerProfileViewScreenState
                           },
                           child: Text('edit_profile'.tr()),
                         ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: () =>
+                              ref.read(authServiceProvider).signOut(),
+                          icon: const Icon(Icons.logout),
+                          label: Text('logout'.tr()),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Theme.of(context)
+                                .colorScheme
+                                .error,
+                            side: BorderSide(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
                       ],
                     ),
                   ),
