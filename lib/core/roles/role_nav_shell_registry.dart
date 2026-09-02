@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../features/calendar/presentation/driver_calendar_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/listings/presentation/my_listings_screen.dart';
@@ -89,7 +90,7 @@ Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
           NavTab(
             label: 'Calendar',
             icon: Icons.calendar_today_outlined,
-            builder: (_) => const ComingSoonScreen(title: 'Calendar'),
+            builder: (_) => DriverCalendarScreen(profile: profile),
           ),
           NavTab(
             label: 'Deliveries',

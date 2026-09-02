@@ -47,5 +47,17 @@
   "theme_system": "පද්ධතිය",
   "push_notifications": "තල්ලු දැනුම්දීම්",
   "view": "බලන්න",
-  "wallet_balance": "පසුම්බි ශේෂය"
+  "wallet_balance": "පසුම්බි ශේෂය",
+  "month_short_jan": "ජන",
+  "month_short_feb": "පෙබ",
+  "month_short_mar": "මාර්",
+  "month_short_apr": "අප්‍රේ",
+  "month_short_may": "මැයි",
+  "month_short_jun": "ජූනි",
+  "month_short_jul": "ජූලි",
+  "month_short_aug": "අගෝ",
+  "month_short_sep": "සැප්",
+  "month_short_oct": "ඔක්",
+  "month_short_nov": "නොවැ",
+  "month_short_dec": "දෙසැ"
 }
