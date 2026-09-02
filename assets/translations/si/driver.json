@@ -82,5 +82,21 @@
   "district_pallets_crop": "{district} • පැලට් {pallets} • {crop}",
   "route_completed": "මාර්ගය {route} • සම්පූර්ණයි",
   "done": "සිදු කළා",
-  "details": "විස්තර"
+  "details": "විස්තර",
+  "my_wallet": "මගේ පසුම්බිය",
+  "available_balance": "ලබාගත හැකි ශේෂය",
+  "withdraw": "ආපසු ගන්න",
+  "expected_arrival": "ලැබෙනු ඇත: {day}, {time}",
+  "tomorrow": "හෙට",
+  "linked_bank": "සම්බන්ධිත බැංකුව",
+  "manage": "කළමනාකරණය",
+  "account_ending": "•••• {last4}",
+  "recent_activity": "මෑත ක්‍රියාකාරකම්",
+  "delivery_fee": "බෙදාහැරීමේ ගාස්තුව",
+  "payout_to_bank": "බැංකුවට ගෙවීම",
+  "order_ref": "ඇණවුම #{id}",
+  "view_all_transactions": "සියලුම ගනුදෙනු බලන්න",
+  "today": "අද",
+  "yesterday": "ඊයේ",
+  "days_ago": "දින {count}කට පෙර"
 }

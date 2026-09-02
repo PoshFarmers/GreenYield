@@ -82,5 +82,21 @@
   "district_pallets_crop": "{district} • {pallets} பலகைகள் • {crop}",
   "route_completed": "வழி {route} • முடிந்தது",
   "done": "முடிந்தது",
-  "details": "விவரங்கள்"
+  "details": "விவரங்கள்",
+  "my_wallet": "எனது பணப்பை",
+  "available_balance": "கிடைக்கும் இருப்பு",
+  "withdraw": "எடு",
+  "expected_arrival": "வரவு எதிர்பார்க்கப்படுகிறது: {day}, {time}",
+  "tomorrow": "நாளை",
+  "linked_bank": "இணைக்கப்பட்ட வங்கி",
+  "manage": "நிர்வகி",
+  "account_ending": "•••• {last4}",
+  "recent_activity": "சமீபத்திய செயல்பாடு",
+  "delivery_fee": "விநியோக கட்டணம்",
+  "payout_to_bank": "வங்கிக்கு செலுத்துகை",
+  "order_ref": "ஆர்டர் #{id}",
+  "view_all_transactions": "அனைத்து பரிவர்த்தனைகளையும் காண்க",
+  "today": "இன்று",
+  "yesterday": "நேற்று",
+  "days_ago": "{count} நாட்களுக்கு முன்"
 }

@@ -10,6 +10,7 @@ import '../../../../features/navigation/presentation/app_nav_shell.dart';
 import '../../../../models/driver_profile.dart';
 import '../../../../models/profile.dart';
 import '../driver_profile_service.dart';
+import '../../../wallet/presentation/driver_wallet_screen.dart';
 import 'driver_manage_routes_screen.dart';
 import 'driver_profile_edit_screen.dart';
 import 'widgets/route_draft_editor.dart'; // weekdayKeys, RouteDayPill
@@ -214,7 +215,7 @@ class _ProfileBody extends ConsumerWidget {
               const SizedBox(height: 20),
               const _StatsCard(),
               const SizedBox(height: 16),
-              const _WalletCard(),
+              _WalletCard(profile: profile),
               const SizedBox(height: 24),
               _VehiclesSection(vehicle: vehicle, onEdit: onEditVehicle),
               const SizedBox(height: 24),
@@ -501,7 +502,9 @@ class _StatItem extends StatelessWidget {
 // --- Wallet card --------------------------------------------------------
 
 class _WalletCard extends StatelessWidget {
-  const _WalletCard();
+  final Profile profile;
+
+  const _WalletCard({required this.profile});
 
   @override
   Widget build(BuildContext context) {
@@ -542,7 +545,16 @@ class _WalletCard extends StatelessWidget {
               ],
             ),
           ),
-          TextButton(onPressed: () {}, child: Text('view'.tr())),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DriverWalletScreen(profile: profile),
+                ),
+              );
+            },
+            child: Text('view'.tr()),
+          ),
         ],
       ),
     );
