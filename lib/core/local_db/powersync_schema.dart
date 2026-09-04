@@ -105,6 +105,47 @@ const schema = Schema([
     Column.integer('order_count'),
     Column.text('created_at'),
   ]),
+  // --- Sprint 2 / Task 3.2 — Order Creation & Checkout Flow ---
+  // Mirrors `orders` / `order_item` / `payment` (see
+  // supabase/migrations/20260827093223_orders.sql and
+  // .../20260827094657_payment_and_refund.sql). There is no separate
+  // `sub_orders` table server-side: a multi-farmer checkout creates one
+  // `orders` row *per farmer*, all sharing the same `checkout_group_id`
+  // — that shared id is what ties a buyer's sibling per-farmer orders
+  // back together as "one checkout" in the UI.
+  Table('orders', [
+    Column.text('checkout_group_id'),
+    Column.text('buyer_profile_id'),
+    Column.text('farmer_profile_id'),
+    Column.text('status'),
+    Column.text('delivery_id'),
+    Column.text('payment_id'),
+    Column.real('subtotal_amount'),
+    Column.real('delivery_fee_amount'),
+    Column.real('total_amount'),
+    Column.text('delivery_address'),
+    Column.text('placed_at'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  Table('order_item', [
+    Column.text('order_id'),
+    Column.text('produce_listing_id'),
+    Column.text('crop_id'),
+    Column.real('quantity_kg'),
+    Column.real('price_per_kg'),
+    Column.text('created_at'),
+  ]),
+  Table('payment', [
+    Column.text('order_id'),
+    Column.text('buyer_profile_id'),
+    Column.text('method'),
+    Column.real('amount'),
+    Column.text('status'),
+    Column.text('gateway_reference'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
   // no client insert/update RLS policy exists for this table.
   Table('pricing_rule', [
     Column.text('name'),
