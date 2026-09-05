@@ -15,7 +15,13 @@ class ProduceListing {
 
   /// Already coalesced: listing's own value, else the farmer_crop one.
   final String? description;
-  final String? imageUrl;
+
+  /// The three tiers of the image fallback chain, kept separate (rather
+  /// than pre-coalesced into one path) because each tier lives in a
+  /// different bucket -- see [displayImage].
+  final String? listingImageUrl;
+  final String? farmerCropImageUrl;
+  final String? cropFallbackImageUrl;
 
   final DateTime? harvestedOn;
 
@@ -28,11 +34,35 @@ class ProduceListing {
     required this.availableQuantityKg,
     required this.status,
     this.description,
-    this.imageUrl,
+    this.listingImageUrl,
+    this.farmerCropImageUrl,
+    this.cropFallbackImageUrl,
     this.harvestedOn,
   });
 
   double get totalValue => pricePerKg * availableQuantityKg;
+
+  /// Path + bucket to actually display: the listing's own photo, else
+  /// the farmer's standing crop photo, else the crop catalogue's
+  /// fallback image. Mirrors `FarmerCrop.displayImage` and the same
+  /// chain `search_marketplace_listings` resolves server-side.
+  ({String? path, String bucket, bool isFallback}) get displayImage {
+    if (listingImageUrl != null) {
+      return (path: listingImageUrl, bucket: 'crop-photos', isFallback: false);
+    }
+    if (farmerCropImageUrl != null) {
+      return (
+        path: farmerCropImageUrl,
+        bucket: 'crop-photos',
+        isFallback: false,
+      );
+    }
+    return (
+      path: cropFallbackImageUrl,
+      bucket: 'crop-fallback-images',
+      isFallback: true,
+    );
+  }
 
   factory ProduceListing.fromMap(Map<String, dynamic> map) {
     final harvestedOn = map['harvested_on'] as String?;
@@ -46,7 +76,9 @@ class ProduceListing {
           (map['available_quantity_kg'] as num?)?.toDouble() ?? 0,
       status: map['status_text'] as String? ?? 'active',
       description: map['description'] as String?,
-      imageUrl: map['image_url'] as String?,
+      listingImageUrl: map['listing_image_url'] as String?,
+      farmerCropImageUrl: map['farmer_crop_image_url'] as String?,
+      cropFallbackImageUrl: map['crop_fallback_image_url'] as String?,
       harvestedOn: harvestedOn == null ? null : DateTime.tryParse(harvestedOn),
     );
   }
