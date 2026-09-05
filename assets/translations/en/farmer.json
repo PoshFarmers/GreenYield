@@ -37,5 +37,8 @@
   "tap_crop_to_edit": "Tap a crop to edit its photo, description and price.",
   "market_prices_title": "Market prices",
   "market_prices_subtitle": "Today's average price for your crops",
-  "no_market_data_short": "No data yet"
+  "no_market_data_short": "No data yet",
+  "farmer_home_subtitle": "Here's how your produce is doing today",
+  "price_history_title": "Price History (30 days)",
+  "no_price_history_yet": "Not enough price history yet for this crop"
 }
