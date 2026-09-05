@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../features/calendar/presentation/driver_calendar_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
+import '../../features/chat/presentation/chat_threads_screen.dart';
+import '../../features/chat/presentation/widgets/chat_nav_badge_icon.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/listings/presentation/my_listings_screen.dart';
 import '../../features/marketplace/presentation/marketplace_screen.dart';
@@ -15,10 +17,10 @@ import '../widgets/coming_soon_screen.dart';
 ///   Buyer  -> Home, Cart,     Orders, Chat
 ///   Driver -> Home, Calendar, Deliveries, Chat
 ///
-/// Only Home is wired to a real screen right now. The rest — including
-/// Chat, until the messaging branch merges — are `ComingSoonScreen`
-/// placeholders. Swap those out in place; the shell itself never needs
-/// to change.
+/// Only Home, Cart, Harvest, Calendar and Chat are wired to real
+/// screens right now. Orders/Deliveries are still `ComingSoonScreen`
+/// placeholders. Swap those out in place; the shell itself never
+/// needs to change.
 Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
   // AuthGate falls back to `roles.first` when profile.active_role is
   // null, but that fallback lived only in its local variable — anything
@@ -37,7 +39,8 @@ Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
   final chatTab = NavTab(
     label: 'Chat',
     icon: Icons.chat_bubble_outline,
-    builder: (_) => const ComingSoonScreen(title: 'Chat'),
+    iconBuilder: (_) => const ChatNavBadgeIcon(),
+    builder: (_) => ChatThreadsScreen(profile: profile),
   );
 
   switch (activeRole) {

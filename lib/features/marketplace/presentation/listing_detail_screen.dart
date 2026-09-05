@@ -10,6 +10,8 @@ import '../../../core/widgets/media_image.dart';
 import '../../../models/marketplace_listing.dart';
 import '../../../models/profile.dart';
 import '../../cart/cart_service.dart';
+import '../../chat/chat_service.dart';
+import '../../chat/presentation/chat_screen.dart';
 import '../../navigation/presentation/app_nav_shell.dart';
 import '../../pricing/presentation/widgets/price_breakdown_card.dart';
 import '../marketplace_service.dart';
@@ -44,6 +46,8 @@ class ListingDetailScreen extends ConsumerStatefulWidget {
 class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   final _service = const MarketplaceService();
   final _cartService = const CartService();
+  final _chatService = const ChatService();
+  bool _isMessagingFarmer = false;
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
@@ -126,13 +130,49 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     }
   }
 
-  void _messageFarmer() {
-    // Chat isn't built yet — this only performs the transition, landing
-    // the buyer on the Chat tab of the shell underneath.
-    Navigator.of(context).popUntil((route) => route.isFirst);
-    ref
-        .read(navShellIndexProvider.notifier)
-        .select(ListingDetailScreen.chatTabIndex);
+  Future<void> _messageFarmer() async {
+    final listing = _listing;
+    if (listing == null || _isMessagingFarmer) return;
+
+    setState(() => _isMessagingFarmer = true);
+    try {
+      final conversationId = await _chatService.getOrCreateConversation(
+        callerRole: 'buyer',
+        otherUserId: listing.farmerProfileId,
+        otherRole: 'farmer',
+      );
+      if (!mounted) return;
+
+      // Capture the Navigator before popping this screen away — once
+      // popUntil runs, this State's own context is on its way out, but
+      // the NavigatorState itself stays valid for the follow-up push.
+      final navigator = Navigator.of(context);
+
+      // Land on the Chat tab of the shell underneath, then push the
+      // room on top of it so back returns to the thread list.
+      navigator.popUntil((route) => route.isFirst);
+      ref
+          .read(navShellIndexProvider.notifier)
+          .select(ListingDetailScreen.chatTabIndex);
+
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            conversationId: conversationId,
+            otherName: listing.farmerName,
+            otherAvatarUrl: listing.farmerAvatarUrl,
+            currentUserId: widget.buyerProfile.id,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _isMessagingFarmer = false);
+    }
   }
 
   @override
@@ -428,8 +468,14 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: _messageFarmer,
-                  icon: const Icon(Icons.chat_bubble_outline),
+                  onPressed: _isMessagingFarmer ? null : _messageFarmer,
+                  icon: _isMessagingFarmer
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.chat_bubble_outline),
                   label: Text('message_farmer'.tr()),
                 ),
               ),
