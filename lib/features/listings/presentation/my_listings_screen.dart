@@ -336,7 +336,7 @@ class _ListingCard extends StatelessWidget {
                 height: 150,
                 width: double.infinity,
                 child: MediaImage(
-                  path: listing.imageUrl,
+                  path: listing.listingImageUrl,
                   bucket: 'crop-photos',
                   placeholder: Container(
                     color: theme.colorScheme.surfaceContainerHighest,
