@@ -1,19 +1,17 @@
-import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:uuid/uuid.dart';
 
-import '../../core/local_db/powersync.dart'; // exposes `db`
+import '../../core/supabase/client.dart';
 import '../../models/cart_item.dart';
 import '../../models/profile.dart';
 import 'order_models.dart';
 
 /// Sprint 2 — Task 3.2: Order Creation & Checkout Flow.
 ///
-/// Mirrors [CartService]'s local-first shape: everything here writes
-/// straight to the on-device PowerSync mirror (`orders`, `order_item`,
-/// `payment`) inside a single transaction, then relies on PowerSync's
-/// CRUD queue to push it out to Supabase once connectivity returns —
-/// a buyer can place an order entirely offline.
+/// Cart reads remain local-first, but order creation is performed by the
+/// authenticated Supabase `place_checkout` RPC so validation, stock changes,
+/// order rows, and payment rows share one server transaction.
 ///
 /// There is no `sub_orders` table server-side (see
 /// `supabase/migrations/20260827093223_orders.sql`): a multi-farmer
@@ -34,7 +32,7 @@ class CheckoutService {
   /// Flat delivery fee charged per farmer sub-order (LKR), until
   /// `pricing_rule` is wired up for real distance-based delivery
   /// pricing.
-  static const double flatDeliveryFeePerSubOrder = 350;
+  static const double flatDeliveryFeePerSubOrder = 0;
 
   /// Flat tax rate applied to each farmer's subtotal, until proper
   /// tax handling lands.
@@ -70,17 +68,13 @@ class CheckoutService {
     return CheckoutSummary(subOrders: subOrders);
   }
 
-  /// Creates one `orders` row (+ `order_item` rows + a `payment` row)
-  /// per farmer represented in [items], all sharing a fresh
-  /// `checkout_group_id`, then clears those items out of the buyer's
-  /// cart. Returns the [PlacedOrderGroup] the confirmation screen needs.
-  ///
-  /// Every write happens in a single `db.writeTransaction` so a crash
-  /// mid-checkout can never leave a partial set of sub-orders behind.
+  /// Creates one order per farmer through the server-side checkout
+  /// transaction. The RPC also clears the submitted cart items.
   Future<PlacedOrderGroup> placeOrder({
     required Profile buyerProfile,
     required List<CartLineItem> items,
     required String paymentMethod, // 'wallet' | 'card'
+    String? requestId,
   }) async {
     if (items.isEmpty) {
       throw StateError('Cannot check out an empty cart');
@@ -89,106 +83,88 @@ class CheckoutService {
       throw StateError('Cart has unavailable items');
     }
 
-    final summary = buildSummary(items);
-    final checkoutGroupId = _uuid.v4();
-    final now = DateTime.now().toIso8601String();
-    final deliveryAddressJson = buyerProfile.address.isEmpty
-        ? null
-        : jsonEncode(buyerProfile.address.toMap());
+    developer.log(
+      'Calling place_checkout RPC — items: ${items.length}, method: $paymentMethod',
+      name: 'GreenYield.CheckoutService',
+    );
 
-    final placedOrderIds = <String>[];
+    final response = await supabase.rpc(
+      'place_checkout',
+      params: {
+        'p_request_id': requestId ?? _uuid.v4(),
+        'p_cart_items': items
+            .map(
+              (item) => {'id': item.cartItemId, 'quantity_kg': item.quantityKg},
+            )
+            .toList(),
+        'p_payment_method': paymentMethod,
+        'p_delivery_address': buyerProfile.address.isEmpty
+            ? null
+            : buyerProfile.address.toMap(),
+      },
+    );
 
-    await db.writeTransaction((tx) async {
-      for (final subOrder in summary.subOrders) {
-        final orderId = _uuid.v4();
-        final paymentId = _uuid.v4();
+    developer.log(
+      'place_checkout RPC response type: ${response.runtimeType}',
+      name: 'GreenYield.CheckoutService',
+    );
 
-        await tx.execute(
-          '''
-          INSERT INTO orders (
-            id, checkout_group_id, buyer_profile_id, farmer_profile_id,
-            status, payment_id, subtotal_amount, delivery_fee_amount,
-            total_amount, delivery_address, placed_at, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, 'placed', ?, ?, ?, ?, ?, ?, ?, ?)
-          ''',
-          [
-            orderId,
-            checkoutGroupId,
-            buyerProfile.id,
-            subOrder.farmerProfileId,
-            paymentId,
-            subOrder.subtotal,
-            subOrder.deliveryFee,
-            subOrder.total,
-            deliveryAddressJson,
-            now,
-            now,
-            now,
-          ],
-        );
+    if (response == null) {
+      throw StateError('place_checkout returned null response');
+    }
 
-        for (final item in subOrder.items) {
-          await tx.execute(
-            '''
-            INSERT INTO order_item (
-              id, order_id, produce_listing_id, crop_id, quantity_kg,
-              price_per_kg, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''',
-            [
-              _uuid.v4(),
-              orderId,
-              item.produceListingId,
-              item.cropId,
-              item.quantityKg,
-              item.pricePerKg,
-              now,
-            ],
-          );
-        }
-
-        // Payment starts 'pending' — actual authorization/capture is a
-        // trusted backend concern (see payment_and_refund.sql), not
-        // something a client can set directly. The wallet/card choice
-        // is UI-only at this stage per Sprint 2 scope.
-        await tx.execute(
-          '''
-          INSERT INTO payment (
-            id, order_id, buyer_profile_id, method, amount, status, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
-          ''',
-          [
-            paymentId,
-            orderId,
-            buyerProfile.id,
-            paymentMethod,
-            subOrder.total,
-            now,
-            now,
-          ],
-        );
-
-        await tx.execute(
-          '''
-          DELETE FROM cart_item
-          WHERE produce_listing_id IN (
-            SELECT id FROM produce_listing WHERE farmer_profile_id = ?
-          )
-          AND cart_id = (SELECT id FROM cart WHERE buyer_profile_id = ?)
-          ''',
-          [subOrder.farmerProfileId, buyerProfile.id],
-        );
-
-        placedOrderIds.add(orderId);
-      }
-    });
+    final result = Map<String, dynamic>.from(response as Map);
+    final orderData = (result['orders'] as List)
+        .map((order) => Map<String, dynamic>.from(order as Map))
+        .toList();
 
     return PlacedOrderGroup(
-      checkoutGroupId: checkoutGroupId,
-      orderIds: placedOrderIds,
-      summary: summary,
-      placedAt: DateTime.now(),
+      checkoutGroupId: result['checkout_group_id'] as String,
+      orderIds: orderData.map((order) => order['order_id'] as String).toList(),
+      summary: CheckoutSummary(
+        subOrders: orderData.map(_subOrderFromResponse).toList(),
+      ),
+      placedAt: DateTime.parse(result['placed_at'] as String),
       deliveryAddress: buyerProfile.address,
+    );
+  }
+
+  CheckoutSubOrder _subOrderFromResponse(Map<String, dynamic> order) {
+    final items = (order['items'] as List).map((rawItem) {
+      final item = Map<String, dynamic>.from(rawItem as Map);
+      return CartLineItem(
+        cartItemId: item['cart_item_id'] as String,
+        produceListingId: item['produce_listing_id'] as String,
+        farmerProfileId: order['farmer_profile_id'] as String,
+        cropId: item['crop_id'] as String,
+        cropName: item['crop_name'] as String,
+        category: 'vegetable',
+        pricePerKg: _toDouble(item['price_per_kg']),
+        availableQuantityKg: _toDouble(item['quantity_kg']),
+        listingStatus: 'active',
+        quantityKg: _toDouble(item['quantity_kg']),
+        imageUrl: item['image_url'] as String?,
+      );
+    }).toList();
+
+    return CheckoutSubOrder(
+      farmerProfileId: order['farmer_profile_id'] as String,
+      items: items,
+      subtotal: _toDouble(order['subtotal']),
+      deliveryFee: _toDouble(order['delivery_fee']),
+      tax: _toDouble(order['tax']),
+    );
+  }
+
+  /// Supabase RPC returns PostgreSQL `numeric` columns as JSON strings
+  /// (e.g. "5.00") rather than JSON numbers to preserve decimal precision.
+  /// This helper handles both forms so the caller doesn't crash.
+  double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.parse(value);
+    throw ArgumentError(
+      'Cannot convert $value (${value.runtimeType}) to double',
     );
   }
 }

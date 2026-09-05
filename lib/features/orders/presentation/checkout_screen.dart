@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/widgets/media_image.dart';
 import '../../../models/cart_item.dart';
@@ -41,7 +43,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _isLoading = true;
   bool _isPlacingOrder = false;
   String? _errorMessage;
+  String? _checkoutRequestId;
   _PaymentMethod _paymentMethod = _PaymentMethod.wallet;
+  Address? _deliveryAddress;
 
   /// produceListingId -> enrichment, same best-effort pattern as the
   /// cart screen — only used here to label each group with a farmer
@@ -53,6 +57,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
+    _deliveryAddress = widget.buyerProfile.address;
     _sub = _cartService.watchCartItems(_buyerProfileId).listen((items) {
       if (!mounted) return;
       setState(() {
@@ -102,9 +107,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool get _hasUnavailableItems => _items.any((item) => item.isUnavailable);
 
   Future<void> _placeOrder() async {
-    if (_items.isEmpty || _hasUnavailableItems || _isPlacingOrder) return;
+    developer.log(
+      'CHECKOUT: _placeOrder() CALLED — items=${_items.length}, '
+      'unavailable=$_hasUnavailableItems, placing=$_isPlacingOrder',
+      name: 'GreenYield.Checkout',
+    );
 
-    if (widget.buyerProfile.address.isEmpty) {
+    if (_items.isEmpty || _hasUnavailableItems || _isPlacingOrder) return;
+    
+    final addr = _deliveryAddress ?? const Address();
+    if (addr.isEmpty) {
       setState(() => _errorMessage = 'checkout_no_address'.tr());
       return;
     }
@@ -116,9 +128,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     try {
       final placedGroup = await _checkoutService.placeOrder(
-        buyerProfile: widget.buyerProfile,
+        buyerProfile: widget.buyerProfile.copyWith(address: _deliveryAddress),
         items: _items,
         paymentMethod: _paymentMethod.name,
+        requestId: _checkoutRequestId ??= const Uuid().v4(),
       );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -129,13 +142,110 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         ),
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      developer.log(
+        'Checkout failed: $error',
+        name: 'GreenYield.Checkout',
+        error: error,
+        stackTrace: stackTrace,
+      );
       if (!mounted) return;
+      // Show the actual error detail in debug builds so problems are visible.
+      final detail = error.toString();
       setState(() {
         _isPlacingOrder = false;
-        _errorMessage = 'checkout_failed'.tr();
+        _errorMessage = '${"checkout_failed".tr()}\n$detail';
       });
     }
+  }
+
+  void _showAddressEditSheet(BuildContext context) {
+    final theme = Theme.of(context);
+    final initial = _deliveryAddress ?? const Address();
+    final line1Ctrl = TextEditingController(text: initial.line1);
+    final line2Ctrl = TextEditingController(text: initial.line2);
+    final cityCtrl = TextEditingController(text: initial.city);
+    final postalCtrl = TextEditingController(text: initial.postalCode);
+    final formKey = GlobalKey<FormState>();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: SafeArea(
+            child: Form(
+              key: formKey,
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.all(24),
+                children: [
+                  Text(
+                    'edit_address'.tr(),
+                    style: theme.textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: line1Ctrl,
+                    decoration: InputDecoration(labelText: 'address_line_1'.tr()),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'field_required'.tr() : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: line2Ctrl,
+                    decoration: InputDecoration(labelText: 'address_line_2_optional'.tr()),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: cityCtrl,
+                          decoration: InputDecoration(labelText: 'city'.tr()),
+                          validator: (v) =>
+                              v == null || v.isEmpty ? 'field_required'.tr() : null,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextFormField(
+                          controller: postalCtrl,
+                          decoration: InputDecoration(labelText: 'postal_code'.tr()),
+                          validator: (v) =>
+                              v == null || v.isEmpty ? 'field_required'.tr() : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: () {
+                      if (formKey.currentState!.validate()) {
+                        setState(() {
+                          _deliveryAddress = Address(
+                            line1: line1Ctrl.text.trim(),
+                            line2: line2Ctrl.text.trim(),
+                            city: cityCtrl.text.trim(),
+                            postalCode: postalCtrl.text.trim(),
+                          );
+                        });
+                        Navigator.pop(context);
+                      }
+                    },
+                    child: Text('save'.tr()),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -171,7 +281,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             children: [
-              _DeliveryDetailsCard(profile: widget.buyerProfile),
+              _DeliveryDetailsCard(
+                profile: widget.buyerProfile,
+                address: _deliveryAddress ?? const Address(),
+                onEdit: () => _showAddressEditSheet(context),
+              ),
               const SizedBox(height: 16),
               _SectionHeader(title: 'order_summary'.tr()),
               const SizedBox(height: 8),
@@ -182,6 +296,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   group: group,
                   farmerName: enrichment?.farmerName,
                   farmerAvatarUrl: enrichment?.farmerAvatarUrl,
+                  enrichmentMap: _enrichment,
                 );
               }),
               const SizedBox(height: 16),
@@ -234,13 +349,18 @@ class _SectionHeader extends StatelessWidget {
 
 class _DeliveryDetailsCard extends StatelessWidget {
   final Profile profile;
+  final Address address;
+  final VoidCallback onEdit;
 
-  const _DeliveryDetailsCard({required this.profile});
+  const _DeliveryDetailsCard({
+    required this.profile,
+    required this.address,
+    required this.onEdit,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final address = profile.address;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -269,9 +389,7 @@ class _DeliveryDetailsCard extends StatelessWidget {
                 ),
               ),
               TextButton(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('edit_address_coming_soon'.tr())),
-                ),
+                onPressed: onEdit,
                 child: Text('edit'.tr()),
               ),
             ],
@@ -307,11 +425,13 @@ class _FarmerOrderCard extends StatelessWidget {
   final CartFarmerGroup group;
   final String? farmerName;
   final String? farmerAvatarUrl;
+  final Map<String, MarketplaceListing> enrichmentMap;
 
   const _FarmerOrderCard({
     required this.group,
     this.farmerName,
     this.farmerAvatarUrl,
+    required this.enrichmentMap,
   });
 
   @override
@@ -361,7 +481,7 @@ class _FarmerOrderCard extends StatelessWidget {
                       width: 44,
                       height: 44,
                       child: MediaImage(
-                        path: item.imageUrl,
+                        path: enrichmentMap[item.produceListingId]?.imageUrl ?? item.imageUrl,
                         bucket: 'crop-photos',
                         placeholder: Container(
                           color: theme.colorScheme.surfaceContainerHighest,
