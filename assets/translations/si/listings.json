@@ -53,5 +53,14 @@
   "harvested_on": "අස්වනු නෙළූ දිනය",
 
   "review_your_listing": "ඔබේ ලැයිස්තුව සමාලෝචනය කරන්න",
-  "total_quantity": "මුළු ප්‍රමාණය"
+  "total_quantity": "මුළු ප්‍රමාණය",
+
+  "market_average_unavailable": "මෙම බෝගය සඳහා තවම ප්‍රමාණවත් වෙළඳපොල දත්ත නැත",
+  "market_average_label": "වෙළඳපොල සාමාන්‍යය",
+  "price_comparison_above": "ඔබේ මිල වෙළඳපොල සාමාන්‍යයට වඩා {percent}% වැඩිය",
+  "price_comparison_below": "ඔබේ මිල වෙළඳපොල සාමාන්‍යයට වඩා {percent}% අඩුය",
+  "price_comparison_at_market": "ඔබේ මිල වෙළඳපොල සාමාන්‍යයට සමානය",
+  "price_trend_hint": "පසුගිය දින {days} තුළ මිල {percent}% කින් වෙනස් වී ඇත",
+  "vs_market": "වෙළඳපොලට සාපේක්ෂව",
+  "at_market": "වෙළඳපොල මට්ටමින්"
 }
