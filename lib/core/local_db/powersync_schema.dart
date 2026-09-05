@@ -23,7 +23,11 @@ const schema = Schema([
     Column.real('default_price_per_kg'),
     Column.text('image_url'),
   ]),
-  Table('crop', [Column.text('name'), Column.text('category')]),
+  Table('crop', [
+    Column.text('name'),
+    Column.text('category'),
+    Column.text('fallback_image_url'),
+  ]),
   Table('produce_listing', [
     Column.text('farmer_profile_id'),
     Column.text('crop_id'),

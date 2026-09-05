@@ -2,8 +2,11 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../core/widgets/media_image.dart';
 import '../../../models/profile.dart';
+import '../../navigation/presentation/app_nav_shell.dart';
 import '../order_models.dart';
 
 /// Sprint 2 — Task 3.2: Order Confirmation screen, shown right after
@@ -15,7 +18,7 @@ import '../order_models.dart';
 /// that whole group as a single confirmed "order" the way the buyer
 /// experiences it, while [PlacedOrderGroup.farmerCount] quietly notes
 /// how many farmers it was actually split across underneath.
-class OrderConfirmationScreen extends StatefulWidget {
+class OrderConfirmationScreen extends ConsumerStatefulWidget {
   final Profile buyerProfile;
   final PlacedOrderGroup placedOrderGroup;
 
@@ -26,11 +29,12 @@ class OrderConfirmationScreen extends StatefulWidget {
   });
 
   @override
-  State<OrderConfirmationScreen> createState() =>
+  ConsumerState<OrderConfirmationScreen> createState() =>
       _OrderConfirmationScreenState();
 }
 
-class _OrderConfirmationScreenState extends State<OrderConfirmationScreen>
+class _OrderConfirmationScreenState
+    extends ConsumerState<OrderConfirmationScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _scale;
@@ -195,9 +199,10 @@ class _OrderConfirmationScreenState extends State<OrderConfirmationScreen>
                   width: double.infinity,
                   height: 52,
                   child: OutlinedButton(
-                    onPressed: () =>
-                        Navigator.of(context)
-                            .popUntil((route) => route.isFirst),
+                    onPressed: () {
+                      Navigator.of(context).popUntil((route) => route.isFirst);
+                      ref.read(navShellIndexProvider.notifier).select(0);
+                    },
                     child: Text('return_to_marketplace'.tr()),
                   ),
                 ),

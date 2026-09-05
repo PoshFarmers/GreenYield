@@ -114,7 +114,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
 
     if (_items.isEmpty || _hasUnavailableItems || _isPlacingOrder) return;
-    
+
     final addr = _deliveryAddress ?? const Address();
     if (addr.isEmpty) {
       setState(() => _errorMessage = 'checkout_no_address'.tr());
@@ -185,20 +185,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 children: [
                   Text(
                     'edit_address'.tr(),
-                    style: theme.textTheme.titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w700),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: line1Ctrl,
-                    decoration: InputDecoration(labelText: 'address_line_1'.tr()),
+                    decoration: InputDecoration(
+                      labelText: 'address_line_1'.tr(),
+                    ),
                     validator: (v) =>
                         v == null || v.isEmpty ? 'field_required'.tr() : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: line2Ctrl,
-                    decoration: InputDecoration(labelText: 'address_line_2_optional'.tr()),
+                    decoration: InputDecoration(
+                      labelText: 'address_line_2_optional'.tr(),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -207,17 +212,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         child: TextFormField(
                           controller: cityCtrl,
                           decoration: InputDecoration(labelText: 'city'.tr()),
-                          validator: (v) =>
-                              v == null || v.isEmpty ? 'field_required'.tr() : null,
+                          validator: (v) => v == null || v.isEmpty
+                              ? 'field_required'.tr()
+                              : null,
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: TextFormField(
                           controller: postalCtrl,
-                          decoration: InputDecoration(labelText: 'postal_code'.tr()),
-                          validator: (v) =>
-                              v == null || v.isEmpty ? 'field_required'.tr() : null,
+                          decoration: InputDecoration(
+                            labelText: 'postal_code'.tr(),
+                          ),
+                          validator: (v) => v == null || v.isEmpty
+                              ? 'field_required'.tr()
+                              : null,
                         ),
                       ),
                     ],
@@ -388,10 +397,7 @@ class _DeliveryDetailsCard extends StatelessWidget {
                   ),
                 ),
               ),
-              TextButton(
-                onPressed: onEdit,
-                child: Text('edit'.tr()),
-              ),
+              TextButton(onPressed: onEdit, child: Text('edit'.tr())),
             ],
           ),
           const SizedBox(height: 6),
@@ -481,7 +487,9 @@ class _FarmerOrderCard extends StatelessWidget {
                       width: 44,
                       height: 44,
                       child: MediaImage(
-                        path: enrichmentMap[item.produceListingId]?.imageUrl ?? item.imageUrl,
+                        path:
+                            enrichmentMap[item.produceListingId]?.imageUrl ??
+                            item.imageUrl,
                         bucket: 'crop-photos',
                         placeholder: Container(
                           color: theme.colorScheme.surfaceContainerHighest,
