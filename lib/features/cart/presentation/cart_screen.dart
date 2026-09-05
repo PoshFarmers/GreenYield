@@ -9,6 +9,7 @@ import '../../../models/cart_item.dart';
 import '../../../models/marketplace_listing.dart';
 import '../../../models/profile.dart';
 import '../../marketplace/marketplace_service.dart';
+import '../../orders/presentation/checkout_screen.dart';
 import '../cart_service.dart';
 
 /// Sprint 2 — Task 3.1: Cart Management (buyer "Cart" tab).
@@ -147,6 +148,7 @@ class _CartScreenState extends State<CartScreen> {
                 farmerName: enrichment?.farmerName,
                 farmerAvatarUrl: enrichment?.farmerAvatarUrl,
                 pendingRemovals: _pendingRemovals,
+                enrichmentMap: _enrichment,
                 onChangeQuantity: _changeQuantity,
                 onRemove: _removeItem,
               );
@@ -156,9 +158,11 @@ class _CartScreenState extends State<CartScreen> {
         _CartSummaryBar(
           grandTotal: _grandTotal,
           hasUnavailableItems: _items.any((item) => item.isUnavailable),
-          onCheckout: () => ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('checkout_coming_soon'.tr()))),
+          onCheckout: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => CheckoutScreen(buyerProfile: widget.profile),
+            ),
+          ),
           theme: theme,
         ),
       ],
@@ -212,12 +216,14 @@ class _FarmerGroupCard extends StatelessWidget {
   final Set<String> pendingRemovals;
   final void Function(CartLineItem item, double newQty) onChangeQuantity;
   final void Function(CartLineItem item) onRemove;
+  final Map<String, MarketplaceListing> enrichmentMap;
 
   const _FarmerGroupCard({
     required this.group,
     required this.pendingRemovals,
     required this.onChangeQuantity,
     required this.onRemove,
+    required this.enrichmentMap,
     this.farmerName,
     this.farmerAvatarUrl,
   });
@@ -268,6 +274,7 @@ class _FarmerGroupCard extends StatelessWidget {
           for (final item in group.items)
             _CartItemTile(
               item: item,
+              enrichedImageUrl: enrichmentMap[item.produceListingId]?.imageUrl,
               isRemoving: pendingRemovals.contains(item.cartItemId),
               onChangeQuantity: (qty) => onChangeQuantity(item, qty),
               onRemove: () => onRemove(item),
@@ -295,12 +302,14 @@ class _FarmerGroupCard extends StatelessWidget {
 
 class _CartItemTile extends StatelessWidget {
   final CartLineItem item;
+  final String? enrichedImageUrl;
   final bool isRemoving;
   final ValueChanged<double> onChangeQuantity;
   final VoidCallback onRemove;
 
   const _CartItemTile({
     required this.item,
+    this.enrichedImageUrl,
     required this.isRemoving,
     required this.onChangeQuantity,
     required this.onRemove,
@@ -323,7 +332,8 @@ class _CartItemTile extends StatelessWidget {
                 width: 56,
                 height: 56,
                 child: MediaImage(
-                  path: item.imageUrl,
+                  path: enrichedImageUrl ?? item.imageUrl,
+
                   bucket: 'crop-photos',
                   placeholder: Container(
                     color: theme.colorScheme.surfaceContainerHighest,

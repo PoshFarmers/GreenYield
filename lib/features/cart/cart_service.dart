@@ -59,11 +59,12 @@ class CartService {
         pl.price_per_kg,
         pl.available_quantity_kg,
         pl.status_text,
-        pl.image_url
+        COALESCE(pl.image_url, fc.image_url, c.fallback_image_url) AS image_url
       FROM cart_item ci
       JOIN cart c2 ON c2.id = ci.cart_id
       JOIN produce_listing pl ON pl.id = ci.produce_listing_id
       JOIN crop c ON c.id = pl.crop_id
+      LEFT JOIN farmer_crop fc ON fc.farmer_profile_id = pl.farmer_profile_id AND fc.crop_id = pl.crop_id
       WHERE c2.buyer_profile_id = ?
       ORDER BY ci.created_at DESC
       ''',
