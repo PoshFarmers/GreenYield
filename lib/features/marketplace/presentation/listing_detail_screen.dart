@@ -5,6 +5,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/app_secondary_header.dart';
 import '../../../core/widgets/avatar_image.dart';
 import '../../../core/widgets/media_image.dart';
 import '../../../models/marketplace_listing.dart';
@@ -181,12 +182,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     final listing = _listing;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('listing'.tr()),
-        actions: [
-          IconButton(icon: const Icon(Icons.help_outline), onPressed: () {}),
-        ],
-      ),
+      appBar: AppSecondaryHeader(title: 'listing'.tr()),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -245,8 +241,9 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
             height: 220,
             width: double.infinity,
             child: MediaImage(
-              path: listing.imageUrl,
-              bucket: 'crop-photos',
+              path: listing.displayImage.path,
+              bucket: listing.displayImage.bucket,
+              public: listing.displayImage.isFallback,
               placeholder: Container(
                 color: theme.colorScheme.surfaceContainerHighest,
                 child: Icon(

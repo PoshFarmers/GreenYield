@@ -6,11 +6,13 @@ import 'package:latlong2/latlong.dart' as ll;
 
 import '../../../../core/auth/auth_providers.dart';
 import '../../../../core/storage/crop_photo_service.dart';
+import '../../../../core/widgets/app_secondary_header.dart';
 import '../../../../core/widgets/avatar_image.dart';
 import '../../../../core/widgets/media_image.dart';
 import '../../../../models/farmer_profile.dart';
 import '../../../../models/profile.dart';
 import '../farmer_profile_service.dart';
+import 'add_crop_screen.dart';
 import 'crop_details_sheet.dart';
 import 'farmer_profile_edit_screen.dart';
 
@@ -54,6 +56,7 @@ class _FarmerProfileViewScreenState
       initialDescription: existing?.description,
       initialPrice: existing?.defaultPricePerKg,
       existingImagePath: existing?.imageUrl,
+      fallbackImageUrl: existing?.fallbackImageUrl,
       onRemove: existing == null
           ? null
           : () => _service.removeCrop(_userId, cropId),
@@ -84,57 +87,15 @@ class _FarmerProfileViewScreenState
   }
 
   /// Lets the farmer pick from catalogue crops they haven't registered
-  /// yet, then drops straight into the details editor for it.
+  /// yet — via the same search/filter/tile-grid picker used by
+  /// onboarding's "Your Crops" step — then drops straight into the
+  /// details editor for it.
   Future<void> _addCrop(List<FarmerCrop> registered) async {
     final registeredIds = registered.map((c) => c.cropId).toSet();
 
-    final picked = await showModalBottomSheet<Crop>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => StreamBuilder<List<Crop>>(
-        stream: _service.watchAllCrops(),
-        builder: (context, snapshot) {
-          final available = (snapshot.data ?? [])
-              .where((c) => !registeredIds.contains(c.id))
-              .toList();
-
-          if (!snapshot.hasData) {
-            return const SizedBox(
-              height: 200,
-              child: Center(child: CircularProgressIndicator()),
-            );
-          }
-
-          return SafeArea(
-            child: ListView(
-              shrinkWrap: true,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                  child: Text(
-                    'add_crop'.tr(),
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-                if (available.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Text('all_crops_added'.tr()),
-                  ),
-                for (final crop in available)
-                  ListTile(
-                    leading: Icon(
-                      crop.category == 'fruit' ? Icons.apple : Icons.eco,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    title: Text(crop.name),
-                    onTap: () => Navigator.of(sheetContext).pop(crop),
-                  ),
-              ],
-            ),
-          );
-        },
+    final picked = await Navigator.of(context).push<Crop>(
+      MaterialPageRoute(
+        builder: (_) => AddCropScreen(registeredCropIds: registeredIds),
       ),
     );
 
@@ -145,7 +106,7 @@ class _FarmerProfileViewScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('farmer_profile_title'.tr())),
+      appBar: AppSecondaryHeader(title: 'farmer_profile_title'.tr()),
       body: StreamBuilder<Profile?>(
         stream: _profileStream,
         initialData: widget.initialProfile,
@@ -202,6 +163,14 @@ class _FarmerProfileViewScreenState
                         const _PerformanceCard(),
                         const SizedBox(height: 12),
                         _CropsGrownCard(
+                          // Farmer crop photos are stored at a deterministic
+                          // path (keyed by crop id), so re-uploading one
+                          // keeps the same bucket/path — nothing about
+                          // FarmerCrop itself changes. Keying each tile by
+                          // this emission forces its MediaImage to remount
+                          // and re-resolve after every edit, rather than
+                          // reusing the previous (now stale) decoded image.
+                          photoRefreshToken: identityHashCode(farmerProfile),
                           crops: farmerProfile.crops,
                           onTapCrop: (crop) => _editCrop(
                             cropId: crop.cropId,
@@ -212,8 +181,17 @@ class _FarmerProfileViewScreenState
                         ),
                         const SizedBox(height: 24),
                         OutlinedButton.icon(
-                          onPressed: () =>
-                              ref.read(authServiceProvider).signOut(),
+                          onPressed: () async {
+                            await ref.read(authServiceProvider).signOut();
+                            // This screen was pushed on top of AuthGate's
+                            // root route — AuthGate swaps to LoginScreen
+                            // on its own, but only becomes visible once
+                            // every pushed route above it is popped.
+                            if (context.mounted) {
+                              Navigator.of(context)
+                                  .popUntil((route) => route.isFirst);
+                            }
+                          },
                           icon: const Icon(Icons.logout),
                           label: Text('logout'.tr()),
                           style: OutlinedButton.styleFrom(
@@ -511,11 +489,13 @@ class _CropsGrownCard extends StatelessWidget {
   final List<FarmerCrop> crops;
   final ValueChanged<FarmerCrop> onTapCrop;
   final VoidCallback onAddCrop;
+  final int photoRefreshToken;
 
   const _CropsGrownCard({
     required this.crops,
     required this.onTapCrop,
     required this.onAddCrop,
+    required this.photoRefreshToken,
   });
 
   @override
@@ -559,8 +539,11 @@ class _CropsGrownCard extends StatelessWidget {
               runSpacing: 10,
               children: crops
                   .map(
-                    (crop) =>
-                        _CropTile(crop: crop, onTap: () => onTapCrop(crop)),
+                    (crop) => _CropTile(
+                      key: ValueKey('${crop.cropId}_$photoRefreshToken'),
+                      crop: crop,
+                      onTap: () => onTapCrop(crop),
+                    ),
                   )
                   .toList(),
             ),
@@ -577,7 +560,7 @@ class _CropTile extends StatelessWidget {
   final FarmerCrop crop;
   final VoidCallback onTap;
 
-  const _CropTile({required this.crop, required this.onTap});
+  const _CropTile({super.key, required this.crop, required this.onTap});
 
   @override
   Widget build(BuildContext context) {

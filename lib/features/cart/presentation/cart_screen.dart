@@ -274,7 +274,7 @@ class _FarmerGroupCard extends StatelessWidget {
           for (final item in group.items)
             _CartItemTile(
               item: item,
-              enrichedImageUrl: enrichmentMap[item.produceListingId]?.imageUrl,
+              enrichedListing: enrichmentMap[item.produceListingId],
               isRemoving: pendingRemovals.contains(item.cartItemId),
               onChangeQuantity: (qty) => onChangeQuantity(item, qty),
               onRemove: () => onRemove(item),
@@ -302,14 +302,14 @@ class _FarmerGroupCard extends StatelessWidget {
 
 class _CartItemTile extends StatelessWidget {
   final CartLineItem item;
-  final String? enrichedImageUrl;
+  final MarketplaceListing? enrichedListing;
   final bool isRemoving;
   final ValueChanged<double> onChangeQuantity;
   final VoidCallback onRemove;
 
   const _CartItemTile({
     required this.item,
-    this.enrichedImageUrl,
+    this.enrichedListing,
     required this.isRemoving,
     required this.onChangeQuantity,
     required this.onRemove,
@@ -318,6 +318,7 @@ class _CartItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final display = enrichedListing?.displayImage;
 
     return Opacity(
       opacity: isRemoving ? 0.4 : 1,
@@ -332,9 +333,9 @@ class _CartItemTile extends StatelessWidget {
                 width: 56,
                 height: 56,
                 child: MediaImage(
-                  path: enrichedImageUrl ?? item.imageUrl,
-
-                  bucket: 'crop-photos',
+                  path: display?.path ?? item.imageUrl,
+                  bucket: display?.bucket ?? 'crop-photos',
+                  public: display?.isFallback ?? false,
                   placeholder: Container(
                     color: theme.colorScheme.surfaceContainerHighest,
                     child: Icon(

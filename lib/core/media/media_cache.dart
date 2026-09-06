@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/painting.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../supabase/client.dart';
@@ -40,7 +41,14 @@ class MediaCache {
   }) async {
     final bytes = await file.readAsBytes();
     final key = _cacheKey(bucket, remotePath);
-    await _manager.putFile(key, bytes, key: key);
+    final cachedFile = await _manager.putFile(key, bytes, key: key);
+
+    // Deterministic paths (avatar, per-crop photo, ...) reuse the same
+    // bucket:path key on every re-upload, so overwriting the on-disk
+    // cache above isn't enough — Flutter's own ImageCache (used by
+    // Image.file/FileImage) keys by file path and would otherwise keep
+    // serving the previously decoded image for that path.
+    await FileImage(cachedFile).evict();
   }
 
   Future<File> getFile({

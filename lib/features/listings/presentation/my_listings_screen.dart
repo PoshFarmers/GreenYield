@@ -24,15 +24,36 @@ class MyListingsScreen extends ConsumerStatefulWidget {
 
 class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
   final _service = ProduceListingService();
+  final _scrollController = ScrollController();
 
   late final Stream<List<ProduceListing>> _listingsStream;
   String _statusFilter = 'all';
-  bool _statsExpanded = true;
+  bool _statsCollapsed = false;
 
   @override
   void initState() {
     super.initState();
     _listingsStream = _service.watchOwnListings(widget.profile.id);
+    _scrollController.addListener(_handleScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_handleScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // Hysteresis so the section doesn't flicker while sitting right at the
+  // threshold — a deliberate scroll past 120px collapses it, only
+  // restoring once scrolled back up near the very top (under 16px).
+  void _handleScroll() {
+    final offset = _scrollController.offset;
+    if (!_statsCollapsed && offset > 120) {
+      setState(() => _statsCollapsed = true);
+    } else if (_statsCollapsed && offset < 16) {
+      setState(() => _statsCollapsed = false);
+    }
   }
 
   @override
@@ -69,6 +90,7 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
                     : listings.where((l) => l.status == _statusFilter).toList();
 
                 return ListView(
+                  controller: _scrollController,
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
                   children: [
                     Text(
@@ -85,9 +107,7 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
                     const SizedBox(height: 16),
                     _StatsSection(
                       listings: listings,
-                      expanded: _statsExpanded,
-                      onToggle: () =>
-                          setState(() => _statsExpanded = !_statsExpanded),
+                      collapsed: _statsCollapsed,
                     ),
                     const SizedBox(height: 16),
                     _StatusFilterBar(
@@ -132,17 +152,14 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
   }
 }
 
-/// The four summary tiles, collapsible so the list gets the screen back.
+/// The four summary tiles. Auto-collapses (shrinks + fades) once the user
+/// scrolls down through their listings, and restores near the top — see
+/// _MyListingsScreenState._handleScroll.
 class _StatsSection extends StatelessWidget {
   final List<ProduceListing> listings;
-  final bool expanded;
-  final VoidCallback onToggle;
+  final bool collapsed;
 
-  const _StatsSection({
-    required this.listings,
-    required this.expanded,
-    required this.onToggle,
-  });
+  const _StatsSection({required this.listings, required this.collapsed});
 
   @override
   Widget build(BuildContext context) {
@@ -159,72 +176,66 @@ class _StatsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        InkWell(
-          onTap: onToggle,
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                Text('overview'.tr(), style: theme.textTheme.labelLarge),
-                const Spacer(),
-                Icon(expanded ? Icons.expand_less : Icons.expand_more),
-              ],
-            ),
-          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Text('overview'.tr(), style: theme.textTheme.labelLarge),
         ),
-        AnimatedCrossFade(
-          duration: const Duration(milliseconds: 200),
-          crossFadeState: expanded
-              ? CrossFadeState.showFirst
-              : CrossFadeState.showSecond,
-          firstChild: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatTile(
-                        icon: Icons.inventory_2_outlined,
-                        label: 'stat_active'.tr(),
-                        value: '${active.length}',
-                      ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeInOut,
+          alignment: Alignment.topCenter,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 220),
+            opacity: collapsed ? 0 : 1,
+            child: collapsed
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _StatTile(
+                                icon: Icons.inventory_2_outlined,
+                                label: 'stat_active'.tr(),
+                                value: '${active.length}',
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _StatTile(
+                                icon: Icons.remove_shopping_cart_outlined,
+                                label: 'stat_sold_out'.tr(),
+                                value: '$soldOut',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _StatTile(
+                                icon: Icons.scale_outlined,
+                                label: 'stat_listed_quantity'.tr(),
+                                value: '${totalKg.toStringAsFixed(0)} kg',
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _StatTile(
+                                icon: Icons.payments_outlined,
+                                label: 'stat_listed_value'.tr(),
+                                value: 'Rs ${totalValue.toStringAsFixed(0)}',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _StatTile(
-                        icon: Icons.remove_shopping_cart_outlined,
-                        label: 'stat_sold_out'.tr(),
-                        value: '$soldOut',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatTile(
-                        icon: Icons.scale_outlined,
-                        label: 'stat_listed_quantity'.tr(),
-                        value: '${totalKg.toStringAsFixed(0)} kg',
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _StatTile(
-                        icon: Icons.payments_outlined,
-                        label: 'stat_listed_value'.tr(),
-                        value: 'Rs ${totalValue.toStringAsFixed(0)}',
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
           ),
-          secondChild: const SizedBox.shrink(),
         ),
       ],
     );

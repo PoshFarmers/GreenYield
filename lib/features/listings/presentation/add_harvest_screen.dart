@@ -55,7 +55,14 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
   @override
   void initState() {
     super.initState();
-    _farmerProfileStream = _farmerService.watchOwnProfile(widget.profile.id);
+    // Broadcast: the crop-selection step's StreamBuilder is unmounted and
+    // remounted each time the wizard steps away from and back to step 0,
+    // which would otherwise re-listen to an already-consumed single-
+    // subscription PowerSync watch stream ("Bad state: Stream has already
+    // been listened to").
+    _farmerProfileStream = _farmerService
+        .watchOwnProfile(widget.profile.id)
+        .asBroadcastStream();
   }
 
   @override
@@ -116,10 +123,16 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
     });
   }
 
-  void _back() => setState(() {
-    _errorMessage = null;
-    _step--;
-  });
+  void _back() {
+    // Unfocus first: with a text field focused (quantity/price, description
+    // steps), a tap on the header back button otherwise only dismisses the
+    // keyboard, making the button appear unresponsive until tapped again.
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _errorMessage = null;
+      _step--;
+    });
+  }
 
   Future<void> _pickPhoto() async {
     final source = await showImageSourceSheet(context);
@@ -200,7 +213,12 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
     return Scaffold(
       appBar: AppSecondaryHeader(
         title: 'add_harvest'.tr(),
-        onBackPressed: _step == 0 ? () => Navigator.of(context).pop() : _back,
+        onBackPressed: _step == 0
+            ? () {
+                FocusManager.instance.primaryFocus?.unfocus();
+                Navigator.of(context).pop();
+              }
+            : _back,
         helpText: 'add_harvest_help_body'.tr(),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(44),
@@ -298,35 +316,18 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
             ),
             const SizedBox(height: 12),
           ],
-          Row(
-            children: [
-              if (_step > 0) ...[
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isPublishing ? null : _back,
-                    child: Text('back'.tr()),
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
-              Expanded(
-                flex: 2,
-                child: ElevatedButton(
-                  onPressed: _isPublishing
-                      ? null
-                      : (isReview ? _publish : _next),
-                  child: _isPublishing
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(
-                          isReview ? 'publish_listing'.tr() : 'continue'.tr(),
-                        ),
-                ),
-              ),
-            ],
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isPublishing ? null : (isReview ? _publish : _next),
+              child: _isPublishing
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(isReview ? 'publish_listing'.tr() : 'continue'.tr()),
+            ),
           ),
         ],
       ),
@@ -701,6 +702,7 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
     final theme = Theme.of(context);
     final crop = _crop;
     final description = _descriptionController.text.trim();
+    final borderRadius = BorderRadius.circular(16);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -712,92 +714,109 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        Container(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                height: 160,
-                child: _photoBytes != null
-                    ? Image.memory(_photoBytes!, fit: BoxFit.cover)
-                    : MediaImage(
-                        path: crop?.displayImage.path,
-                        bucket: crop?.displayImage.bucket ?? 'crop-photos',
-                        public: crop?.displayImage.isFallback ?? false,
-                        placeholder: Container(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          child: Icon(
-                            Icons.image_outlined,
-                            size: 40,
-                            color: theme.colorScheme.outline,
-                          ),
-                        ),
-                      ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
+        Stack(
+          children: [
+            ClipRRect(
+              borderRadius: borderRadius,
+              child: Container(
+                color: theme.colorScheme.surfaceContainerLowest,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      crop?.cropName ?? '',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    SizedBox(
+                      height: 160,
+                      child: _photoBytes != null
+                          ? Image.memory(_photoBytes!, fit: BoxFit.cover)
+                          : MediaImage(
+                              path: crop?.displayImage.path,
+                              bucket:
+                                  crop?.displayImage.bucket ?? 'crop-photos',
+                              public: crop?.displayImage.isFallback ?? false,
+                              placeholder: Container(
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
+                                child: Icon(
+                                  Icons.image_outlined,
+                                  size: 40,
+                                  color: theme.colorScheme.outline,
+                                ),
+                              ),
+                            ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            crop?.cropName ?? '',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (description.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(description, style: theme.textTheme.bodySmall),
+                          ],
+                          const Divider(height: 24),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _ReviewField(
+                                  label: 'total_quantity'.tr(),
+                                  value: '${_quantity.toStringAsFixed(0)} kg',
+                                ),
+                              ),
+                              Expanded(
+                                child: _ReviewField(
+                                  label: 'price_per_kg'.tr(),
+                                  value: 'Rs ${_price.toStringAsFixed(2)}',
+                                  highlight: true,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _ReviewField(
+                                  label: 'harvested_on'.tr(),
+                                  value: _harvestedOn == null
+                                      ? '—'
+                                      : _formatDate(_harvestedOn!),
+                                ),
+                              ),
+                              Expanded(
+                                child: _ReviewField(
+                                  label: 'estimated_total_value'.tr(),
+                                  value:
+                                      'Rs ${(_quantity * _price).toStringAsFixed(2)}',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ),
-                    if (description.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(description, style: theme.textTheme.bodySmall),
-                    ],
-                    const Divider(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ReviewField(
-                            label: 'total_quantity'.tr(),
-                            value: '${_quantity.toStringAsFixed(0)} kg',
-                          ),
-                        ),
-                        Expanded(
-                          child: _ReviewField(
-                            label: 'price_per_kg'.tr(),
-                            value: 'Rs ${_price.toStringAsFixed(2)}',
-                            highlight: true,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ReviewField(
-                            label: 'harvested_on'.tr(),
-                            value: _harvestedOn == null
-                                ? '—'
-                                : _formatDate(_harvestedOn!),
-                          ),
-                        ),
-                        Expanded(
-                          child: _ReviewField(
-                            label: 'estimated_total_value'.tr(),
-                            value:
-                                'Rs ${(_quantity * _price).toStringAsFixed(2)}',
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            // Painted on top so the border is never covered at the rounded
+            // corners (the image otherwise sits flush against the top edge
+            // with nothing to buffer it).
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: borderRadius,
+                    border: Border.all(color: theme.colorScheme.outlineVariant),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
