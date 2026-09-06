@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Reusable "sub-page" header: back arrow + centered title + optional
 /// help icon. This is the shape most non-nav-shell screens want (edit
@@ -53,7 +54,12 @@ class AppSecondaryHeader extends StatelessWidget
                   onBackPressed ?? () => Navigator.of(context).maybePop(),
             )
           : null,
-      title: Text(title, style: Theme.of(context).textTheme.titleLarge),
+      title: Text(
+        title,
+        style: GoogleFonts.outfit(
+          textStyle: Theme.of(context).textTheme.titleLarge,
+        ),
+      ),
       bottom: bottom,
       actions: [
         if (helpText != null)
