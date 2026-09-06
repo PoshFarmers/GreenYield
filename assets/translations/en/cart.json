@@ -1,0 +1,15 @@
+{
+  "added_to_cart": "Added to cart",
+  "cart_empty_title": "Your cart is empty",
+  "cart_empty_subtitle": "Browse the marketplace and add some fresh produce.",
+  "unknown_farmer": "Farmer",
+  "farmer_subtotal": "Farmer subtotal",
+  "grand_total": "Grand total",
+  "proceed_to_checkout": "Proceed to Checkout",
+  "checkout_coming_soon": "Checkout is coming next.",
+  "remove_from_cart": "Remove",
+  "cart_item_sold_out": "Sold out",
+  "cart_item_unavailable": "No longer available",
+  "cart_item_only_x_left": "Only {qty} kg left in stock",
+  "cart_has_unavailable_items": "Some items in your cart are no longer available and won't be included at checkout."
+}

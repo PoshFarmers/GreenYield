@@ -1,0 +1,13 @@
+{
+  "notifications_title": "Notifications",
+  "notifications_mark_all_read": "Mark all as read",
+  "notifications_filter_all": "All",
+  "notifications_filter_unread": "Unread",
+  "notifications_filter_orders": "Orders",
+  "notifications_filter_payments": "Payments",
+  "notifications_filter_logistics": "Logistics",
+  "notifications_filter_account": "Account",
+  "notifications_empty_title": "You're all caught up",
+  "notifications_empty_subtitle": "New orders, payments, and updates will show up here.",
+  "notifications_load_error": "Couldn't load notifications."
+}

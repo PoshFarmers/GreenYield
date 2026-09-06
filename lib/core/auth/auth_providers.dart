@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_service.dart';
+import '../local_db/powersync.dart';
 import '../../models/profile.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
@@ -13,27 +14,22 @@ final authStateChangesProvider = StreamProvider<AuthState>((ref) {
 });
 
 /// The signed-in user's generic profile row, or null if one hasn't
-/// been created yet. Automatically re-fetches whenever the auth
-/// state changes (sign-in, sign-out, switching accounts) — Riverpod
-/// handles the caching/re-fetch bookkeeping that AuthGate used to do
-/// by hand with a StatefulWidget.
-///
-/// After CompleteProfileScreen creates the row, call
-/// `ref.invalidate(ownProfileProvider)` to force a re-fetch rather
-/// than tracking a manual "reload" callback.
-final ownProfileProvider = FutureProvider<Profile?>((ref) async {
-  ref.watch(authStateChangesProvider); // rebuild whenever auth state changes
-  final authService = ref.watch(authServiceProvider);
-  if (!authService.isSignedIn) return null;
-  return authService.fetchOwnProfile();
-});
-
-/// Every role ('farmer'/'buyer'/'driver') the current user currently
-/// holds. Empty until they complete RoleSelectionScreen at least once.
-/// Invalidate this after adding a role so AuthGate re-checks it.
-final ownRolesProvider = FutureProvider<List<String>>((ref) async {
+/// been created yet. Backed by a PowerSync watch stream.
+final ownProfileProvider = StreamProvider<Profile?>((ref) async* {
   ref.watch(authStateChangesProvider);
   final authService = ref.watch(authServiceProvider);
-  if (!authService.isSignedIn) return [];
-  return authService.fetchOwnRoles();
+  if (!authService.isSignedIn) {
+    yield null;
+    return;
+  }
+  await db.waitForFirstSync();
+  yield* authService.watchOwnProfile();
+});
+
+/// Every role ('farmer'/'buyer'/'driver') the current user holds.
+final ownRolesProvider = StreamProvider<List<String>>((ref) {
+  ref.watch(authStateChangesProvider);
+  final authService = ref.watch(authServiceProvider);
+  if (!authService.isSignedIn) return Stream.value([]);
+  return authService.watchOwnRoles();
 });

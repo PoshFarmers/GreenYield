@@ -1,37 +1,25 @@
-import '../../../core/supabase/client.dart';
+import '../../../core/local_db/repository.dart';
 import '../../../models/buyer_profile.dart';
 
 class BuyerProfileService {
-  Future<bool> hasProfile(String profileId) async {
-    final row = await supabase
-        .from('buyer_profile')
-        .select('profile_id')
-        .eq('profile_id', profileId)
-        .maybeSingle();
-    return row != null;
-  }
+  // buyer_profile is a 1:1 table where local id == profile id, and
+  // toInsertMap() already includes 'profile_id' itself (redundant with
+  // the local id, but that mirrors the existing table shape) — see
+  // BuyerProfile.toInsertMap in models/buyer_profile.dart.
+  final _repo = Repository<BuyerProfile>(
+    table: 'buyer_profile',
+    fromMap: BuyerProfile.fromMap,
+    toInsertMap: (p) => p.toInsertMap(),
+  );
 
-  Future<BuyerProfile?> fetchOwnProfile(String profileId) async {
-    final row = await supabase
-        .from('buyer_profile')
-        .select()
-        .eq('profile_id', profileId)
-        .maybeSingle();
-    if (row == null) return null;
-    return BuyerProfile.fromMap(row);
-  }
+  Future<bool> hasProfile(String profileId) => _repo.exists(profileId);
 
-  Future<void> createProfile(BuyerProfile profile) async {
-    await supabase.from('buyer_profile').insert(profile.toInsertMap());
-  }
+  Stream<BuyerProfile?> watchOwnProfile(String profileId) =>
+      _repo.watchOne(profileId);
 
-  Future<void> updateProfile(BuyerProfile profile) async {
-    await supabase
-        .from('buyer_profile')
-        .update({
-          'buyer_type': profile.buyerType,
-          'buyer_label': profile.buyerLabel,
-        })
-        .eq('profile_id', profile.profileId);
-  }
+  Future<void> createProfile(BuyerProfile profile) =>
+      _repo.insert(profile.profileId, profile);
+
+  Future<void> updateProfile(BuyerProfile profile) =>
+      _repo.update(profile.profileId, profile);
 }

@@ -7,11 +7,13 @@ import 'core/localization/multi_file_asset_loader.dart';
 import 'core/supabase/client.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
+import 'core/local_db/powersync.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await EasyLocalization.ensureInitialized();
   await initSupabase();
+  await initPowerSync();
 
   // Created manually (rather than letting ProviderScope create its own)
   final container = ProviderContainer();
