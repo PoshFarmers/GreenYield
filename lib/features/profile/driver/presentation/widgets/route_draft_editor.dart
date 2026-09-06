@@ -1,7 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../../core/widgets/app_text_field.dart';
+import '../../../../../core/widgets/route_map_picker.dart';
 import '../../../../../models/driver_profile.dart';
 
 /// In-memory, not-yet-saved route being edited by the user. Carries
@@ -27,9 +27,11 @@ class RouteDraft {
   // Coordinates/place id resolved for the current text, if any — kept
   // alongside the controllers so a draft started from an existing
   // RoutePreference (which may already have structured location data)
-  // doesn't lose it just from being re-edited as plain text.
-  LocationPoint _originPoint = LocationPoint.empty;
-  LocationPoint _destinationPoint = LocationPoint.empty;
+  // doesn't lose it just from being re-edited as plain text. Exposed
+  // (not just private) so the map picker can both seed itself from and
+  // write real coordinates back into the draft.
+  LocationPoint originPoint = LocationPoint.empty;
+  LocationPoint destinationPoint = LocationPoint.empty;
 
   factory RouteDraft.fromRoutePreference(RoutePreference route) {
     final draft = RouteDraft(
@@ -39,8 +41,8 @@ class RouteDraft {
       direction: route.direction,
       activeDays: route.activeDayKeys,
     );
-    draft._originPoint = route.origin;
-    draft._destinationPoint = route.destination;
+    draft.originPoint = route.origin;
+    draft.destinationPoint = route.destination;
     return draft;
   }
 
@@ -54,20 +56,28 @@ class RouteDraft {
     return RoutePreference(
       id: existingId,
       driverProfileId: driverProfileId,
-      origin: _originPoint.copyWith(
+      origin: originPoint.copyWith(
         address: originController.text.trim(),
         // Coordinates only stay valid if the address wasn't retyped.
-        clearCoordinates: _originPoint.address != originController.text.trim(),
+        clearCoordinates: originPoint.address != originController.text.trim(),
       ),
-      destination: _destinationPoint.copyWith(
+      destination: destinationPoint.copyWith(
         address: destinationController.text.trim(),
         clearCoordinates:
-            _destinationPoint.address != destinationController.text.trim(),
+            destinationPoint.address != destinationController.text.trim(),
       ),
       direction: direction,
       activeDaysMask: activeDaysMaskFromKeys(activeDays),
+      distanceKm: distanceKm,
+      durationMinutes: durationMinutes,
     );
   }
+
+  /// Real road distance/duration from the map picker's routing call —
+  /// kept on the draft so a save right after picking a route persists
+  /// it instead of relying on the caller re-deriving it.
+  double? distanceKm;
+  int? durationMinutes;
 
   void dispose() {
     originController.dispose();
@@ -123,26 +133,24 @@ class _RouteDraftCardState extends State<RouteDraftCard> {
                 onPressed: widget.onRemove,
               ),
             ),
-          _EndpointRow(
-            icon: Icons.trip_origin,
-            iconColor: theme.colorScheme.primary,
-            label: 'start_location'.tr(),
-            controller: draft.originController,
-            onChanged: (_) => _notify(),
-          ),
-          const Padding(
-            padding: EdgeInsets.only(left: 9),
-            child: SizedBox(
-              height: 18,
-              child: VerticalDivider(width: 18, thickness: 1.4),
-            ),
-          ),
-          _EndpointRow(
-            icon: Icons.location_on,
-            iconColor: theme.colorScheme.tertiary,
-            label: 'end_location'.tr(),
-            controller: draft.destinationController,
-            onChanged: (_) => _notify(),
+          RouteMapPicker(
+            originController: draft.originController,
+            destinationController: draft.destinationController,
+            initialOrigin: draft.originPoint,
+            initialDestination: draft.destinationPoint,
+            onOriginChanged: (point) {
+              draft.originPoint = point;
+              _notify();
+            },
+            onDestinationChanged: (point) {
+              draft.destinationPoint = point;
+              _notify();
+            },
+            onRouteInfo: (distanceKm, durationMinutes) {
+              draft.distanceKm = distanceKm;
+              draft.durationMinutes = durationMinutes;
+              _notify();
+            },
           ),
           const SizedBox(height: 16),
           Text('direction'.tr(), style: theme.textTheme.labelLarge),
@@ -180,40 +188,6 @@ class _RouteDraftCardState extends State<RouteDraftCard> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _EndpointRow extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-  final TextEditingController controller;
-  final ValueChanged<String>? onChanged;
-
-  const _EndpointRow({
-    required this.icon,
-    required this.iconColor,
-    required this.label,
-    required this.controller,
-    this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Icon(icon, size: 18, color: iconColor),
-        const SizedBox(width: 10),
-        Expanded(
-          child: AppTextField(
-            label: label,
-            controller: controller,
-            onChanged: onChanged,
-          ),
-        ),
-      ],
     );
   }
 }
