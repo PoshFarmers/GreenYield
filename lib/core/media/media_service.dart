@@ -97,11 +97,13 @@ class MediaService {
   Future<File> getDisplayFile({
     required String bucket,
     required String remotePath,
+    bool public = false,
     int signedUrlExpiresIn = 3600,
   }) {
     return _cache.getFile(
       bucket: bucket,
       remotePath: remotePath,
+      public: public,
       signedUrlExpiresIn: signedUrlExpiresIn,
     );
   }

@@ -601,8 +601,9 @@ class _CropTile extends StatelessWidget {
                 height: 36,
                 width: 36,
                 child: MediaImage(
-                  path: crop.imageUrl,
-                  bucket: 'crop-photos',
+                  path: crop.displayImage.path,
+                  bucket: crop.displayImage.bucket,
+                  public: crop.displayImage.isFallback,
                   placeholder: Container(
                     color: theme.colorScheme.surfaceContainerLowest,
                     child: Icon(

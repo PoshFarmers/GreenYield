@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/auth/auth_providers.dart';
 import '../../../../core/storage/crop_photo_service.dart';
 import '../../../../models/farmer_profile.dart';
+import '../../../../core/widgets/app_secondary_header.dart';
 import '../farmer_profile_service.dart';
 import 'crop_details_sheet.dart';
+import 'crop_tile.dart';
 
 class FarmerCompleteProfileScreen extends ConsumerStatefulWidget {
   const FarmerCompleteProfileScreen({super.key});
@@ -49,6 +51,7 @@ class _FarmerCompleteProfileScreenState
       cropName: crop.name,
       initialDescription: existing?.description,
       initialPrice: existing?.price,
+      fallbackImageUrl: crop.fallbackImageUrl,
       onRemove: existing == null
           ? null
           : () => setState(() => _selected.remove(crop.id)),
@@ -115,49 +118,10 @@ class _FarmerCompleteProfileScreenState
   }
 
   Widget _buildCropTile(Crop crop) {
-    final theme = Theme.of(context);
-    final isSelected = _selected.containsKey(crop.id);
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
+    return CropTile(
+      crop: crop,
+      isSelected: _selected.containsKey(crop.id),
       onTap: () => _openCropSheet(crop),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.primary.withValues(alpha: 0.12)
-              : theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? theme.colorScheme.primary : Colors.transparent,
-            width: 1.5,
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              crop.category == 'fruit' ? Icons.apple : Icons.eco,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              crop.name,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall,
-            ),
-            if (isSelected) ...[
-              const SizedBox(height: 4),
-              Icon(
-                Icons.check_circle,
-                size: 14,
-                color: theme.colorScheme.primary,
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 
@@ -165,7 +129,10 @@ class _FarmerCompleteProfileScreenState
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text('your_crops_title'.tr())),
+      appBar: AppSecondaryHeader(
+        title: 'your_crops_title'.tr(),
+        showBackButton: false,
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -195,13 +162,6 @@ class _FarmerCompleteProfileScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        'your_crops_title'.tr(),
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
                       Text(
                         'your_crops_subtitle'.tr(),
                         style: theme.textTheme.bodyMedium,
@@ -274,7 +234,7 @@ class _FarmerCompleteProfileScreenState
                         physics: const NeverScrollableScrollPhysics(),
                         crossAxisSpacing: 10,
                         mainAxisSpacing: 10,
-                        childAspectRatio: 0.95,
+                        childAspectRatio: 0.8,
                         children: filtered.map(_buildCropTile).toList(),
                       ),
                       if (filtered.isEmpty) ...[

@@ -16,6 +16,7 @@
   "no_listings_yet": "No listings here yet.\nTap + to post your produce for sale.",
 
   "add_harvest": "Add Harvest",
+  "add_harvest_help_body": "Pick a crop already on your menu, set the quantity and price for this batch, add a photo and harvest date, then review before publishing.",
   "step_of": "Step {current} of {total}",
   "step_crop": "Crop",
   "step_quantity_price": "Quantity & Price",

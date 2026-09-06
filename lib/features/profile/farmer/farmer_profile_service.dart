@@ -28,7 +28,7 @@ class FarmerProfileService {
     return db
         .watch(
           '''
-      SELECT crop.id, crop.name, crop.category,
+      SELECT crop.id, crop.name, crop.category, crop.fallback_image_url,
              farmer_crop.description, farmer_crop.default_price_per_kg,
              farmer_crop.image_url
       FROM farmer_crop
