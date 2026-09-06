@@ -3,7 +3,16 @@ class Vehicle {
   final String driverProfileId;
   final String vehicleType; // three_wheeler|van|lorry|truck|tractor
   final String plateNumber;
+
+  /// Total seating/passenger capacity of the vehicle. Stored in the
+  /// existing `max_load_kg` column — the column name is a legacy
+  /// holdover from the cargo-logistics schema, but the value itself is
+  /// a plain capacity count, so no migration is needed to repurpose it
+  /// for the passenger-ride "Vehicle Capacity" field.
   final double maxLoadKg;
+
+  /// Preferred maximum passenger count for a ride, stored in
+  /// `preferred_min_load_kg` for the same reason as [maxLoadKg] above.
   final double? preferredMinLoadKg;
 
   const Vehicle({
@@ -14,6 +23,12 @@ class Vehicle {
     required this.maxLoadKg,
     this.preferredMinLoadKg,
   });
+
+  /// Vehicle Capacity, as a whole passenger count for display/inputs.
+  int get capacity => maxLoadKg.round();
+
+  /// Preferred Capacity, as a whole passenger count for display/inputs.
+  int? get preferredCapacity => preferredMinLoadKg?.round();
 
   factory Vehicle.fromMap(Map<String, dynamic> map) {
     return Vehicle(
@@ -83,42 +98,98 @@ Set<String> activeDaysKeysFromMask(int mask) {
   return keys;
 }
 
+/// A single resolved point on the map: the free-text address the driver
+/// sees, plus (when available) the geocoded coordinates and a stable
+/// place identifier so the same point can be reused elsewhere in the
+/// app (map previews, distance/duration estimates, re-centering a
+/// picker) instead of re-geocoding the address string every time.
+///
+/// [latitude]/[longitude]/[placeId] are all nullable because a driver
+/// can type a free-text address that hasn't resolved to a place yet —
+/// the address is still saved, just without the structured extras.
+class LocationPoint {
+  final String address;
+  final double? latitude;
+  final double? longitude;
+  final String? placeId;
+
+  const LocationPoint({
+    required this.address,
+    this.latitude,
+    this.longitude,
+    this.placeId,
+  });
+
+  bool get isEmpty => address.trim().isEmpty;
+  bool get hasCoordinates => latitude != null && longitude != null;
+
+  static const empty = LocationPoint(address: '');
+
+  LocationPoint copyWith({
+    String? address,
+    double? latitude,
+    double? longitude,
+    String? placeId,
+    bool clearCoordinates = false,
+  }) {
+    return LocationPoint(
+      address: address ?? this.address,
+      latitude: clearCoordinates ? null : (latitude ?? this.latitude),
+      longitude: clearCoordinates ? null : (longitude ?? this.longitude),
+      placeId: clearCoordinates ? null : (placeId ?? this.placeId),
+    );
+  }
+}
+
 class RoutePreference {
   final String? id;
   final String driverProfileId;
-  final String originLocation;
-  final String destinationLocation;
+  final LocationPoint origin;
+  final LocationPoint destination;
   final RouteDirection direction;
   final int activeDaysMask;
   final bool isActive;
+  final double? distanceKm;
+  final int? durationMinutes;
 
   const RoutePreference({
     this.id,
     required this.driverProfileId,
-    required this.originLocation,
-    required this.destinationLocation,
+    required this.origin,
+    required this.destination,
     this.direction = RouteDirection.both,
     this.activeDaysMask = 0,
     this.isActive = true,
+    this.distanceKm,
+    this.durationMinutes,
   });
+
+  // Convenience accessors — most read-only UI (saved-route cards, list
+  // rows) only ever needs the address strings.
+  String get originLocation => origin.address;
+  String get destinationLocation => destination.address;
 
   Set<String> get activeDayKeys => activeDaysKeysFromMask(activeDaysMask);
 
   RoutePreference copyWith({
-    String? originLocation,
-    String? destinationLocation,
+    LocationPoint? origin,
+    LocationPoint? destination,
     RouteDirection? direction,
     int? activeDaysMask,
     bool? isActive,
+    double? distanceKm,
+    int? durationMinutes,
   }) {
     return RoutePreference(
       id: id,
       driverProfileId: driverProfileId,
-      originLocation: originLocation ?? this.originLocation,
-      destinationLocation: destinationLocation ?? this.destinationLocation,
+      origin: origin ?? this.origin,
+      destination: destination ?? this.destination,
       direction: direction ?? this.direction,
       activeDaysMask: activeDaysMask ?? this.activeDaysMask,
       isActive: isActive ?? this.isActive,
+      distanceKm: distanceKm ?? this.distanceKm,
+      durationMinutes: durationMinutes ?? this.durationMinutes,
     );
   }
 
@@ -126,21 +197,41 @@ class RoutePreference {
     return RoutePreference(
       id: map['id'] as String,
       driverProfileId: map['driver_profile_id'] as String,
-      originLocation: map['origin_location'] as String,
-      destinationLocation: map['destination_location'] as String,
+      origin: LocationPoint(
+        address: map['origin_location'] as String,
+        latitude: (map['origin_lat'] as num?)?.toDouble(),
+        longitude: (map['origin_lng'] as num?)?.toDouble(),
+        placeId: map['origin_place_id'] as String?,
+      ),
+      destination: LocationPoint(
+        address: map['destination_location'] as String,
+        latitude: (map['destination_lat'] as num?)?.toDouble(),
+        longitude: (map['destination_lng'] as num?)?.toDouble(),
+        placeId: map['destination_place_id'] as String?,
+      ),
       direction: routeDirectionFromDb((map['direction'] as String?) ?? 'both'),
       activeDaysMask: (map['active_days'] as num?)?.toInt() ?? 0,
       isActive: ((map['is_active'] as num?)?.toInt() ?? 1) == 1,
+      distanceKm: (map['distance_km'] as num?)?.toDouble(),
+      durationMinutes: (map['duration_minutes'] as num?)?.toInt(),
     );
   }
 
   Map<String, dynamic> toInsertMap() => {
     'driver_profile_id': driverProfileId,
-    'origin_location': originLocation,
-    'destination_location': destinationLocation,
+    'origin_location': origin.address,
+    'origin_lat': origin.latitude,
+    'origin_lng': origin.longitude,
+    'origin_place_id': origin.placeId,
+    'destination_location': destination.address,
+    'destination_lat': destination.latitude,
+    'destination_lng': destination.longitude,
+    'destination_place_id': destination.placeId,
     'direction': routeDirectionToDb(direction),
     'active_days': activeDaysMask,
     'is_active': isActive ? 1 : 0,
+    'distance_km': distanceKm,
+    'duration_minutes': durationMinutes,
   };
 }
 

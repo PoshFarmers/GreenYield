@@ -24,14 +24,24 @@ class RouteDraft {
        destinationController = TextEditingController(text: destination),
        activeDays = activeDays ?? <String>{};
 
+  // Coordinates/place id resolved for the current text, if any — kept
+  // alongside the controllers so a draft started from an existing
+  // RoutePreference (which may already have structured location data)
+  // doesn't lose it just from being re-edited as plain text.
+  LocationPoint _originPoint = LocationPoint.empty;
+  LocationPoint _destinationPoint = LocationPoint.empty;
+
   factory RouteDraft.fromRoutePreference(RoutePreference route) {
-    return RouteDraft(
+    final draft = RouteDraft(
       existingId: route.id,
       origin: route.originLocation,
       destination: route.destinationLocation,
       direction: route.direction,
       activeDays: route.activeDayKeys,
     );
+    draft._originPoint = route.origin;
+    draft._destinationPoint = route.destination;
+    return draft;
   }
 
   /// True once both endpoints are filled in — used to decide whether a
@@ -44,8 +54,16 @@ class RouteDraft {
     return RoutePreference(
       id: existingId,
       driverProfileId: driverProfileId,
-      originLocation: originController.text.trim(),
-      destinationLocation: destinationController.text.trim(),
+      origin: _originPoint.copyWith(
+        address: originController.text.trim(),
+        // Coordinates only stay valid if the address wasn't retyped.
+        clearCoordinates: _originPoint.address != originController.text.trim(),
+      ),
+      destination: _destinationPoint.copyWith(
+        address: destinationController.text.trim(),
+        clearCoordinates:
+            _destinationPoint.address != destinationController.text.trim(),
+      ),
       direction: direction,
       activeDaysMask: activeDaysMaskFromKeys(activeDays),
     );

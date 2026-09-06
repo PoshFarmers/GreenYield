@@ -181,7 +181,7 @@ class _DriverProfileEditScreenState
                     const SizedBox(height: 16),
 
                     AppTextField(
-                      label: 'max_load_kg'.tr(),
+                      label: 'vehicle_capacity'.tr(),
                       controller: _maxLoadController,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
@@ -197,7 +197,7 @@ class _DriverProfileEditScreenState
                     const SizedBox(height: 16),
 
                     AppTextField(
-                      label: 'preferred_min_load_kg'.tr(),
+                      label: 'preferred_capacity'.tr(),
                       controller: _preferredMinLoadController,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
