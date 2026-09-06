@@ -39,9 +39,9 @@ create policy "farmer_crop_delete_own" on farmer_crop for delete using (auth.uid
 
 insert into crop (name, category) values
   ('Tomato', 'vegetable'), ('Carrot', 'vegetable'), ('Cabbage', 'vegetable'),
-  ('Brinjal', 'vegetable'), ('Okra', 'vegetable'), ('Pumpkin', 'vegetable'),
+  ('Eggplant', 'vegetable'), ('Okra', 'vegetable'), ('Pumpkin', 'vegetable'),
   ('Cucumber', 'vegetable'), ('Green Beans', 'vegetable'), ('Potato', 'vegetable'),
-  ('Onion', 'vegetable'), ('Beetroot', 'vegetable'), ('Capsicum', 'vegetable'),
+  ('Onion', 'vegetable'), ('Beetroot', 'vegetable'), ('Red bell pepper', 'vegetable'),
   ('Banana', 'fruit'), ('Mango', 'fruit'), ('Papaya', 'fruit'),
   ('Pineapple', 'fruit'), ('Watermelon', 'fruit'), ('Orange', 'fruit'),
   ('Guava', 'fruit'), ('Jackfruit', 'fruit'), ('Rambutan', 'fruit'), ('Mangosteen', 'fruit')
