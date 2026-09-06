@@ -320,111 +320,128 @@ class _ListingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final borderRadius = BorderRadius.circular(16);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Stack(
-            children: [
-              SizedBox(
-                height: 150,
-                width: double.infinity,
-                child: MediaImage(
-                  path: listing.listingImageUrl,
-                  bucket: 'crop-photos',
-                  placeholder: Container(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    child: Icon(
-                      Icons.image_outlined,
-                      size: 40,
-                      color: theme.colorScheme.outline,
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 10,
-                left: 10,
-                child: _StatusBadge(status: listing.status),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(14),
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: borderRadius,
+          child: Container(
+            color: theme.colorScheme.surfaceContainerLowest,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  listing.cropName,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (listing.description != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    listing.description!,
-                    style: theme.textTheme.bodySmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-                const Divider(height: 24),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                Stack(
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'price_per_kg'.tr(),
-                          style: theme.textTheme.bodySmall,
-                        ),
-                        Text(
-                          'Rs ${listing.pricePerKg.toStringAsFixed(2)}',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.bold,
+                    SizedBox(
+                      height: 150,
+                      width: double.infinity,
+                      child: MediaImage(
+                        path: listing.displayImage.path,
+                        bucket: listing.displayImage.bucket,
+                        public: listing.displayImage.isFallback,
+                        placeholder: Container(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          child: Icon(
+                            Icons.image_outlined,
+                            size: 40,
+                            color: theme.colorScheme.outline,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        MarketPriceComparisonCard(
-                          cropId: listing.cropId,
-                          farmerPricePerKg: listing.pricePerKg,
-                          compact: true,
-                        ),
-                      ],
+                      ),
                     ),
-                    const Spacer(),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          'stock_available'.tr(),
-                          style: theme.textTheme.bodySmall,
-                        ),
-                        Text(
-                          '${listing.availableQuantityKg.toStringAsFixed(0)} kg',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: _StatusBadge(status: listing.status),
                     ),
                   ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        listing.cropName,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (listing.description != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          listing.description!,
+                          style: theme.textTheme.bodySmall,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const Divider(height: 24),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'price_per_kg'.tr(),
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              Text(
+                                'Rs ${listing.pricePerKg.toStringAsFixed(2)}',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              MarketPriceComparisonCard(
+                                cropId: listing.cropId,
+                                farmerPricePerKg: listing.pricePerKg,
+                                compact: true,
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'stock_available'.tr(),
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              Text(
+                                '${listing.availableQuantityKg.toStringAsFixed(0)} kg',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+        // Painted on top so the border is never covered at the rounded
+        // corners (the image otherwise sits flush against the top edge
+        // with nothing to buffer it).
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: borderRadius,
+                border: Border.all(color: theme.colorScheme.outlineVariant),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
