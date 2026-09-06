@@ -192,9 +192,30 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       label: Text('continue_with_google'.tr()),
                     ),
                     const SizedBox(height: 24),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text('have_account'.tr()),
+                    Center(
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
+                        children: [
+                          Text(
+                            'have_account'.tr(),
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              'login'.tr(),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
