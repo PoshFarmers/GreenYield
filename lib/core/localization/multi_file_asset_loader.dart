@@ -13,8 +13,11 @@ class MultiFileAssetLoader extends AssetLoader {
     'farmer',
     'buyer',
     'driver',
+    'notifications',
     'listings',
     'marketplace',
+    'cart',
+    'checkout',
   ];
 
   const MultiFileAssetLoader();

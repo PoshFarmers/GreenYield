@@ -35,4 +35,11 @@ class AppColors {
   // used anywhere green needs to be *read*, not just filled, in dark mode.
   static const Color darkPrimary = Color(0xFF4CAF50);
   static const Color darkError = Color(0xFFE6867E);
+
+  // Notification palette -----------------------------------------------
+  static const Color deepForestGreen = Color(0xFF1B4D3E);
+  static const Color freshLeafGreen = Color(0xFF4CAF50);
+  static const Color warnAmber = Color(0xFFFFC107);
+  static const Color cream = Color(0xFFF9FBF8);
+  static const Color mutedGray = Color(0xFF757575);
 }

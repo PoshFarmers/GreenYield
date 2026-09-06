@@ -6,6 +6,7 @@ import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/media_image.dart';
 import '../../../models/produce_listing.dart';
 import '../../../models/profile.dart';
+import '../../pricing/presentation/widgets/market_price_comparison_card.dart';
 import '../produce_listing_service.dart';
 import 'add_harvest_screen.dart';
 
@@ -392,6 +393,12 @@ class _ListingCard extends StatelessWidget {
                             color: theme.colorScheme.primary,
                             fontWeight: FontWeight.bold,
                           ),
+                        ),
+                        const SizedBox(height: 2),
+                        MarketPriceComparisonCard(
+                          cropId: listing.cropId,
+                          farmerPricePerKg: listing.pricePerKg,
+                          compact: true,
                         ),
                       ],
                     ),

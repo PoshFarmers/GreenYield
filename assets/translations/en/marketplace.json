@@ -22,5 +22,10 @@
   "away": "away",
   "sold_out_message": "This listing is sold out.",
   "listing_unavailable": "This listing is no longer available.",
-  "offline_listing_may_be_stale": "You're offline. This listing may be out of date."
+  "offline_listing_may_be_stale": "You're offline. This listing may be out of date.",
+  "farm_gate_subtotal": "Farm-gate subtotal",
+  "estimated_delivery_fee": "Estimated delivery fee",
+  "estimated_total": "Estimated total",
+  "delivery_fee_unknown": "Calculated at checkout",
+  "delivery_fee_unknown_hint": "We don't have enough location data yet to estimate delivery cost."
 }

@@ -6,6 +6,7 @@ import '../../../core/theme/theme_provider.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/avatar_image.dart';
 import '../../../models/profile.dart';
+import '../../pricing/presentation/widgets/farmer_price_trends_section.dart';
 
 class HomeScreen extends ConsumerWidget {
   final Profile profile;
@@ -41,6 +42,16 @@ class HomeScreen extends ConsumerWidget {
                   '${profile.firstName} ${profile.lastName}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
+
+                if (profile.activeRole == 'farmer') ...[
+                  const SizedBox(height: 28),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FarmerPriceTrendsSection(
+                      farmerProfileId: profile.id,
+                    ),
+                  ),
+                ],
 
                 const SizedBox(height: 32),
 

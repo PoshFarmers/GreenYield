@@ -34,5 +34,8 @@
   "set_up_crops": "Set up my crops",
   "add_crop": "Add a crop",
   "all_crops_added": "You've added every available crop.",
-  "tap_crop_to_edit": "Tap a crop to edit its photo, description and price."
+  "tap_crop_to_edit": "Tap a crop to edit its photo, description and price.",
+  "market_prices_title": "Market prices",
+  "market_prices_subtitle": "Today's average price for your crops",
+  "no_market_data_short": "No data yet"
 }

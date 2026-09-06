@@ -9,7 +9,9 @@ import '../../../core/widgets/avatar_image.dart';
 import '../../../core/widgets/media_image.dart';
 import '../../../models/marketplace_listing.dart';
 import '../../../models/profile.dart';
+import '../../cart/cart_service.dart';
 import '../../navigation/presentation/app_nav_shell.dart';
+import '../../pricing/presentation/widgets/price_breakdown_card.dart';
 import '../marketplace_service.dart';
 
 /// Full detail for one listing, with the quantity stepper and the entry
@@ -41,6 +43,7 @@ class ListingDetailScreen extends ConsumerStatefulWidget {
 
 class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   final _service = const MarketplaceService();
+  final _cartService = const CartService();
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
@@ -48,6 +51,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   double _quantity = 1;
   bool _isLoading = true;
   bool _isOffline = false;
+  bool _isAddingToCart = false;
   String? _errorMessage;
 
   @override
@@ -103,6 +107,23 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
 
   void _changeQuantity(double delta) {
     setState(() => _quantity = _clampQuantity(_quantity + delta));
+  }
+
+  Future<void> _addToCart(MarketplaceListing listing) async {
+    if (_isAddingToCart) return;
+    setState(() => _isAddingToCart = true);
+    try {
+      await _cartService.addToCart(
+        buyerProfileId: widget.buyerProfile.id,
+        produceListingId: listing.id,
+        quantityKg: _quantity,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('added_to_cart'.tr())));
+    } finally {
+      if (mounted) setState(() => _isAddingToCart = false);
+    }
   }
 
   void _messageFarmer() {
@@ -173,8 +194,6 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   }
 
   Widget _buildContent(ThemeData theme, MarketplaceListing listing) {
-    final subtotal = _quantity * listing.pricePerKg;
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
@@ -350,26 +369,25 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('subtotal'.tr(), style: theme.textTheme.bodyMedium),
-                    Text(
-                      '${'currency_prefix'.tr()} ${subtotal.toStringAsFixed(2)}',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                PriceBreakdownCard(
+                  pricePerKg: listing.pricePerKg,
+                  quantityKg: _quantity,
+                  distanceKm: listing.distanceKm,
                 ),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('cart_coming_soon'.tr())),
-                    ),
-                    icon: const Icon(Icons.shopping_cart_outlined),
+                    onPressed: _isAddingToCart
+                        ? null
+                        : () => _addToCart(listing),
+                    icon: _isAddingToCart
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.shopping_cart_outlined),
                     label: Text('add_to_cart'.tr()),
                   ),
                 ),
