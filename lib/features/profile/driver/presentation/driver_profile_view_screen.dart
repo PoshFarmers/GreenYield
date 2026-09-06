@@ -723,7 +723,7 @@ class _VehicleCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${'max_load_kg'.tr()}: ${vehicle.maxLoadKg.toStringAsFixed(0)} kg',
+                  '${'vehicle_capacity'.tr()}: ${vehicle.capacity}',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),

@@ -56,10 +56,18 @@ const schema = Schema([
   Table('driver_route_preference', [
     Column.text('driver_profile_id'),
     Column.text('origin_location'),
+    Column.real('origin_lat'),
+    Column.real('origin_lng'),
+    Column.text('origin_place_id'),
     Column.text('destination_location'),
+    Column.real('destination_lat'),
+    Column.real('destination_lng'),
+    Column.text('destination_place_id'),
     Column.text('direction'),
     Column.integer('active_days'),
     Column.integer('is_active'),
+    Column.real('distance_km'),
+    Column.integer('duration_minutes'),
   ]),
   Table('notification', [
     Column.text('profile_id'),
