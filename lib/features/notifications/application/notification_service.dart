@@ -27,7 +27,7 @@ class NotificationService {
     final uid = _uid;
     if (uid == null) return [];
 
-    final where = <String>['profile_id = ?'];
+    final where = <String>['profile_id = ?', "type != 'new_message'"];
     final params = <Object?>[uid];
 
     if (isRead == true) where.add('read_at is not null');
@@ -55,8 +55,8 @@ class NotificationService {
     if (uid == null) return Stream.value(0);
     return db
         .watch(
-          'SELECT COUNT(*) as count FROM notification '
-          'WHERE profile_id = ? AND read_at IS NULL',
+          "SELECT COUNT(*) as count FROM notification "
+          "WHERE profile_id = ? AND read_at IS NULL AND type != 'new_message'",
           parameters: [uid],
         )
         .map((rows) => rows.first['count'] as int? ?? 0);
