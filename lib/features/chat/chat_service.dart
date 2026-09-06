@@ -179,7 +179,9 @@ class ChatService {
             orElse: () => const {},
           );
           final lastReadAt = peer['last_read_at'] as String?;
-          return lastReadAt == null ? null : DateTime.parse(lastReadAt).toLocal();
+          return lastReadAt == null
+              ? null
+              : DateTime.parse(lastReadAt).toLocal();
         });
   }
 

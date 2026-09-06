@@ -17,14 +17,18 @@ final unreadConversationCountProvider = StreamProvider<int>((ref) {
 });
 
 /// Live message stream for one conversation room.
-final chatMessagesProvider =
-    StreamProvider.family<List<ChatMessage>, String>((ref, conversationId) {
-      return ref.watch(chatServiceProvider).streamMessages(conversationId);
-    });
+final chatMessagesProvider = StreamProvider.family<List<ChatMessage>, String>((
+  ref,
+  conversationId,
+) {
+  return ref.watch(chatServiceProvider).streamMessages(conversationId);
+});
 
 /// Live read-cursor for the other participant in a conversation, used
 /// to render "seen" checkmarks on the caller's own messages.
-final peerLastReadAtProvider =
-    StreamProvider.family<DateTime?, String>((ref, conversationId) {
-      return ref.watch(chatServiceProvider).streamPeerLastReadAt(conversationId);
-    });
+final peerLastReadAtProvider = StreamProvider.family<DateTime?, String>((
+  ref,
+  conversationId,
+) {
+  return ref.watch(chatServiceProvider).streamPeerLastReadAt(conversationId);
+});
