@@ -45,12 +45,13 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
   }
 
   // Hysteresis so the section doesn't flicker while sitting right at the
-  // threshold — collapse past 24px, only restore once back under 8px.
+  // threshold — a deliberate scroll past 120px collapses it, only
+  // restoring once scrolled back up near the very top (under 16px).
   void _handleScroll() {
     final offset = _scrollController.offset;
-    if (!_statsCollapsed && offset > 24) {
+    if (!_statsCollapsed && offset > 120) {
       setState(() => _statsCollapsed = true);
-    } else if (_statsCollapsed && offset < 8) {
+    } else if (_statsCollapsed && offset < 16) {
       setState(() => _statsCollapsed = false);
     }
   }
