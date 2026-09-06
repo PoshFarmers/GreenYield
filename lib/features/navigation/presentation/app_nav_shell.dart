@@ -7,10 +7,17 @@ class NavTab {
   final IconData icon;
   final WidgetBuilder builder;
 
+  /// Optional override for the destination icon — used by the Chat tab
+  /// to show a live yellow unread-thread badge instead of a plain
+  /// [Icon] (see `ChatNavBadgeIcon`). Falls back to `Icon(icon)` when
+  /// omitted.
+  final WidgetBuilder? iconBuilder;
+
   const NavTab({
     required this.label,
     required this.icon,
     required this.builder,
+    this.iconBuilder,
   });
 }
 
@@ -78,7 +85,12 @@ class _AppNavShellState extends ConsumerState<AppNavShell> {
             ref.read(navShellIndexProvider.notifier).select(i),
         destinations: [
           for (final tab in widget.tabs)
-            NavigationDestination(icon: Icon(tab.icon), label: tab.label),
+            NavigationDestination(
+              icon: tab.iconBuilder != null
+                  ? Builder(builder: tab.iconBuilder!)
+                  : Icon(tab.icon),
+              label: tab.label,
+            ),
         ],
       ),
     );

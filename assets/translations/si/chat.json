@@ -1,0 +1,19 @@
+{
+  "chat_title": "සංවාද",
+  "search_messages": "පණිවිඩ සොයන්න...",
+  "no_conversations_title": "තවම සංවාද නැත",
+  "no_conversations_subtitle": "ගොවියෙකුගේ, ඇණවුමක හෝ බෙදාහැරීමේ තිරයකින් සංවාදයක් ආරම්භ කරන්න.",
+  "message_farmer": "ගොවියාට පණිවිඩයක්",
+  "type_a_message": "පණිවිඩයක් ටයිප් කරන්න...",
+  "attach_image": "රූපයක් අමුණන්න",
+  "role_farmer": "ගොවියා",
+  "role_buyer": "ගැනුම්කරු",
+  "role_driver": "රියදුරු",
+  "chat_photo": "ඡායාරූපය",
+  "today": "අද",
+  "yesterday": "ඊයේ",
+  "failed_to_load_chats": "සංවාද පූරණය කළ නොහැක.",
+  "failed_to_send_message": "පණිවිඩය යැවීමට අසමත් විය. නැවත උත්සාහ කරන්න.",
+  "retry": "නැවත උත්සාහ කරන්න",
+  "you": "ඔබ"
+}
