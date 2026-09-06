@@ -476,8 +476,9 @@ class _FarmerOrderCard extends StatelessWidget {
               ],
             ),
           ),
-          ...group.items.map(
-            (item) => Padding(
+          ...group.items.map((item) {
+            final display = enrichmentMap[item.produceListingId]?.displayImage;
+            return Padding(
               padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
               child: Row(
                 children: [
@@ -487,10 +488,9 @@ class _FarmerOrderCard extends StatelessWidget {
                       width: 44,
                       height: 44,
                       child: MediaImage(
-                        path:
-                            enrichmentMap[item.produceListingId]?.imageUrl ??
-                            item.imageUrl,
-                        bucket: 'crop-photos',
+                        path: display?.path ?? item.imageUrl,
+                        bucket: display?.bucket ?? 'crop-photos',
+                        public: display?.isFallback ?? false,
                         placeholder: Container(
                           color: theme.colorScheme.surfaceContainerHighest,
                           child: Icon(
@@ -530,8 +530,8 @@ class _FarmerOrderCard extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-          ),
+            );
+          }),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
             child: Row(
