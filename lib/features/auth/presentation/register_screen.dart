@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/widgets/app_secondary_header.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/google_glyph.dart';
 
@@ -95,7 +96,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     });
 
     return Scaffold(
-      appBar: AppBar(title: Text('register'.tr())),
+      appBar: AppSecondaryHeader(title: 'register'.tr()),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
