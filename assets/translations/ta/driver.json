@@ -84,6 +84,8 @@
   "district_duration": "{district} • {minutes} நிமிடங்கள்",
   "district_pallets_crop": "{district} • {pallets} பலகைகள் • {crop}",
   "route_completed": "வழி {route} • முடிந்தது",
+  "crop_summary": "{crop}",
+  "order_total": "ஒருமேர்ம் மொத்தம்: {amount}",
   "done": "முடிந்தது",
   "details": "விவரங்கள்",
   "step_x_of_n": "படி {step} / {total}",
