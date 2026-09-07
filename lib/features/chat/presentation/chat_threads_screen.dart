@@ -105,7 +105,9 @@ class _ChatThreadsScreenState extends ConsumerState<ChatThreadsScreen>
     // messages sent while the WebSocket was backgrounded (and possibly
     // disconnected) are never silently missed.
     if (state == AppLifecycleState.resumed) {
-      ref.invalidate(chatThreadsProvider);
+      if (widget.profile.activeRole != null) {
+        ref.invalidate(chatThreadsProvider(widget.profile.activeRole!));
+      }
     }
   }
 
@@ -118,7 +120,10 @@ class _ChatThreadsScreenState extends ConsumerState<ChatThreadsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final threadsAsync = ref.watch(chatThreadsProvider);
+    final activeRole = widget.profile.activeRole;
+    final threadsAsync = activeRole == null
+        ? const AsyncValue.data(<ChatThread>[])
+        : ref.watch(chatThreadsProvider(activeRole));
     final filters = <_ThreadFilter>[
       const _ThreadFilter.all(),
       const _ThreadFilter.unread(),
@@ -187,7 +192,11 @@ class _ChatThreadsScreenState extends ConsumerState<ChatThreadsScreen>
                       Text('failed_to_load_chats'.tr()),
                       const SizedBox(height: 12),
                       OutlinedButton(
-                        onPressed: () => ref.invalidate(chatThreadsProvider),
+                        onPressed: widget.profile.activeRole == null
+                            ? null
+                            : () => ref.invalidate(
+                                chatThreadsProvider(widget.profile.activeRole!),
+                              ),
                         child: Text('retry'.tr()),
                       ),
                     ],
@@ -252,7 +261,7 @@ class _ChatThreadsScreenState extends ConsumerState<ChatThreadsScreen>
   }
 }
 
-class _ThreadTile extends StatelessWidget {
+class _ThreadTile extends ConsumerWidget {
   final ChatThread thread;
   final Profile profile;
 
@@ -292,7 +301,7 @@ class _ThreadTile extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final snippet = thread.lastMessageText ?? 'chat_photo'.tr();
 
     return Material(
@@ -376,8 +385,8 @@ class _ThreadTile extends StatelessWidget {
               ),
           ],
         ),
-        onTap: () {
-          Navigator.of(context).push(
+        onTap: () async {
+          await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => ChatScreen(
                 conversationId: thread.conversationId,
@@ -387,6 +396,19 @@ class _ThreadTile extends StatelessWidget {
               ),
             ),
           );
+
+          // The room may have marked the conversation as read while it was
+          // open. Refresh the list once when returning so the snippet,
+          // unread badge and ordering are immediately correct even if the
+          // Realtime participant UPDATE arrives a little later.
+          if (context.mounted && profile.activeRole != null) {
+            final activeRole = profile.activeRole!;
+            // Refresh both the thread list and the global nav badge immediately
+            // after the room marks messages as read. Do not wait for the
+            // participant Realtime UPDATE to arrive.
+            ref.invalidate(chatThreadsProvider(activeRole));
+            ref.invalidate(unreadConversationCountProvider(activeRole));
+          }
         },
       ),
     );
