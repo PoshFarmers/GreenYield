@@ -5,15 +5,22 @@ import '../chat_service.dart';
 
 final chatServiceProvider = Provider<ChatService>((ref) => const ChatService());
 
-/// Live thread list backing `chat_threads_screen.dart`.
-final chatThreadsProvider = StreamProvider<List<ChatThread>>((ref) {
-  return ref.watch(chatServiceProvider).watchChatThreads();
+/// Live thread list for the currently active role.
+final chatThreadsProvider = StreamProvider.family<List<ChatThread>, String>((
+  ref,
+  activeRole,
+) {
+  return ref.watch(chatServiceProvider).watchChatThreads(activeRole);
 });
 
-/// Live count of distinct threads with unread messages — feeds the
-/// yellow badge on every role's Chat nav tab.
-final unreadConversationCountProvider = StreamProvider<int>((ref) {
-  return ref.watch(chatServiceProvider).getUnreadConversationCountStream();
+/// Live count of unread conversation threads for the currently active role.
+final unreadConversationCountProvider = StreamProvider.family<int, String>((
+  ref,
+  activeRole,
+) {
+  return ref
+      .watch(chatServiceProvider)
+      .getUnreadConversationCountStream(activeRole);
 });
 
 /// Live message stream for one conversation room.
@@ -24,8 +31,7 @@ final chatMessagesProvider = StreamProvider.family<List<ChatMessage>, String>((
   return ref.watch(chatServiceProvider).streamMessages(conversationId);
 });
 
-/// Live read-cursor for the other participant in a conversation, used
-/// to render "seen" checkmarks on the caller's own messages.
+/// Live read cursor for the other participant in a conversation.
 final peerLastReadAtProvider = StreamProvider.family<DateTime?, String>((
   ref,
   conversationId,

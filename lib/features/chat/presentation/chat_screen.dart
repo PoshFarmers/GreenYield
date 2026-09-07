@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart';
@@ -8,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/widgets/avatar_image.dart';
 import '../../../models/chat_models.dart';
 import '../application/chat_providers.dart';
+import '../chat_service.dart';
 
 /// `chat_screen.dart` — the conversation room. Custom app bar with the
 /// other participant's avatar/name, sender-vs-receiver bubbles, image
@@ -35,9 +37,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _textController = TextEditingController();
   File? _pendingImage;
   bool _isSending = false;
+  Timer? _readDebounce;
 
   @override
   void dispose() {
+    _readDebounce?.cancel();
     _textController.dispose();
     super.dispose();
   }
@@ -80,18 +84,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  void _scheduleMarkAsRead() {
+    _readDebounce?.cancel();
+    _readDebounce = Timer(const Duration(milliseconds: 150), () {
+      if (!mounted) return;
+      ref
+          .read(chatServiceProvider)
+          .markMessagesAsRead(widget.conversationId)
+          .catchError((_) {});
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final messagesAsync = ref.watch(
       chatMessagesProvider(widget.conversationId),
     );
 
-    // Mark the thread read each time the stream delivers new data so
-    // the unread badge clears as soon as the room is opened and stays
-    // cleared as new messages arrive while the user is in the room.
-    messagesAsync.whenData((_) {
-      ref.read(chatServiceProvider).markMessagesAsRead(widget.conversationId);
-    });
+    // Read state is a side effect. Keep it out of build() and debounce it
+    // so a burst of incoming messages causes one database write, not one
+    // write per message.
+    ref.listen<AsyncValue<List<ChatMessage>>>(
+      chatMessagesProvider(widget.conversationId),
+      (previous, next) {
+        if (next.hasValue) _scheduleMarkAsRead();
+      },
+    );
+
+    final peerLastReadAt = ref
+        .watch(peerLastReadAtProvider(widget.conversationId))
+        .asData
+        ?.value;
 
     return Scaffold(
       appBar: AppBar(
@@ -128,7 +151,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   itemBuilder: (context, index) {
                     final message = messages[index];
                     final isMine = message.senderId == widget.currentUserId;
-                    return _MessageBubble(message: message, isMine: isMine);
+                    return _MessageBubble(
+                      message: message,
+                      isMine: isMine,
+                      peerLastReadAt: peerLastReadAt,
+                    );
                   },
                 );
               },
@@ -199,11 +226,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 }
 
-class _MessageBubble extends ConsumerWidget {
+class _MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool isMine;
+  final DateTime? peerLastReadAt;
 
-  const _MessageBubble({required this.message, required this.isMine});
+  const _MessageBubble({
+    required this.message,
+    required this.isMine,
+    required this.peerLastReadAt,
+  });
 
   String _timestamp() {
     final at = message.createdAt;
@@ -214,7 +246,7 @@ class _MessageBubble extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bubbleColor = isMine
         ? theme.colorScheme.primary
@@ -222,14 +254,10 @@ class _MessageBubble extends ConsumerWidget {
     final textColor = isMine
         ? theme.colorScheme.onPrimary
         : theme.colorScheme.onSurface;
-    final peerLastReadAt = isMine
-        ? ref
-              .watch(peerLastReadAtProvider(message.conversationId))
-              .asData
-              ?.value
-        : null;
     final isSeen =
-        peerLastReadAt != null && !message.createdAt.isAfter(peerLastReadAt);
+        isMine &&
+        peerLastReadAt != null &&
+        !message.createdAt.isAfter(peerLastReadAt!);
 
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
@@ -257,9 +285,9 @@ class _MessageBubble extends ConsumerWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: FutureBuilder<String>(
-                  future: ref
-                      .read(chatServiceProvider)
-                      .resolveAttachmentUrl(message.attachmentUrl!),
+                  future: const ChatService().resolveAttachmentUrl(
+                    message.attachmentUrl!,
+                  ),
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) {
                       return const SizedBox(

@@ -11,12 +11,19 @@ import '../../application/chat_providers.dart';
 /// *threads* with unread messages, not total unread messages.
 class ChatNavBadgeIcon extends ConsumerWidget {
   final IconData icon;
+  final String activeRole;
 
-  const ChatNavBadgeIcon({super.key, this.icon = Icons.chat_bubble_outline});
+  const ChatNavBadgeIcon({
+    super.key,
+    this.icon = Icons.chat_bubble_outline,
+    required this.activeRole,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final count = ref.watch(unreadConversationCountProvider).asData?.value ?? 0;
+    final count =
+        ref.watch(unreadConversationCountProvider(activeRole)).asData?.value ??
+        0;
 
     return Badge(
       isLabelVisible: count > 0,

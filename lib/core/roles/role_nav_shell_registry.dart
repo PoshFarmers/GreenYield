@@ -39,7 +39,7 @@ Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
   final chatTab = NavTab(
     label: 'Chat',
     icon: Icons.chat_bubble_outline,
-    iconBuilder: (_) => const ChatNavBadgeIcon(),
+    iconBuilder: (_) => ChatNavBadgeIcon(activeRole: activeRole),
     builder: (_) => ChatThreadsScreen(profile: profile),
   );
 
