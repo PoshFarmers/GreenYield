@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/local_db/powersync.dart';
 import '../../core/supabase/client.dart';
 import '../../models/chat_models.dart';
 
@@ -72,7 +73,11 @@ class ChatService {
   /// of messages arrives at once.
   Stream<List<ChatThread>> watchChatThreads() {
     final controller = StreamController<List<ChatThread>>.broadcast();
-    late final StreamSubscription<List<Map<String, dynamic>>> subscription;
+    // Three subscriptions — whichever fires first wins; the 300 ms debounce
+    // collapses simultaneous events into a single RPC call.
+    StreamSubscription<List<Map<String, dynamic>>>? subConversation;
+    StreamSubscription<List<Map<String, dynamic>>>? subMessage;
+    StreamSubscription<List<Map<String, dynamic>>>? subParticipant;
     Timer? debounce;
 
     void refresh() {
@@ -98,49 +103,115 @@ class ChatService {
             if (!controller.isClosed) controller.addError(error);
           });
 
-      subscription = supabase
+      // conversation.updated_at bump (via trigger on message insert)
+      subConversation = supabase
           .from('conversation')
+          .stream(primaryKey: ['id'])
+          .listen((_) => refresh());
+
+      // Direct message inserts — catches the event on the recipient's device
+      // even if the conversation.updated_at Realtime event is slightly delayed.
+      subMessage = supabase
+          .from('message')
+          .stream(primaryKey: ['id'])
+          .listen((_) => refresh());
+
+      // New conversation_participant rows — fires on the recipient's device
+      // when get_or_create_conversation() creates a brand-new thread; the
+      // conversation.updated_at event alone won't show a new thread to the
+      // recipient because their stream snapshot pre-dates the new row.
+      subParticipant = supabase
+          .from('conversation_participant')
           .stream(primaryKey: ['id'])
           .listen((_) => refresh());
     };
     controller.onCancel = () {
       debounce?.cancel();
-      subscription.cancel();
+      subConversation?.cancel();
+      subMessage?.cancel();
+      subParticipant?.cancel();
     };
 
     return controller.stream;
   }
 
-  /// Total number of *threads* (not messages) with at least one
-  /// message newer than the caller's `last_read_at` cursor for that
-  /// thread — feeds the yellow badge on every role's Chat nav tab.
-  /// Re-derived via `unread_conversation_count()` whenever a message
-  /// arrives, since the underlying comparison (created_at vs. a
-  /// per-participant cursor) isn't something the client can cheaply
-  /// recompute from raw stream rows alone.
+  /// Total number of distinct threads with at least one unread message,
+  /// used by the yellow badge on every role's Chat nav tab.
+  ///
+  /// Uses two sources merged together so the badge works both online
+  /// and offline:
+  ///
+  ///   1. **PowerSync / local SQLite** (`notification` table, type =
+  ///      `'new_message'`, unread): fires immediately on app launch and
+  ///      whenever PowerSync syncs in new rows after reconnecting.
+  ///      This ensures the badge is correct even if the Realtime
+  ///      WebSocket was down while messages arrived.
+  ///
+  ///   2. **Supabase Realtime** (`unread_conversation_count()` RPC,
+  ///      driven by the `message` stream): fires live while online
+  ///      for sub-second badge updates.
+  ///
+  /// The stream emits the *maximum* of the two values at any point in
+  /// time, so a stale online count can't silently clear the badge while
+  /// the local SQLite still knows about unread threads.
   Stream<int> getUnreadConversationCountStream() {
     final controller = StreamController<int>.broadcast();
-    late final StreamSubscription<List<Map<String, dynamic>>> subscription;
+    final uid = supabase.auth.currentUser?.id;
 
-    void refresh() {
-      supabase
-          .rpc('unread_conversation_count')
-          .then((value) {
-            if (!controller.isClosed) controller.add(value as int);
-          })
-          .catchError((Object error) {
-            if (!controller.isClosed) controller.addError(error);
-          });
+    int localCount = 0;
+    int realtimeCount = 0;
+
+    void emit() {
+      if (!controller.isClosed) {
+        controller.add(localCount > realtimeCount ? localCount : realtimeCount);
+      }
     }
 
+    // Source 1: PowerSync watch — offline-resilient, fires on reconnect.
+    StreamSubscription<List<Map<String, dynamic>>>? localSub;
+    // Source 2: Realtime message stream → RPC refresh.
+    StreamSubscription<List<Map<String, dynamic>>>? realtimeSub;
+
     controller.onListen = () {
-      refresh();
-      subscription = supabase
+      if (uid != null) {
+        localSub = db
+            .watch(
+              'SELECT COUNT(DISTINCT json_extract(payload, \'\$.conversation_id\')) AS cnt '
+              'FROM notification '
+              'WHERE profile_id = ? AND type = \'new_message\' AND read_at IS NULL',
+              parameters: [uid],
+            )
+            .listen((rows) {
+              localCount = rows.isNotEmpty
+                  ? (rows.first['cnt'] as int? ?? 0)
+                  : 0;
+              emit();
+            });
+      }
+
+      void refreshRealtime() {
+        supabase
+            .rpc('unread_conversation_count')
+            .then((value) {
+              realtimeCount = value as int? ?? 0;
+              emit();
+            })
+            .catchError((_) {
+              /* swallow; local count still shows */
+            });
+      }
+
+      refreshRealtime();
+      realtimeSub = supabase
           .from('message')
           .stream(primaryKey: ['id'])
-          .listen((_) => refresh());
+          .listen((_) => refreshRealtime());
     };
-    controller.onCancel = () => subscription.cancel();
+
+    controller.onCancel = () {
+      localSub?.cancel();
+      realtimeSub?.cancel();
+    };
 
     return controller.stream;
   }

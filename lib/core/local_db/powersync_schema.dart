@@ -80,6 +80,35 @@ const schema = Schema([
     Column.text('read_at'),
     Column.text('created_at'),
   ]),
+  // Chat tables — deliberately kept out of PowerSync reads in the rest
+  // of the app (chat uses Supabase Realtime directly for sub-second
+  // delivery), but they must be in the schema so PowerSync replicates
+  // them locally. That means (a) `new_message` notification rows that
+  // arrive while offline will be there when the user comes back online,
+  // and (b) the chat can still be browsed in a disconnected state.
+  Table('conversation', [
+    Column.text('context_type'),
+    Column.text('title'),
+    Column.text('updated_at'),
+    Column.text('created_at'),
+  ]),
+  Table('conversation_participant', [
+    Column.text('conversation_id'),
+    Column.text('profile_id'),
+    Column.text('role'),
+    Column.text('display_name'),
+    Column.text('avatar_url'),
+    Column.text('last_read_at'),
+    Column.text('joined_at'),
+  ]),
+  Table('message', [
+    Column.text('conversation_id'),
+    Column.text('sender_id'),
+    Column.text('body'),
+    Column.text('attachment_url'),
+    Column.text('attachment_type'),
+    Column.text('created_at'),
+  ]),
   Table('cart', [
     Column.text('buyer_profile_id'),
     Column.text('created_at'),

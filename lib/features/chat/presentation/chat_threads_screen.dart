@@ -22,12 +22,96 @@ class ChatThreadsScreen extends ConsumerStatefulWidget {
   ConsumerState<ChatThreadsScreen> createState() => _ChatThreadsScreenState();
 }
 
-class _ChatThreadsScreenState extends ConsumerState<ChatThreadsScreen> {
+/// A chip in the role-based filter bar. `all` and `unread` are always
+/// present; `role` chips are derived from the signed-in user's
+/// [Profile.activeRole] so a Buyer sees Farmers/Drivers, a Farmer sees
+/// Buyers/Drivers, and a Driver sees Farmers/Buyers.
+sealed class _ThreadFilter {
+  const _ThreadFilter();
+
+  const factory _ThreadFilter.all() = _AllFilter;
+  const factory _ThreadFilter.unread() = _UnreadFilter;
+  const factory _ThreadFilter.role(ChatRole role) = _RoleFilter;
+
+  String label() => switch (this) {
+    _AllFilter() => 'filter_all'.tr(),
+    _UnreadFilter() => 'filter_unread'.tr(),
+    _RoleFilter(role: final role) => switch (role) {
+      ChatRole.farmer => 'role_farmers'.tr(),
+      ChatRole.buyer => 'role_buyers'.tr(),
+      ChatRole.driver => 'role_drivers'.tr(),
+    },
+  };
+
+  bool matches(ChatThread thread) => switch (this) {
+    _AllFilter() => true,
+    _UnreadFilter() => thread.hasUnread,
+    _RoleFilter(role: final role) => thread.otherRole == role,
+  };
+
+  @override
+  bool operator ==(Object other) => switch ((this, other)) {
+    (_AllFilter(), _AllFilter()) => true,
+    (_UnreadFilter(), _UnreadFilter()) => true,
+    (_RoleFilter(role: final a), _RoleFilter(role: final b)) => a == b,
+    _ => false,
+  };
+
+  @override
+  int get hashCode => switch (this) {
+    _AllFilter() => 0,
+    _UnreadFilter() => 1,
+    _RoleFilter(role: final role) => role.hashCode,
+  };
+}
+
+class _AllFilter extends _ThreadFilter {
+  const _AllFilter();
+}
+
+class _UnreadFilter extends _ThreadFilter {
+  const _UnreadFilter();
+}
+
+class _RoleFilter extends _ThreadFilter {
+  final ChatRole role;
+  const _RoleFilter(this.role);
+}
+
+/// Maps the signed-in user's active role to the two "other role" chips
+/// they should see, in display order, after the fixed All/Unread chips.
+List<ChatRole> _peerRolesFor(String? activeRole) => switch (activeRole) {
+  'buyer' => const [ChatRole.farmer, ChatRole.driver],
+  'farmer' => const [ChatRole.buyer, ChatRole.driver],
+  'driver' => const [ChatRole.farmer, ChatRole.buyer],
+  _ => const [ChatRole.farmer, ChatRole.buyer, ChatRole.driver],
+};
+
+class _ChatThreadsScreenState extends ConsumerState<ChatThreadsScreen>
+    with WidgetsBindingObserver {
   final _searchController = TextEditingController();
   String _query = '';
+  _ThreadFilter _selectedFilter = const _ThreadFilter.all();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-fetch the thread list whenever the app is foregrounded so that
+    // messages sent while the WebSocket was backgrounded (and possibly
+    // disconnected) are never silently missed.
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(chatThreadsProvider);
+    }
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
   }
@@ -35,6 +119,12 @@ class _ChatThreadsScreenState extends ConsumerState<ChatThreadsScreen> {
   @override
   Widget build(BuildContext context) {
     final threadsAsync = ref.watch(chatThreadsProvider);
+    final filters = <_ThreadFilter>[
+      const _ThreadFilter.all(),
+      const _ThreadFilter.unread(),
+      for (final role in _peerRolesFor(widget.profile.activeRole))
+        _ThreadFilter.role(role),
+    ];
 
     return Scaffold(
       appBar: AppBar(title: Text('chat_title'.tr())),
@@ -55,6 +145,36 @@ class _ChatThreadsScreenState extends ConsumerState<ChatThreadsScreen> {
               ),
             ),
           ),
+          SizedBox(
+            height: 40,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: filters.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final filter = filters[index];
+                final selected = filter == _selectedFilter;
+                return ChoiceChip(
+                  label: Text(filter.label()),
+                  selected: selected,
+                  onSelected: (_) => setState(() => _selectedFilter = filter),
+                  labelStyle: TextStyle(
+                    color: selected
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : Theme.of(context).colorScheme.onSurface,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                  selectedColor: Theme.of(context).colorScheme.primary,
+                  backgroundColor: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest,
+                  shape: const StadiumBorder(),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
           Expanded(
             child: threadsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -75,9 +195,12 @@ class _ChatThreadsScreenState extends ConsumerState<ChatThreadsScreen> {
                 ),
               ),
               data: (threads) {
+                final byFilter = threads
+                    .where((t) => _selectedFilter.matches(t))
+                    .toList();
                 final filtered = _query.isEmpty
-                    ? threads
-                    : threads
+                    ? byFilter
+                    : byFilter
                           .where(
                             (t) => t.otherName.toLowerCase().contains(_query),
                           )
