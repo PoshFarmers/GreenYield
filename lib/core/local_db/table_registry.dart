@@ -50,7 +50,10 @@ final Map<String, TableConfig> tableRegistry = {
   'order_item': const TableConfig(tableName: 'order_item'),
   'payment': const TableConfig(tableName: 'payment'),
 
-  // --- add new tables here as delivery/wallet land ---
+  // --- Farmer rating & reviews ---
+  'farmer_review': const TableConfig(tableName: 'farmer_review'),
+
+  // --- add new tables here as wallet lands ---
   // 'listing': TableConfig(tableName: 'listing', remotePkColumn: 'id'),
 };
 
