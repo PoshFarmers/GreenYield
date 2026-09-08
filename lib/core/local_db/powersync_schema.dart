@@ -220,6 +220,22 @@ const schema = Schema([
     Column.text('unassigned_at'),
     Column.integer('is_current'),
   ]),
+  Table('wallet', [
+    Column.text('profile_id'),
+    Column.real('balance'),
+    Column.text('currency'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  Table('wallet_transaction', [
+    Column.text('wallet_id'),
+    Column.text('type'),
+    Column.real('amount'),
+    Column.real('balance_after'),
+    Column.text('reference_table'),
+    Column.text('reference_id'),
+    Column.text('created_at'),
+  ]),
   // no client insert/update RLS policy exists for this table.
   Table('pricing_rule', [
     Column.text('name'),
