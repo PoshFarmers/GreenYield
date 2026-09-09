@@ -28,5 +28,7 @@
   "return_to_marketplace": "மார்க்கெட்பிளேஸுக்குத் திரும்பு",
   "orders_placed_count": "உங்கள் விவசாயிகளுடன் {count} ஆர்டர்கள் வைக்கப்பட்டன",
   "edit_address_coming_soon": "விநியோக முகவரியைத் திருத்துவது விரைவில் வரும்.",
-  "track_order_coming_soon": "ஆர்டர் கண்காணிப்பு விரைவில் வரும்."
+  "track_order_coming_soon": "ஆர்டர் கண்காணிப்பு விரைவில் வரும்.",
+  "order_date": "விநியோக தேதி",
+  "change_date": "மாற்று"
 }

@@ -28,5 +28,7 @@
   "return_to_marketplace": "Return to Marketplace",
   "orders_placed_count": "{count} orders placed with your farmers",
   "edit_address_coming_soon": "Editing delivery address is coming soon.",
-  "track_order_coming_soon": "Order tracking is coming soon."
+  "track_order_coming_soon": "Order tracking is coming soon.",
+  "order_date": "Delivery Date",
+  "change_date": "Change"
 }
