@@ -38,6 +38,17 @@ class FarmerReviewService {
         .map((rows) => rows.isEmpty ? null : FarmerReview.fromMap(rows.first));
   }
 
+  /// One-shot version of [watchReviewForOrder] — used where a stream
+  /// would be overkill (e.g. deciding once whether to pop up the
+  /// post-delivery review prompt).
+  Future<FarmerReview?> getReviewForOrder(String orderId) async {
+    final rows = await db.getAll(
+      'SELECT * FROM farmer_review WHERE order_id = ?',
+      [orderId],
+    );
+    return rows.isEmpty ? null : FarmerReview.fromMap(rows.first);
+  }
+
   /// The most recent delivered order the signed-in buyer has with this
   /// farmer, if any — used to decide whether "Rate & review" should
   /// appear on the farmer's public profile page at all (only buyers who
