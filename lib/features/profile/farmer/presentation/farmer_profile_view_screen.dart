@@ -11,6 +11,8 @@ import '../../../../core/widgets/avatar_image.dart';
 import '../../../../core/widgets/media_image.dart';
 import '../../../../models/farmer_profile.dart';
 import '../../../../models/profile.dart';
+import '../../../../models/wallet.dart';
+import '../../../wallet/wallet_service.dart';
 import '../farmer_profile_service.dart';
 import 'add_crop_screen.dart';
 import 'crop_details_sheet.dart';
@@ -156,7 +158,7 @@ class _FarmerProfileViewScreenState
                           ),
                         ),
                         const SizedBox(height: 12),
-                        const _WalletCard(),
+                        _WalletCard(profileId: _userId),
                         const SizedBox(height: 12),
                         _FarmLocationCard(profile: profile),
                         const SizedBox(height: 12),
@@ -337,7 +339,9 @@ class _HeaderCard extends StatelessWidget {
 /// Wallet balance — the wallet feature itself isn't built yet, so this
 /// shows a placeholder rather than a real balance.
 class _WalletCard extends StatelessWidget {
-  const _WalletCard();
+  final String profileId;
+
+  const _WalletCard({required this.profileId});
 
   @override
   Widget build(BuildContext context) {
@@ -355,16 +359,23 @@ class _WalletCard extends StatelessWidget {
             children: [
               Text('wallet_balance'.tr(), style: theme.textTheme.bodySmall),
               const SizedBox(height: 2),
-              Text(
-                '—',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+              StreamBuilder<Wallet?>(
+                stream: const WalletService().watchBalance(profileId),
+                builder: (context, snapshot) {
+                  final wallet = snapshot.data;
+                  final text = wallet == null
+                      ? 'LKR 0.00'
+                      : '${wallet.currency} ${wallet.balance.toStringAsFixed(2)}';
+                  return Text(
+                    text,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  );
+                },
               ),
             ],
           ),
-          const Spacer(),
-          Text('coming_soon'.tr(), style: theme.textTheme.bodySmall),
         ],
       ),
     );
