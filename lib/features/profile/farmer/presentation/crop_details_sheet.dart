@@ -36,6 +36,7 @@ Future<CropDetails?> showCropDetailsSheet({
   String? initialDescription,
   double? initialPrice,
   String? existingImagePath,
+  String? fallbackImageUrl,
   VoidCallback? onRemove,
 }) {
   return showModalBottomSheet<CropDetails>(
@@ -46,6 +47,7 @@ Future<CropDetails?> showCropDetailsSheet({
       initialDescription: initialDescription,
       initialPrice: initialPrice,
       existingImagePath: existingImagePath,
+      fallbackImageUrl: fallbackImageUrl,
       onRemove: onRemove,
     ),
   );
@@ -56,6 +58,7 @@ class _CropDetailsSheet extends StatefulWidget {
   final String? initialDescription;
   final double? initialPrice;
   final String? existingImagePath;
+  final String? fallbackImageUrl;
   final VoidCallback? onRemove;
 
   const _CropDetailsSheet({
@@ -63,6 +66,7 @@ class _CropDetailsSheet extends StatefulWidget {
     this.initialDescription,
     this.initialPrice,
     this.existingImagePath,
+    this.fallbackImageUrl,
     this.onRemove,
   });
 
@@ -138,7 +142,8 @@ class _CropDetailsSheetState extends State<_CropDetailsSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasAnyPhoto = _imageBytes != null || widget.existingImagePath != null;
+    final hasOwnPhoto = _imageBytes != null || widget.existingImagePath != null;
+    final hasAnyPhoto = hasOwnPhoto || widget.fallbackImageUrl != null;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -161,9 +166,18 @@ class _CropDetailsSheetState extends State<_CropDetailsSheet> {
                   width: double.infinity,
                   child: _imageBytes != null
                       ? Image.memory(_imageBytes!, fit: BoxFit.cover)
-                      : MediaImage(
+                      : widget.existingImagePath != null
+                      ? MediaImage(
                           path: widget.existingImagePath,
                           bucket: 'crop-photos',
+                          placeholder: Container(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                          ),
+                        )
+                      : MediaImage(
+                          path: widget.fallbackImageUrl,
+                          bucket: 'crop-fallback-images',
+                          public: true,
                           placeholder: Container(
                             color: theme.colorScheme.surfaceContainerHighest,
                           ),

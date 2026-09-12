@@ -184,8 +184,7 @@ class _LocationSetupScreenState extends ConsumerState<LocationSetupScreen> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(_promptKey.tr(), style: theme.textTheme.bodyMedium),
+
                   const SizedBox(height: 16),
                   Row(
                     children: [

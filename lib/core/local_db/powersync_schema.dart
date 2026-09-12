@@ -23,9 +23,11 @@ const schema = Schema([
     Column.real('default_price_per_kg'),
     Column.text('image_url'),
   ]),
-  Table('crop', [Column.text('name'), Column.text('category')]),
-  // `status` is a Postgres enum, so only its `status_text` mirror is
-  // synced (see the powersync_compat_view migration).
+  Table('crop', [
+    Column.text('name'),
+    Column.text('category'),
+    Column.text('fallback_image_url'),
+  ]),
   Table('produce_listing', [
     Column.text('farmer_profile_id'),
     Column.text('crop_id'),
@@ -54,10 +56,18 @@ const schema = Schema([
   Table('driver_route_preference', [
     Column.text('driver_profile_id'),
     Column.text('origin_location'),
+    Column.real('origin_lat'),
+    Column.real('origin_lng'),
+    Column.text('origin_place_id'),
     Column.text('destination_location'),
-    Column.text('direction'), // outbound|return|both
-    Column.integer('active_days'), // bitmask, bit0=Mon .. bit6=Sun
-    Column.integer('is_active'), // 0/1 — PowerSync has no bool column
+    Column.real('destination_lat'),
+    Column.real('destination_lng'),
+    Column.text('destination_place_id'),
+    Column.text('direction'),
+    Column.integer('active_days'),
+    Column.integer('is_active'),
+    Column.real('distance_km'),
+    Column.integer('duration_minutes'),
   ]),
   Table('notification', [
     Column.text('profile_id'),
@@ -68,6 +78,125 @@ const schema = Schema([
     Column.text('source_table'),
     Column.text('source_id'),
     Column.text('read_at'),
+    Column.text('created_at'),
+  ]),
+  // Chat tables — deliberately kept out of PowerSync reads in the rest
+  // of the app (chat uses Supabase Realtime directly for sub-second
+  // delivery), but they must be in the schema so PowerSync replicates
+  // them locally. That means (a) `new_message` notification rows that
+  // arrive while offline will be there when the user comes back online,
+  // and (b) the chat can still be browsed in a disconnected state.
+  Table('conversation', [
+    Column.text('context_type'),
+    Column.text('title'),
+    Column.text('updated_at'),
+    Column.text('created_at'),
+  ]),
+  Table('conversation_participant', [
+    Column.text('conversation_id'),
+    Column.text('profile_id'),
+    Column.text('role'),
+    Column.text('display_name'),
+    Column.text('avatar_url'),
+    Column.text('last_read_at'),
+    Column.text('joined_at'),
+  ]),
+  Table('message', [
+    Column.text('conversation_id'),
+    Column.text('sender_id'),
+    Column.text('body'),
+    Column.text('attachment_url'),
+    Column.text('attachment_type'),
+    Column.text('created_at'),
+  ]),
+  Table('cart', [
+    Column.text('buyer_profile_id'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  Table('cart_item', [
+    Column.text('cart_id'),
+    Column.text('produce_listing_id'),
+    Column.real('quantity_kg'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  // From branch 7.1
+  Table('market_price', [
+    Column.text('crop_id'),
+    Column.real('avg_price_per_kg'),
+    Column.real('min_price_per_kg'),
+    Column.real('max_price_per_kg'),
+    Column.text('as_of_date'),
+    Column.text('updated_at'),
+  ]),
+  Table('price_trend', [
+    Column.text('crop_id'),
+    Column.text('trend_direction'),
+    Column.real('change_percent'),
+    Column.integer('period_days'),
+    Column.text('computed_at'),
+  ]),
+  Table('price_history', [
+    Column.text('crop_id'),
+    Column.text('price_date'),
+    Column.real('avg_price_per_kg'),
+    Column.real('min_price_per_kg'),
+    Column.real('max_price_per_kg'),
+    Column.integer('order_count'),
+    Column.text('created_at'),
+  ]),
+  // --- Sprint 2 / Task 3.2 — Order Creation & Checkout Flow ---
+  // Mirrors `orders` / `order_item` / `payment` (see
+  // supabase/migrations/20260827093223_orders.sql and
+  // .../20260827094657_payment_and_refund.sql). There is no separate
+  // `sub_orders` table server-side: a multi-farmer checkout creates one
+  // `orders` row *per farmer*, all sharing the same `checkout_group_id`
+  // — that shared id is what ties a buyer's sibling per-farmer orders
+  // back together as "one checkout" in the UI.
+  Table('orders', [
+    Column.text('checkout_group_id'),
+    Column.text('buyer_profile_id'),
+    Column.text('farmer_profile_id'),
+    Column.text('status'),
+    Column.text('delivery_id'),
+    Column.text('payment_id'),
+    Column.real('subtotal_amount'),
+    Column.real('delivery_fee_amount'),
+    Column.real('total_amount'),
+    Column.text('delivery_address'),
+    Column.text('placed_at'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  Table('order_item', [
+    Column.text('order_id'),
+    Column.text('produce_listing_id'),
+    Column.text('crop_id'),
+    Column.real('quantity_kg'),
+    Column.real('price_per_kg'),
+    Column.text('created_at'),
+  ]),
+  Table('payment', [
+    Column.text('order_id'),
+    Column.text('buyer_profile_id'),
+    Column.text('method'),
+    Column.real('amount'),
+    Column.text('status'),
+    Column.text('gateway_reference'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  // no client insert/update RLS policy exists for this table.
+  Table('pricing_rule', [
+    Column.text('name'),
+    Column.real('base_fee'),
+    Column.real('per_km_rate'),
+    Column.real('min_fee'),
+    Column.real('max_fee'),
+    Column.text('effective_from'),
+    Column.text('effective_to'),
+    Column.integer('is_active'),
     Column.text('created_at'),
   ]),
 ]);

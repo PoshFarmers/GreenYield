@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Thin wrapper around TextFormField
 class AppTextField extends StatelessWidget {
@@ -9,6 +10,10 @@ class AppTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final ValueChanged<String>? onChanged;
   final String? semanticsHint;
+  final String? hintText;
+  final String? prefixText;
+  final String? suffixText;
+  final List<TextInputFormatter>? inputFormatters;
 
   const AppTextField({
     super.key,
@@ -19,6 +24,10 @@ class AppTextField extends StatelessWidget {
     this.validator,
     this.onChanged,
     this.semanticsHint,
+    this.hintText,
+    this.prefixText,
+    this.suffixText,
+    this.inputFormatters,
   });
 
   @override
@@ -33,7 +42,13 @@ class AppTextField extends StatelessWidget {
         keyboardType: keyboardType,
         validator: validator,
         onChanged: onChanged,
-        decoration: InputDecoration(labelText: label),
+        inputFormatters: inputFormatters,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hintText,
+          prefixText: prefixText,
+          suffixText: suffixText,
+        ),
       ),
     );
   }

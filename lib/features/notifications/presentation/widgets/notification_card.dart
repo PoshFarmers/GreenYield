@@ -4,32 +4,77 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../models/notification_item.dart';
 
 /// One notification row: type icon, title, description, relative
-/// timestamp, and an unread indicator (accent bar + dot). Wrap in a
-/// `Dismissible` where swipe-to-dismiss is needed (see NotificationScreen).
-class NotificationCard extends StatelessWidget {
+/// timestamp, and an unread indicator (accent bar + dot). Tap to expand
+/// and show the full message body. Wrap in a `Dismissible` where
+/// swipe-to-dismiss is needed (see NotificationScreen).
+class NotificationCard extends StatefulWidget {
   final NotificationItem notification;
   final VoidCallback? onTap;
 
   const NotificationCard({super.key, required this.notification, this.onTap});
 
   @override
+  State<NotificationCard> createState() => _NotificationCardState();
+}
+
+class _NotificationCardState extends State<NotificationCard>
+    with SingleTickerProviderStateMixin {
+  bool _isExpanded = false;
+  late AnimationController _expandController;
+
+  @override
+  void initState() {
+    super.initState();
+    _expandController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    _expandController.dispose();
+    super.dispose();
+  }
+
+  void _toggleExpanded() {
+    setState(() {
+      _isExpanded = !_isExpanded;
+    });
+    if (_isExpanded) {
+      _expandController.forward();
+    } else {
+      _expandController.reverse();
+    }
+    // Call the onTap callback if provided
+    widget.onTap?.call();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final unread = !notification.isRead;
-    final (icon, iconColor) = _iconFor(notification);
+    final unread = !widget.notification.isRead;
+    final (icon, iconColor) = _iconFor(widget.notification);
+    final hasBody =
+        widget.notification.body != null &&
+        widget.notification.body!.isNotEmpty;
 
     return Material(
       color: AppColors.cream,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
+        onTap: hasBody ? _toggleExpanded : widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border(
               left: BorderSide(
                 width: 4,
-                color: unread ? _accentFor(notification) : Colors.transparent,
+                color: unread
+                    ? _accentFor(widget.notification)
+                    : Colors.transparent,
               ),
             ),
           ),
@@ -51,7 +96,7 @@ class NotificationCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            notification.title,
+                            widget.notification.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -62,7 +107,7 @@ class NotificationCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          _relativeTime(notification.createdAt),
+                          _relativeTime(widget.notification.createdAt),
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.mutedGray,
@@ -70,18 +115,35 @@ class NotificationCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    if (notification.body != null &&
-                        notification.body!.isNotEmpty) ...[
+                    if (hasBody) ...[
                       const SizedBox(height: 4),
                       Text(
-                        notification.body!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                        widget.notification.body!,
+                        maxLines: _isExpanded ? null : 2,
+                        overflow: _isExpanded
+                            ? TextOverflow.visible
+                            : TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 13,
                           color: Colors.black87,
                         ),
                       ),
+                      if (_isExpanded) ...[
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            'Tap to collapse',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.freshLeafGreen.withValues(
+                                alpha: 0.7,
+                              ),
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ],
                 ),
@@ -95,6 +157,19 @@ class NotificationCard extends StatelessWidget {
                   decoration: const BoxDecoration(
                     color: AppColors.freshLeafGreen,
                     shape: BoxShape.circle,
+                  ),
+                ),
+              ] else if (hasBody) ...[
+                const SizedBox(width: 8),
+                RotationTransition(
+                  turns: Tween<double>(
+                    begin: 0,
+                    end: 0.5,
+                  ).animate(_expandController),
+                  child: Icon(
+                    Icons.expand_more,
+                    color: AppColors.mutedGray.withValues(alpha: 0.6),
+                    size: 20,
                   ),
                 ),
               ],

@@ -44,9 +44,11 @@ class ProduceListingService {
   }
 
   /// Every listing this farmer has posted, newest first, with the
-  /// description/photo fallback chain (listing -> farmer_crop) already
+  /// description fallback chain (listing -> farmer_crop) already
   /// applied — the same coalesce the marketplace_listing_read view does
-  /// server-side, done here against the local mirror.
+  /// server-side, done here against the local mirror. The image columns
+  /// are left un-coalesced (see `ProduceListing.displayImage`) since
+  /// each tier lives in a different storage bucket.
   Stream<List<ProduceListing>> watchOwnListings(String farmerProfileId) {
     return db
         .watch(
@@ -60,7 +62,9 @@ class ProduceListingService {
         pl.available_quantity_kg,
         pl.status_text,
         COALESCE(pl.description, fc.description) AS description,
-        COALESCE(pl.image_url, fc.image_url)     AS image_url,
+        pl.image_url                           AS listing_image_url,
+        fc.image_url                           AS farmer_crop_image_url,
+        c.fallback_image_url                   AS crop_fallback_image_url,
         pl.harvested_on
       FROM produce_listing pl
       JOIN crop c ON c.id = pl.crop_id

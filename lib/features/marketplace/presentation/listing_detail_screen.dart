@@ -5,11 +5,16 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/app_secondary_header.dart';
 import '../../../core/widgets/avatar_image.dart';
 import '../../../core/widgets/media_image.dart';
 import '../../../models/marketplace_listing.dart';
 import '../../../models/profile.dart';
+import '../../cart/cart_service.dart';
+import '../../chat/chat_service.dart';
+import '../../chat/presentation/chat_screen.dart';
 import '../../navigation/presentation/app_nav_shell.dart';
+import '../../pricing/presentation/widgets/price_breakdown_card.dart';
 import '../marketplace_service.dart';
 
 /// Full detail for one listing, with the quantity stepper and the entry
@@ -41,6 +46,9 @@ class ListingDetailScreen extends ConsumerStatefulWidget {
 
 class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   final _service = const MarketplaceService();
+  final _cartService = const CartService();
+  final _chatService = const ChatService();
+  bool _isMessagingFarmer = false;
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
@@ -48,6 +56,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   double _quantity = 1;
   bool _isLoading = true;
   bool _isOffline = false;
+  bool _isAddingToCart = false;
   String? _errorMessage;
 
   @override
@@ -105,13 +114,66 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     setState(() => _quantity = _clampQuantity(_quantity + delta));
   }
 
-  void _messageFarmer() {
-    // Chat isn't built yet — this only performs the transition, landing
-    // the buyer on the Chat tab of the shell underneath.
-    Navigator.of(context).popUntil((route) => route.isFirst);
-    ref
-        .read(navShellIndexProvider.notifier)
-        .select(ListingDetailScreen.chatTabIndex);
+  Future<void> _addToCart(MarketplaceListing listing) async {
+    if (_isAddingToCart) return;
+    setState(() => _isAddingToCart = true);
+    try {
+      await _cartService.addToCart(
+        buyerProfileId: widget.buyerProfile.id,
+        produceListingId: listing.id,
+        quantityKg: _quantity,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('added_to_cart'.tr())));
+    } finally {
+      if (mounted) setState(() => _isAddingToCart = false);
+    }
+  }
+
+  Future<void> _messageFarmer() async {
+    final listing = _listing;
+    if (listing == null || _isMessagingFarmer) return;
+
+    setState(() => _isMessagingFarmer = true);
+    try {
+      final conversationId = await _chatService.getOrCreateConversation(
+        callerRole: 'buyer',
+        otherUserId: listing.farmerProfileId,
+        otherRole: 'farmer',
+      );
+      if (!mounted) return;
+
+      // Capture the Navigator before popping this screen away — once
+      // popUntil runs, this State's own context is on its way out, but
+      // the NavigatorState itself stays valid for the follow-up push.
+      final navigator = Navigator.of(context);
+
+      // Land on the Chat tab of the shell underneath, then push the
+      // room on top of it so back returns to the thread list.
+      navigator.popUntil((route) => route.isFirst);
+      ref
+          .read(navShellIndexProvider.notifier)
+          .select(ListingDetailScreen.chatTabIndex);
+
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            conversationId: conversationId,
+            otherName: listing.farmerName,
+            otherAvatarUrl: listing.farmerAvatarUrl,
+            currentUserId: widget.buyerProfile.id,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _isMessagingFarmer = false);
+    }
   }
 
   @override
@@ -120,12 +182,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     final listing = _listing;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('listing'.tr()),
-        actions: [
-          IconButton(icon: const Icon(Icons.help_outline), onPressed: () {}),
-        ],
-      ),
+      appBar: AppSecondaryHeader(title: 'listing'.tr()),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -173,8 +230,6 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   }
 
   Widget _buildContent(ThemeData theme, MarketplaceListing listing) {
-    final subtotal = _quantity * listing.pricePerKg;
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
@@ -186,8 +241,9 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
             height: 220,
             width: double.infinity,
             child: MediaImage(
-              path: listing.imageUrl,
-              bucket: 'crop-photos',
+              path: listing.displayImage.path,
+              bucket: listing.displayImage.bucket,
+              public: listing.displayImage.isFallback,
               placeholder: Container(
                 color: theme.colorScheme.surfaceContainerHighest,
                 child: Icon(
@@ -350,26 +406,25 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('subtotal'.tr(), style: theme.textTheme.bodyMedium),
-                    Text(
-                      '${'currency_prefix'.tr()} ${subtotal.toStringAsFixed(2)}',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                PriceBreakdownCard(
+                  pricePerKg: listing.pricePerKg,
+                  quantityKg: _quantity,
+                  distanceKm: listing.distanceKm,
                 ),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('cart_coming_soon'.tr())),
-                    ),
-                    icon: const Icon(Icons.shopping_cart_outlined),
+                    onPressed: _isAddingToCart
+                        ? null
+                        : () => _addToCart(listing),
+                    icon: _isAddingToCart
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.shopping_cart_outlined),
                     label: Text('add_to_cart'.tr()),
                   ),
                 ),
@@ -410,8 +465,14 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: _messageFarmer,
-                  icon: const Icon(Icons.chat_bubble_outline),
+                  onPressed: _isMessagingFarmer ? null : _messageFarmer,
+                  icon: _isMessagingFarmer
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.chat_bubble_outline),
                   label: Text('message_farmer'.tr()),
                 ),
               ),

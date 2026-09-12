@@ -16,6 +16,7 @@
   "no_listings_yet": "No listings here yet.\nTap + to post your produce for sale.",
 
   "add_harvest": "Add Harvest",
+  "add_harvest_help_body": "Pick a crop already on your menu, set the quantity and price for this batch, add a photo and harvest date, then review before publishing.",
   "step_of": "Step {current} of {total}",
   "step_crop": "Crop",
   "step_quantity_price": "Quantity & Price",
@@ -53,5 +54,14 @@
   "harvested_on": "Harvested on",
 
   "review_your_listing": "Review your listing",
-  "total_quantity": "Total quantity"
+  "total_quantity": "Total quantity",
+
+  "market_average_unavailable": "Not enough market data yet for this crop",
+  "market_average_label": "Market average",
+  "price_comparison_above": "Your price is {percent}% above the market average",
+  "price_comparison_below": "Your price is {percent}% below the market average",
+  "price_comparison_at_market": "Your price matches the market average",
+  "price_trend_hint": "Prices have moved {percent}% over the last {days} days",
+  "vs_market": "vs market",
+  "at_market": "at market"
 }

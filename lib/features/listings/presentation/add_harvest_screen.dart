@@ -6,9 +6,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/storage/crop_photo_service.dart';
+import '../../../core/widgets/app_secondary_header.dart';
+import '../../../core/widgets/app_text_field.dart';
+import '../../../core/widgets/image_source_sheet.dart';
 import '../../../core/widgets/media_image.dart';
 import '../../../models/farmer_profile.dart';
 import '../../../models/profile.dart';
+import '../../pricing/presentation/widgets/market_price_comparison_card.dart';
 import '../../profile/farmer/crop_price_bounds.dart';
 import '../../profile/farmer/farmer_profile_service.dart';
 import '../produce_listing_service.dart';
@@ -51,7 +55,14 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
   @override
   void initState() {
     super.initState();
-    _farmerProfileStream = _farmerService.watchOwnProfile(widget.profile.id);
+    // Broadcast: the crop-selection step's StreamBuilder is unmounted and
+    // remounted each time the wizard steps away from and back to step 0,
+    // which would otherwise re-listen to an already-consumed single-
+    // subscription PowerSync watch stream ("Bad state: Stream has already
+    // been listened to").
+    _farmerProfileStream = _farmerService
+        .watchOwnProfile(widget.profile.id)
+        .asBroadcastStream();
   }
 
   @override
@@ -112,12 +123,20 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
     });
   }
 
-  void _back() => setState(() {
-    _errorMessage = null;
-    _step--;
-  });
+  void _back() {
+    // Unfocus first: with a text field focused (quantity/price, description
+    // steps), a tap on the header back button otherwise only dismisses the
+    // keyboard, making the button appear unresponsive until tapped again.
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _errorMessage = null;
+      _step--;
+    });
+  }
 
-  Future<void> _pickPhoto(ImageSource source) async {
+  Future<void> _pickPhoto() async {
+    final source = await showImageSourceSheet(context);
+    if (source == null) return;
     final picked = await ImagePicker().pickImage(
       source: source,
       maxWidth: 1600,
@@ -192,20 +211,15 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        leading: BackButton(
-          onPressed: _step == 0 ? () => Navigator.of(context).pop() : _back,
-        ),
-        title: Text(
-          'add_harvest'.tr(),
-          style: TextStyle(
-            color: theme.colorScheme.primary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        actions: [
-          IconButton(icon: const Icon(Icons.help_outline), onPressed: () {}),
-        ],
+      appBar: AppSecondaryHeader(
+        title: 'add_harvest'.tr(),
+        onBackPressed: _step == 0
+            ? () {
+                FocusManager.instance.primaryFocus?.unfocus();
+                Navigator.of(context).pop();
+              }
+            : _back,
+        helpText: 'add_harvest_help_body'.tr(),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(44),
           child: Padding(
@@ -302,35 +316,18 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
             ),
             const SizedBox(height: 12),
           ],
-          Row(
-            children: [
-              if (_step > 0) ...[
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isPublishing ? null : _back,
-                    child: Text('back'.tr()),
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
-              Expanded(
-                flex: 2,
-                child: ElevatedButton(
-                  onPressed: _isPublishing
-                      ? null
-                      : (isReview ? _publish : _next),
-                  child: _isPublishing
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(
-                          isReview ? 'publish_listing'.tr() : 'continue'.tr(),
-                        ),
-                ),
-              ),
-            ],
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isPublishing ? null : (isReview ? _publish : _next),
+              child: _isPublishing
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(isReview ? 'publish_listing'.tr() : 'continue'.tr()),
+            ),
           ),
         ],
       ),
@@ -397,7 +394,7 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
               physics: const NeverScrollableScrollPhysics(),
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 1.3,
+              childAspectRatio: 0.95,
               children: filtered.map(_buildCropCard).toList(),
             );
           },
@@ -410,49 +407,78 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
     final theme = Theme.of(context);
     final isSelected = _crop?.cropId == crop.cropId;
 
+    final borderRadius = BorderRadius.circular(14);
+
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: borderRadius,
       onTap: () => _selectCrop(crop),
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected
-                ? theme.colorScheme.primary
-                : theme.colorScheme.outlineVariant,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ClipOval(
-              child: SizedBox(
-                height: 48,
-                width: 48,
-                child: MediaImage(
-                  path: crop.imageUrl,
-                  bucket: 'crop-photos',
-                  placeholder: Container(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    child: Icon(
-                      crop.category == 'fruit' ? Icons.apple : Icons.eco,
-                      color: theme.colorScheme.primary,
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: borderRadius,
+            child: Container(
+              color: theme.colorScheme.surfaceContainerLowest,
+              child: Column(
+                children: [
+                  // The image fills the bulk of the card -- only the
+                  // name strip below it has a fixed height.
+                  Expanded(
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: MediaImage(
+                        path: crop.displayImage.path,
+                        bucket: crop.displayImage.bucket,
+                        public: crop.displayImage.isFallback,
+                        placeholder: Container(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          alignment: Alignment.center,
+                          child: Icon(
+                            crop.category == 'fruit' ? Icons.apple : Icons.eco,
+                            size: 32,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
                     ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 8,
+                    ),
+                    child: Text(
+                      crop.cropName,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Painted on top of the clipped image/text so the border is
+          // never covered at the rounded corners (the image otherwise
+          // sits flush against the top edge with nothing to buffer it).
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: borderRadius,
+                  border: Border.all(
+                    color: isSelected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.outlineVariant,
+                    width: isSelected ? 2 : 1,
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              crop.cropName,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -471,17 +497,16 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        _FieldCard(
+        AppTextField(
           label: 'total_harvest_quantity'.tr(),
-          child: TextField(
-            controller: _quantityController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-            ],
-            decoration: InputDecoration(hintText: '0', suffixText: 'kg'.tr()),
-            onChanged: (_) => setState(() {}),
-          ),
+          controller: _quantityController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+          ],
+          hintText: '0',
+          suffixText: 'kg'.tr(),
+          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 16),
         Text(
@@ -491,17 +516,16 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        _FieldCard(
+        AppTextField(
           label: 'price_per_unit_kg'.tr(),
-          child: TextField(
-            controller: _priceController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-            ],
-            decoration: const InputDecoration(prefixText: 'Rs ', hintText: '0'),
-            onChanged: (_) => setState(() {}),
-          ),
+          controller: _priceController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+          ],
+          hintText: '0',
+          prefixText: 'Rs ',
+          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 12),
         Container(
@@ -549,6 +573,13 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
             ],
           ),
         ),
+        if (_crop != null) ...[
+          const SizedBox(height: 12),
+          MarketPriceComparisonCard(
+            cropId: _crop!.cropId,
+            farmerPricePerKg: _price,
+          ),
+        ],
         const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -585,56 +616,53 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
         const SizedBox(height: 4),
         Text('add_photos_subtitle'.tr(), style: theme.textTheme.bodyMedium),
         const SizedBox(height: 16),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: SizedBox(
-            height: 180,
-            width: double.infinity,
-            child: _photoBytes != null
-                ? Image.memory(_photoBytes!, fit: BoxFit.cover)
-                : MediaImage(
-                    path: _crop?.imageUrl,
-                    bucket: 'crop-photos',
-                    placeholder: Container(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      child: Icon(
-                        Icons.image_outlined,
-                        size: 40,
-                        color: theme.colorScheme.outline,
-                      ),
-                    ),
-                  ),
+        GestureDetector(
+          onTap: _pickPhoto,
+          child: Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: SizedBox(
+                  height: 260,
+                  width: double.infinity,
+                  child: _photoBytes != null
+                      ? Image.memory(_photoBytes!, fit: BoxFit.cover)
+                      : MediaImage(
+                          path: _crop?.displayImage.path,
+                          bucket: _crop?.displayImage.bucket ?? 'crop-photos',
+                          public: _crop?.displayImage.isFallback ?? false,
+                          placeholder: Container(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            child: Icon(
+                              Icons.image_outlined,
+                              size: 40,
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+              Positioned(
+                right: 8,
+                bottom: 8,
+                child: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: theme.colorScheme.primary,
+                  child: const Icon(Icons.edit, size: 16, color: Colors.white),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
         Text(
           _photoBytes != null
               ? 'using_new_photo'.tr()
-              : (_crop?.imageUrl != null
+              : (_crop?.displayImage.path != null
                     ? 'using_crop_photo'.tr()
                     : 'no_photo_yet'.tr()),
           style: theme.textTheme.bodySmall,
           textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _pickPhoto(ImageSource.camera),
-                icon: const Icon(Icons.photo_camera_outlined),
-                label: Text('take_photo'.tr()),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _pickPhoto(ImageSource.gallery),
-                icon: const Icon(Icons.photo_library_outlined),
-                label: Text('choose_from_gallery'.tr()),
-              ),
-            ),
-          ],
         ),
         if (_photoBytes != null) ...[
           const SizedBox(height: 8),
@@ -674,6 +702,7 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
     final theme = Theme.of(context);
     final crop = _crop;
     final description = _descriptionController.text.trim();
+    final borderRadius = BorderRadius.circular(16);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -685,91 +714,109 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        Container(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                height: 160,
-                child: _photoBytes != null
-                    ? Image.memory(_photoBytes!, fit: BoxFit.cover)
-                    : MediaImage(
-                        path: crop?.imageUrl,
-                        bucket: 'crop-photos',
-                        placeholder: Container(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          child: Icon(
-                            Icons.image_outlined,
-                            size: 40,
-                            color: theme.colorScheme.outline,
-                          ),
-                        ),
-                      ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
+        Stack(
+          children: [
+            ClipRRect(
+              borderRadius: borderRadius,
+              child: Container(
+                color: theme.colorScheme.surfaceContainerLowest,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      crop?.cropName ?? '',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    SizedBox(
+                      height: 160,
+                      child: _photoBytes != null
+                          ? Image.memory(_photoBytes!, fit: BoxFit.cover)
+                          : MediaImage(
+                              path: crop?.displayImage.path,
+                              bucket:
+                                  crop?.displayImage.bucket ?? 'crop-photos',
+                              public: crop?.displayImage.isFallback ?? false,
+                              placeholder: Container(
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
+                                child: Icon(
+                                  Icons.image_outlined,
+                                  size: 40,
+                                  color: theme.colorScheme.outline,
+                                ),
+                              ),
+                            ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            crop?.cropName ?? '',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (description.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(description, style: theme.textTheme.bodySmall),
+                          ],
+                          const Divider(height: 24),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _ReviewField(
+                                  label: 'total_quantity'.tr(),
+                                  value: '${_quantity.toStringAsFixed(0)} kg',
+                                ),
+                              ),
+                              Expanded(
+                                child: _ReviewField(
+                                  label: 'price_per_kg'.tr(),
+                                  value: 'Rs ${_price.toStringAsFixed(2)}',
+                                  highlight: true,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _ReviewField(
+                                  label: 'harvested_on'.tr(),
+                                  value: _harvestedOn == null
+                                      ? '—'
+                                      : _formatDate(_harvestedOn!),
+                                ),
+                              ),
+                              Expanded(
+                                child: _ReviewField(
+                                  label: 'estimated_total_value'.tr(),
+                                  value:
+                                      'Rs ${(_quantity * _price).toStringAsFixed(2)}',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ),
-                    if (description.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(description, style: theme.textTheme.bodySmall),
-                    ],
-                    const Divider(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ReviewField(
-                            label: 'total_quantity'.tr(),
-                            value: '${_quantity.toStringAsFixed(0)} kg',
-                          ),
-                        ),
-                        Expanded(
-                          child: _ReviewField(
-                            label: 'price_per_kg'.tr(),
-                            value: 'Rs ${_price.toStringAsFixed(2)}',
-                            highlight: true,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ReviewField(
-                            label: 'harvested_on'.tr(),
-                            value: _harvestedOn == null
-                                ? '—'
-                                : _formatDate(_harvestedOn!),
-                          ),
-                        ),
-                        Expanded(
-                          child: _ReviewField(
-                            label: 'estimated_total_value'.tr(),
-                            value:
-                                'Rs ${(_quantity * _price).toStringAsFixed(2)}',
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            // Painted on top so the border is never covered at the rounded
+            // corners (the image otherwise sits flush against the top edge
+            // with nothing to buffer it).
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: borderRadius,
+                    border: Border.all(color: theme.colorScheme.outlineVariant),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -778,38 +825,6 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
   String _formatDate(DateTime date) =>
       '${date.year}-${date.month.toString().padLeft(2, '0')}-'
       '${date.day.toString().padLeft(2, '0')}';
-}
-
-class _FieldCard extends StatelessWidget {
-  final String label;
-  final Widget child;
-
-  const _FieldCard({required this.label, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          child,
-        ],
-      ),
-    );
-  }
 }
 
 class _ReviewField extends StatelessWidget {

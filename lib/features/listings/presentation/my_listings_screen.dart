@@ -6,6 +6,7 @@ import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/media_image.dart';
 import '../../../models/produce_listing.dart';
 import '../../../models/profile.dart';
+import '../../pricing/presentation/widgets/market_price_comparison_card.dart';
 import '../produce_listing_service.dart';
 import 'add_harvest_screen.dart';
 
@@ -23,15 +24,36 @@ class MyListingsScreen extends ConsumerStatefulWidget {
 
 class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
   final _service = ProduceListingService();
+  final _scrollController = ScrollController();
 
   late final Stream<List<ProduceListing>> _listingsStream;
   String _statusFilter = 'all';
-  bool _statsExpanded = true;
+  bool _statsCollapsed = false;
 
   @override
   void initState() {
     super.initState();
     _listingsStream = _service.watchOwnListings(widget.profile.id);
+    _scrollController.addListener(_handleScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_handleScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // Hysteresis so the section doesn't flicker while sitting right at the
+  // threshold — a deliberate scroll past 120px collapses it, only
+  // restoring once scrolled back up near the very top (under 16px).
+  void _handleScroll() {
+    final offset = _scrollController.offset;
+    if (!_statsCollapsed && offset > 120) {
+      setState(() => _statsCollapsed = true);
+    } else if (_statsCollapsed && offset < 16) {
+      setState(() => _statsCollapsed = false);
+    }
   }
 
   @override
@@ -68,6 +90,7 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
                     : listings.where((l) => l.status == _statusFilter).toList();
 
                 return ListView(
+                  controller: _scrollController,
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
                   children: [
                     Text(
@@ -84,9 +107,7 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
                     const SizedBox(height: 16),
                     _StatsSection(
                       listings: listings,
-                      expanded: _statsExpanded,
-                      onToggle: () =>
-                          setState(() => _statsExpanded = !_statsExpanded),
+                      collapsed: _statsCollapsed,
                     ),
                     const SizedBox(height: 16),
                     _StatusFilterBar(
@@ -131,17 +152,14 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
   }
 }
 
-/// The four summary tiles, collapsible so the list gets the screen back.
+/// The four summary tiles. Auto-collapses (shrinks + fades) once the user
+/// scrolls down through their listings, and restores near the top — see
+/// _MyListingsScreenState._handleScroll.
 class _StatsSection extends StatelessWidget {
   final List<ProduceListing> listings;
-  final bool expanded;
-  final VoidCallback onToggle;
+  final bool collapsed;
 
-  const _StatsSection({
-    required this.listings,
-    required this.expanded,
-    required this.onToggle,
-  });
+  const _StatsSection({required this.listings, required this.collapsed});
 
   @override
   Widget build(BuildContext context) {
@@ -158,72 +176,66 @@ class _StatsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        InkWell(
-          onTap: onToggle,
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                Text('overview'.tr(), style: theme.textTheme.labelLarge),
-                const Spacer(),
-                Icon(expanded ? Icons.expand_less : Icons.expand_more),
-              ],
-            ),
-          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Text('overview'.tr(), style: theme.textTheme.labelLarge),
         ),
-        AnimatedCrossFade(
-          duration: const Duration(milliseconds: 200),
-          crossFadeState: expanded
-              ? CrossFadeState.showFirst
-              : CrossFadeState.showSecond,
-          firstChild: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatTile(
-                        icon: Icons.inventory_2_outlined,
-                        label: 'stat_active'.tr(),
-                        value: '${active.length}',
-                      ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeInOut,
+          alignment: Alignment.topCenter,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 220),
+            opacity: collapsed ? 0 : 1,
+            child: collapsed
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _StatTile(
+                                icon: Icons.inventory_2_outlined,
+                                label: 'stat_active'.tr(),
+                                value: '${active.length}',
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _StatTile(
+                                icon: Icons.remove_shopping_cart_outlined,
+                                label: 'stat_sold_out'.tr(),
+                                value: '$soldOut',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _StatTile(
+                                icon: Icons.scale_outlined,
+                                label: 'stat_listed_quantity'.tr(),
+                                value: '${totalKg.toStringAsFixed(0)} kg',
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _StatTile(
+                                icon: Icons.payments_outlined,
+                                label: 'stat_listed_value'.tr(),
+                                value: 'Rs ${totalValue.toStringAsFixed(0)}',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _StatTile(
-                        icon: Icons.remove_shopping_cart_outlined,
-                        label: 'stat_sold_out'.tr(),
-                        value: '$soldOut',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatTile(
-                        icon: Icons.scale_outlined,
-                        label: 'stat_listed_quantity'.tr(),
-                        value: '${totalKg.toStringAsFixed(0)} kg',
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _StatTile(
-                        icon: Icons.payments_outlined,
-                        label: 'stat_listed_value'.tr(),
-                        value: 'Rs ${totalValue.toStringAsFixed(0)}',
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
           ),
-          secondChild: const SizedBox.shrink(),
         ),
       ],
     );
@@ -319,105 +331,128 @@ class _ListingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final borderRadius = BorderRadius.circular(16);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Stack(
-            children: [
-              SizedBox(
-                height: 150,
-                width: double.infinity,
-                child: MediaImage(
-                  path: listing.imageUrl,
-                  bucket: 'crop-photos',
-                  placeholder: Container(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    child: Icon(
-                      Icons.image_outlined,
-                      size: 40,
-                      color: theme.colorScheme.outline,
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 10,
-                left: 10,
-                child: _StatusBadge(status: listing.status),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(14),
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: borderRadius,
+          child: Container(
+            color: theme.colorScheme.surfaceContainerLowest,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  listing.cropName,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (listing.description != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    listing.description!,
-                    style: theme.textTheme.bodySmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-                const Divider(height: 24),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                Stack(
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'price_per_kg'.tr(),
-                          style: theme.textTheme.bodySmall,
-                        ),
-                        Text(
-                          'Rs ${listing.pricePerKg.toStringAsFixed(2)}',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.bold,
+                    SizedBox(
+                      height: 150,
+                      width: double.infinity,
+                      child: MediaImage(
+                        path: listing.displayImage.path,
+                        bucket: listing.displayImage.bucket,
+                        public: listing.displayImage.isFallback,
+                        placeholder: Container(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          child: Icon(
+                            Icons.image_outlined,
+                            size: 40,
+                            color: theme.colorScheme.outline,
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                    const Spacer(),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          'stock_available'.tr(),
-                          style: theme.textTheme.bodySmall,
-                        ),
-                        Text(
-                          '${listing.availableQuantityKg.toStringAsFixed(0)} kg',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: _StatusBadge(status: listing.status),
                     ),
                   ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        listing.cropName,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (listing.description != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          listing.description!,
+                          style: theme.textTheme.bodySmall,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const Divider(height: 24),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'price_per_kg'.tr(),
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              Text(
+                                'Rs ${listing.pricePerKg.toStringAsFixed(2)}',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              MarketPriceComparisonCard(
+                                cropId: listing.cropId,
+                                farmerPricePerKg: listing.pricePerKg,
+                                compact: true,
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'stock_available'.tr(),
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              Text(
+                                '${listing.availableQuantityKg.toStringAsFixed(0)} kg',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+        // Painted on top so the border is never covered at the rounded
+        // corners (the image otherwise sits flush against the top edge
+        // with nothing to buffer it).
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: borderRadius,
+                border: Border.all(color: theme.colorScheme.outlineVariant),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
