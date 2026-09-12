@@ -62,5 +62,22 @@
   "month_short_dec": "டிச",
   "light": "வெளிச்சம்",
   "dark": "இருள்",
-  "system": "கணினி"
+  "system": "கணினி",
+  "wallet_title": "பணப்பை",
+  "current_balance": "தற்போதைய இருப்பு",
+  "top_up": "பணம் சேர்",
+  "top_up_wallet": "பணப்பையில் பணம் சேர்",
+  "amount_lkr": "தொகை (Rs)",
+  "enter_amount_hint": "தொகையை உள்ளிடவும்",
+  "error_enter_valid_amount": "0ஐ விட அதிகமான சரியான தொகையை உள்ளிடவும்",
+  "top_up_success": "பணப்பையில் வெற்றிகரமாக பணம் சேர்க்கப்பட்டது",
+  "top_up_failed": "பணம் சேர்ப்பது தோல்வியடைந்தது. மீண்டும் முயற்சிக்கவும்.",
+  "recent_transactions": "சமீபத்திய பரிவர்த்தனைகள்",
+  "no_transactions_yet": "இன்னும் பரிவர்த்தனைகள் இல்லை",
+  "transaction_type_topup": "பணம் சேர்த்தல்",
+  "transaction_type_payment": "கட்டணம்",
+  "transaction_type_payout": "கொடுப்பனவு",
+  "transaction_type_refund": "பணம் திரும்பப்பெறல்",
+  "transaction_type_withdrawal": "திரும்பப் பெறுதல்",
+  "transaction_type_adjustment": "சரிசெய்தல்"
 }
