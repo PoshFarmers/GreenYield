@@ -1,10 +1,12 @@
 import '../../core/local_db/powersync.dart'; // exposes `db`
+import '../../core/supabase/client.dart';
 import '../../models/wallet.dart';
 
-/// Read-only wallet access. All writes happen server-side via
-/// `apply_wallet_transaction()` (Sprint 2) — this class only watches
-/// the local PowerSync mirror, same read-only pattern as
-/// MarketPriceService.
+/// Wallet access. Reads watch the local PowerSync mirror (read-only —
+/// balance/transaction writes all happen server-side via
+/// `apply_wallet_transaction()`). The one write this class exposes,
+/// [topUp], goes through the `topup_wallet` RPC rather than writing
+/// to the wallet tables directly — see that migration's doc comment.
 class WalletService {
   const WalletService();
 
@@ -35,5 +37,12 @@ class WalletService {
           parameters: [profileId, limit],
         )
         .map((rows) => rows.map(WalletTransaction.fromMap).toList());
+  }
+
+  /// Credits the signed-in user's own wallet by [amount] LKR via the
+  /// `topup_wallet` RPC. Throws on failure (e.g. invalid amount) —
+  /// callers should catch and surface the error.
+  Future<void> topUp(double amount) async {
+    await supabase.rpc('topup_wallet', params: {'p_amount': amount});
   }
 }

@@ -15,6 +15,7 @@ import '../driver_profile_service.dart';
 import 'driver_manage_routes_screen.dart';
 import 'driver_profile_edit_screen.dart';
 import 'widgets/route_draft_editor.dart'; // weekdayKeys, RouteDayPill
+import '../../../wallet/presentation/wallet_screen.dart';
 
 /// Driver's profile screen — mirrors the Figma "Profile" design.
 ///
@@ -553,7 +554,14 @@ class _WalletCard extends StatelessWidget {
               ],
             ),
           ),
-          TextButton(onPressed: () {}, child: Text('view'.tr())),
+          TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => WalletScreen(profileId: profileId),
+              ),
+            ),
+            child: Text('view'.tr()),
+          ),
         ],
       ),
     );

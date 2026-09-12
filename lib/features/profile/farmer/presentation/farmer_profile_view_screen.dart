@@ -17,6 +17,7 @@ import '../farmer_profile_service.dart';
 import 'add_crop_screen.dart';
 import 'crop_details_sheet.dart';
 import 'farmer_profile_edit_screen.dart';
+import '../../../wallet/presentation/wallet_screen.dart';
 
 class FarmerProfileViewScreen extends ConsumerStatefulWidget {
   final Profile? initialProfile;
@@ -354,27 +355,37 @@ class _WalletCard extends StatelessWidget {
             color: theme.colorScheme.primary,
           ),
           const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('wallet_balance'.tr(), style: theme.textTheme.bodySmall),
-              const SizedBox(height: 2),
-              StreamBuilder<Wallet?>(
-                stream: const WalletService().watchBalance(profileId),
-                builder: (context, snapshot) {
-                  final wallet = snapshot.data;
-                  final text = wallet == null
-                      ? 'LKR 0.00'
-                      : '${wallet.currency} ${wallet.balance.toStringAsFixed(2)}';
-                  return Text(
-                    text,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  );
-                },
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('wallet_balance'.tr(), style: theme.textTheme.bodySmall),
+                const SizedBox(height: 2),
+                StreamBuilder<Wallet?>(
+                  stream: const WalletService().watchBalance(profileId),
+                  builder: (context, snapshot) {
+                    final wallet = snapshot.data;
+                    final text = wallet == null
+                        ? 'LKR 0.00'
+                        : '${wallet.currency} ${wallet.balance.toStringAsFixed(2)}';
+                    return Text(
+                      text,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => WalletScreen(profileId: profileId),
               ),
-            ],
+            ),
+            child: Text('view'.tr()),
           ),
         ],
       ),
