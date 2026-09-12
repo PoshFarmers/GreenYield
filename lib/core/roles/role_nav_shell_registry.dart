@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../features/calendar/presentation/driver_calendar_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
+import '../../features/cart/presentation/widgets/cart_nav_badge_icon.dart';
 import '../../features/chat/presentation/chat_threads_screen.dart';
 import '../../features/chat/presentation/widgets/chat_nav_badge_icon.dart';
 import '../../features/home/presentation/home_screen.dart';
@@ -75,6 +76,7 @@ Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
           NavTab(
             label: 'Cart',
             icon: Icons.shopping_cart_outlined,
+            iconBuilder: (_) => CartNavBadgeIcon(buyerProfileId: profile.id),
             builder: (_) => CartScreen(profile: profile),
           ),
           NavTab(
