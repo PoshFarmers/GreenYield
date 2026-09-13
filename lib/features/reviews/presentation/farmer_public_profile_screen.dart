@@ -141,7 +141,10 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen> {
             message: "This farmer hasn't added any crops yet.",
           )
         else
-          ...profile.crops.map((crop) => _CropTile(crop: crop)),
+          ...profile.crops.map(
+            (crop) =>
+                _CropTile(crop: crop, farmerProfileId: profile.farmerProfileId),
+          ),
         const SizedBox(height: 24),
         _buildSectionHeader(theme, 'Reviews (${profile.reviewCount})'),
         const SizedBox(height: 12),
@@ -310,8 +313,9 @@ class _ReviewCallToAction extends StatelessWidget {
 
 class _CropTile extends StatelessWidget {
   final FarmerPublicCrop crop;
+  final String farmerProfileId;
 
-  const _CropTile({required this.crop});
+  const _CropTile({required this.crop, required this.farmerProfileId});
 
   @override
   Widget build(BuildContext context) {
@@ -319,68 +323,82 @@ class _CropTile extends StatelessWidget {
     final image = crop.displayImage;
     final available = crop.availableQuantityKg > 0;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => _CropListingsSheet.show(
+        context,
+        farmerProfileId: farmerProfileId,
+        crop: crop,
       ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: SizedBox(
-              width: 56,
-              height: 56,
-              child: MediaImage(
-                path: image.path,
-                bucket: image.bucket,
-                public: image.isFallback,
-                placeholder: Container(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  child: Icon(
-                    Icons.eco_outlined,
-                    color: theme.colorScheme.outline,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: 56,
+                height: 56,
+                child: MediaImage(
+                  path: image.path,
+                  bucket: image.bucket,
+                  public: image.isFallback,
+                  placeholder: Container(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: Icon(
+                      Icons.eco_outlined,
+                      color: theme.colorScheme.outline,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  crop.cropName,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    crop.cropName,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  available
-                      ? '${crop.availableQuantityKg.toStringAsFixed(0)} kg available'
-                      : 'Currently unavailable',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: available
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurfaceVariant,
+                  const SizedBox(height: 2),
+                  Text(
+                    available
+                        ? '${crop.availableQuantityKg.toStringAsFixed(0)} kg available'
+                        : 'Currently unavailable',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: available
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          if (crop.defaultPricePerKg != null)
-            Text(
-              'LKR ${crop.defaultPricePerKg!.toStringAsFixed(2)}/kg',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+                ],
               ),
             ),
-        ],
+            if (crop.defaultPricePerKg != null)
+              Text(
+                'LKR ${crop.defaultPricePerKg!.toStringAsFixed(2)}/kg',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.chevron_right,
+              size: 20,
+              color: theme.colorScheme.outline,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -461,6 +479,188 @@ class _EmptyState extends StatelessWidget {
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bottom sheet showing every listing batch the farmer has published for
+/// one crop — including past/inactive ones — with how much of each is
+/// still left. Shown when a buyer taps a crop tile on the profile.
+class _CropListingsSheet extends StatefulWidget {
+  final String farmerProfileId;
+  final FarmerPublicCrop crop;
+
+  const _CropListingsSheet({required this.farmerProfileId, required this.crop});
+
+  static Future<void> show(
+    BuildContext context, {
+    required String farmerProfileId,
+    required FarmerPublicCrop crop,
+  }) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) =>
+          _CropListingsSheet(farmerProfileId: farmerProfileId, crop: crop),
+    );
+  }
+
+  @override
+  State<_CropListingsSheet> createState() => _CropListingsSheetState();
+}
+
+class _CropListingsSheetState extends State<_CropListingsSheet> {
+  final _service = const FarmerPublicProfileService();
+  late Future<List<FarmerCropListing>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _service.fetchCropListings(
+      farmerProfileId: widget.farmerProfileId,
+      cropId: widget.crop.cropId,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.crop.cropName,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Harvest batches',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: FutureBuilder<List<FarmerCropListing>>(
+                  future: _future,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    if (snapshot.hasError) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        child: Center(child: Text(snapshot.error.toString())),
+                      );
+                    }
+                    final listings = snapshot.data ?? const [];
+                    if (listings.isEmpty) {
+                      return const _EmptyState(
+                        icon: Icons.inventory_2_outlined,
+                        message:
+                            "This farmer hasn't added any harvest "
+                            'batches for this crop yet.',
+                      );
+                    }
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: listings.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) =>
+                          _CropListingTile(listing: listings[index]),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CropListingTile extends StatelessWidget {
+  final FarmerCropListing listing;
+
+  const _CropListingTile({required this.listing});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final initial = listing.initialQuantityKg;
+    final available = listing.availableQuantityKg;
+    final fraction = initial <= 0 ? 0.0 : (available / initial).clamp(0, 1);
+    final soldOut = available <= 0;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  listing.harvestedOn != null
+                      ? 'Harvested ${DateFormat('MMM d, yyyy').format(listing.harvestedOn!)}'
+                      : 'Published ${DateFormat('MMM d, yyyy').format(listing.publishedAt)}',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+              Text(
+                '${available.toStringAsFixed(0)}/${initial.toStringAsFixed(0)} kg',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: soldOut
+                      ? theme.colorScheme.onSurfaceVariant
+                      : theme.colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: fraction.toDouble(),
+              minHeight: 6,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              color: soldOut
+                  ? theme.colorScheme.outline
+                  : theme.colorScheme.primary,
             ),
           ),
         ],
