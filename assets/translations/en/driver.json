@@ -84,6 +84,8 @@
   "district_duration": "{district} \u2022 {minutes} mins",
   "district_pallets_crop": "{district} \u2022 {pallets} Pallets \u2022 {crop}",
   "route_completed": "Route {route} \u2022 Completed",
+  "crop_summary": "{crop}",
+  "order_total": "Order total: {amount}",
   "done": "Done",
   "details": "Details",
   "step_x_of_n": "Step {step} of {total}",
