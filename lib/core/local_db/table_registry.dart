@@ -50,7 +50,11 @@ final Map<String, TableConfig> tableRegistry = {
   'order_item': const TableConfig(tableName: 'order_item'),
   'payment': const TableConfig(tableName: 'payment'),
 
-  // --- add new tables here as delivery/wallet land ---
+  // --- Driver dispatch: nearest-driver auto-assignment at checkout ---
+  'delivery': const TableConfig(tableName: 'delivery'),
+  'delivery_assignment': const TableConfig(tableName: 'delivery_assignment'),
+
+  // --- add new tables here as wallet lands ---
   // 'listing': TableConfig(tableName: 'listing', remotePkColumn: 'id'),
 };
 
