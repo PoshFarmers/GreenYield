@@ -8,6 +8,11 @@
 commit_msg_file="$1"
 first_line=$(head -n1 "$commit_msg_file")
 
+# Skip Conventional Commits check for merge commits (e.g. "Merge branch 'x' into y")
+if [[ "$first_line" =~ ^Merge\  ]]; then
+  exit 0
+fi
+
 pattern='^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-z0-9_-]+\))?: .{1,}$'
 
 if ! [[ "$first_line" =~ $pattern ]]; then

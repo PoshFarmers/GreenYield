@@ -1,0 +1,15 @@
+{
+  "added_to_cart": "කරත්තයට එකතු කරන ලදී",
+  "cart_empty_title": "ඔබේ කරත්තය හිස්ය",
+  "cart_empty_subtitle": "වෙළඳපොළ බලා නැවුම් අස්වැන්න එකතු කරන්න.",
+  "unknown_farmer": "ගොවියා",
+  "farmer_subtotal": "ගොවියාගේ උප එකතුව",
+  "grand_total": "මුළු එකතුව",
+  "proceed_to_checkout": "පිටවීමට යන්න",
+  "checkout_coming_soon": "පිටවීම ඉක්මනින් එනවා.",
+  "remove_from_cart": "ඉවත් කරන්න",
+  "cart_item_sold_out": "විකුණා අවසන්",
+  "cart_item_unavailable": "තවදුරටත් නොමැත",
+  "cart_item_only_x_left": "තොගයේ ඉතිරිව ඇත්තේ කිලෝ {qty} පමණි",
+  "cart_has_unavailable_items": "ඔබේ කරත්තයේ ඇති සමහර අයිතම තවදුරටත් නොමැති අතර ඒවා පිටවීමේදී ඇතුළත් නොවේ."
+}

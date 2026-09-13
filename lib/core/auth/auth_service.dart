@@ -2,15 +2,23 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../supabase/client.dart';
+import '../local_db/powersync.dart'; // exposes `db`
+import '../local_db/repository.dart';
 import '../../models/profile.dart';
 
-/// Every bit of auth logic goes through this class — screens should
-/// never call `supabase.auth.*` directly
 class AuthService {
-  /// Custom scheme registered in AndroidManifest.xml / Info.plist so
-  /// the OAuth browser flow can redirect back into the app on mobile.
-  /// Not needed on web — the browser flow redirects in-page there.
   static const _mobileRedirect = 'io.supabase.greenyield://login-callback';
+
+  // Repository.insert always supplies the local id separately, so
+  // Profile.toInsertMap()'s own 'id' entry has to be stripped here —
+  // the previous hand-written SQL passed profile.id AND
+  // toInsertMap()['id'] into the same INSERT, producing a duplicate
+  // 'id' column. This fixes that as a side effect of the refactor.
+  final _profiles = Repository<Profile>(
+    table: 'profile',
+    fromMap: Profile.fromMap,
+    toInsertMap: (p) => p.toInsertMap()..remove('id'),
+  );
 
   Stream<AuthState> get authStateChanges => supabase.auth.onAuthStateChange;
 
@@ -32,10 +40,6 @@ class AuthService {
     return supabase.auth.signInWithPassword(email: email, password: password);
   }
 
-  /// Opens the system browser for Google's OAuth consent screen and
-  /// redirects back into the app on success. Auth state changes are
-  /// picked up via [authStateChanges] — this method doesn't return a
-  /// session directly.
   Future<void> signInWithGoogle() {
     return supabase.auth.signInWithOAuth(
       OAuthProvider.google,
@@ -45,60 +49,62 @@ class AuthService {
 
   Future<void> signOut() => supabase.auth.signOut();
 
-  /// Returns the current user's generic profile row, or null if one
-  /// hasn't been created yet.
-  Future<Profile?> fetchOwnProfile() async {
+  Stream<Profile?> watchOwnProfile() {
     final user = currentUser;
-    if (user == null) return null;
-
-    final row = await supabase
-        .from('profile_read')
-        .select()
-        .eq('id', user.id)
-        .maybeSingle();
-
-    if (row == null) return null;
-    return Profile.fromMap(row);
+    if (user == null) return Stream.value(null);
+    return _profiles.watchOne(user.id);
   }
 
-  /// Creates the generic profile row for the signed-in user.
-  Future<void> createOwnProfile(Profile profile) async {
-    await supabase.from('profile').insert(profile.toInsertMap());
-  }
+  Future<void> createOwnProfile(Profile profile) =>
+      _profiles.insert(profile.id, profile);
 
-  // Updates own profile
-  Future<void> updateOwnProfile(Profile profile) async {
-    await supabase
-        .from('profile')
-        .update(profile.toInsertMap())
-        .eq('id', profile.id);
-  }
+  Future<void> updateOwnProfile(Profile profile) =>
+      _profiles.update(profile.id, profile);
 
-  /// Grants a role to the current user (inserts into profile_role).
+  /// profile_role rows have no real model to speak of (just a role
+  /// string) and use a PowerSync-generated id, same as before — left
+  /// as a direct db call rather than forcing it through `Repository<T>`.
   Future<void> addRole(String role) async {
     final userId = currentUser!.id;
-    await supabase.from('profile_role').insert({
-      'profile_id': userId,
-      'role': role,
-    });
+    await db.execute(
+      'INSERT INTO profile_role (id, profile_id, role) VALUES (uuid(), ?, ?)',
+      [userId, role],
+    );
   }
 
-  /// Returns every role the current user currently holds.
-  Future<List<String>> fetchOwnRoles() async {
+  Stream<List<String>> watchOwnRoles() {
     final userId = currentUser!.id;
-    final rows = await supabase
-        .from('profile_role')
-        .select('role')
-        .eq('profile_id', userId);
-    return rows.map((row) => row['role'] as String).toList();
+    return db
+        .watch(
+          'SELECT role FROM profile_role WHERE profile_id = ?',
+          parameters: [userId],
+        )
+        .map((rows) => rows.map((r) => r['role'] as String).toList());
   }
 
-  /// Which role's UI is currently shown.
   Future<void> setActiveRole(String role) async {
     final userId = currentUser!.id;
-    await supabase
-        .from('profile')
-        .update({'active_role': role})
-        .eq('id', userId);
+    await db.execute('UPDATE profile SET active_role = ? WHERE id = ?', [
+      role,
+      userId,
+    ]);
+  }
+
+  Future<void> updateProfileLocation({
+    required GeoPoint locationPoint,
+    required String locationText,
+  }) async {
+    final userId = currentUser!.id;
+
+    final latitude = locationPoint.latitude;
+    final longitude = locationPoint.longitude;
+
+    final locationWkt = 'POINT($longitude $latitude)';
+    final geoJson = '{"type":"Point","coordinates":[$longitude,$latitude]}';
+
+    await db.execute(
+      'UPDATE profile SET location_point = ?, location_geojson = ?, location_text = ? WHERE id = ?',
+      [locationWkt, geoJson, locationText, userId],
+    );
   }
 }
