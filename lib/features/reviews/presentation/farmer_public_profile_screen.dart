@@ -203,22 +203,24 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen> {
                         ],
                       ),
                     ],
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        StarRatingDisplay(rating: profile.avgRating, size: 16),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            profile.reviewCount == 0
+                                ? 'No reviews yet'
+                                : '${profile.avgRating.toStringAsFixed(1)} (${profile.reviewCount} ${profile.reviewCount == 1 ? 'review' : 'reviews'})',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              StarRatingDisplay(rating: profile.avgRating),
-              const SizedBox(width: 8),
-              Text(
-                profile.reviewCount == 0
-                    ? 'No reviews yet'
-                    : '${profile.avgRating.toStringAsFixed(1)} (${profile.reviewCount} ${profile.reviewCount == 1 ? 'review' : 'reviews'})',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
