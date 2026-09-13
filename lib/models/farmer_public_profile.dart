@@ -98,6 +98,45 @@ class FarmerPublicCrop {
   }
 }
 
+/// One listing batch behind a crop's aggregate available stock — from
+/// `get_farmer_crop_listings`. There's no stored "initial quantity";
+/// [initialQuantityKg] is reconstructed server-side as
+/// `available_quantity_kg + sold order_item quantity`, so it reflects
+/// how much this batch started with even after some of it sold.
+class FarmerCropListing {
+  final String id;
+  final double availableQuantityKg;
+  final double initialQuantityKg;
+  final String status;
+  final DateTime? harvestedOn;
+  final DateTime publishedAt;
+
+  const FarmerCropListing({
+    required this.id,
+    required this.availableQuantityKg,
+    required this.initialQuantityKg,
+    required this.status,
+    this.harvestedOn,
+    required this.publishedAt,
+  });
+
+  factory FarmerCropListing.fromMap(Map<String, dynamic> map) {
+    return FarmerCropListing(
+      id: map['id'] as String,
+      availableQuantityKg:
+          (map['available_quantity_kg'] as num?)?.toDouble() ?? 0,
+      initialQuantityKg: (map['initial_quantity_kg'] as num?)?.toDouble() ?? 0,
+      status: (map['status'] as String?) ?? 'active',
+      harvestedOn: map['harvested_on'] == null
+          ? null
+          : DateTime.tryParse(map['harvested_on'] as String),
+      publishedAt:
+          DateTime.tryParse(map['published_at'] as String? ?? '') ??
+          DateTime.now(),
+    );
+  }
+}
+
 /// One review as shown on the farmer's public profile — the buyer's
 /// name, not their id (this is a read-only display row, not something
 /// the viewer can act on unless it's their own).
