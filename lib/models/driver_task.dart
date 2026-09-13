@@ -5,6 +5,11 @@ import 'package:flutter/material.dart';
 /// inline below since it's only used there).
 enum DriverTaskType { delivery, pickup }
 
+/// Number formatter for `order_total`'s `{amount}` placeholder —
+/// deliberately simple (no currency lib dependency) since the value is
+/// already an LKR total from `orders.total_amount`.
+String _formatAmount(double amount) => amount.toStringAsFixed(2);
+
 /// A single delivery/pickup task shown on the driver's weekly calendar.
 ///
 /// No backend table for driver scheduling exists yet (there's no
@@ -41,6 +46,55 @@ class DriverTask {
     this.isDone = false,
     this.thumbnailEmojis = const [],
   });
+
+  /// Builds a real task from one row of
+  /// `DriverScheduleService.watchTasksForDriver`'s joined query — one
+  /// row per delivery assigned to this driver, carrying the farmer/buyer
+  /// display names cached on `delivery` at assignment time (see
+  /// `20260913090000_notify_and_driver_order_access.sql`) plus a
+  /// comma-joined crop-name summary from that order's items.
+  ///
+  /// A delivery is a single stop pair (pickup then dropoff); until it's
+  /// picked up it shows as a pickup task, then as a delivery task until
+  /// it's marked delivered.
+  factory DriverTask.fromDeliveryRow(Map<String, dynamic> row) {
+    final status = row['status'] as String? ?? 'assigned';
+    final isPickupPhase = status == 'assigned';
+    final cropSummary = (row['crop_names'] as String?)?.trim();
+    final total = (row['total_amount'] as num?)?.toDouble();
+
+    final assignedAt = DateTime.parse(row['assigned_at'] as String).toLocal();
+
+    return DriverTask(
+      id: row['delivery_id'] as String,
+      type: isPickupPhase ? DriverTaskType.pickup : DriverTaskType.delivery,
+      titleKey: isPickupPhase ? 'pickup_at' : 'delivery_to',
+      titleArgs: {
+        'place':
+            (isPickupPhase
+                ? row['farmer_display_name'] as String?
+                : row['buyer_display_name'] as String?) ??
+            '',
+      },
+      subtitleKey: cropSummary != null && cropSummary.isNotEmpty
+          ? 'crop_summary'
+          : 'order_total',
+      subtitleArgs: cropSummary != null && cropSummary.isNotEmpty
+          ? {'crop': cropSummary}
+          : {'amount': total == null ? '' : _formatAmount(total)},
+      time: TimeOfDay.fromDateTime(assignedAt),
+      isDone: status == 'delivered',
+    );
+  }
+
+  /// The calendar day this task belongs on — the day the order was
+  /// assigned to this driver (there's no separate "scheduled delivery
+  /// date" in the schema yet, so a freshly placed order shows up on the
+  /// driver's calendar the same day it's placed).
+  static DateTime dayOf(Map<String, dynamic> row) {
+    final assignedAt = DateTime.parse(row['assigned_at'] as String).toLocal();
+    return DateTime(assignedAt.year, assignedAt.month, assignedAt.day);
+  }
 }
 
 /// Deterministic placeholder schedule keyed by weekday (1 = Monday .. 7

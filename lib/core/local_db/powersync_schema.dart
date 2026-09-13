@@ -187,6 +187,36 @@ const schema = Schema([
     Column.text('created_at'),
     Column.text('updated_at'),
   ]),
+  // --- Driver dispatch: nearest-driver auto-assignment at checkout ---
+  // Mirrors `delivery` / `delivery_assignment` (see
+  // .../20260827094000_delivery_and_assignment.sql and
+  // .../20260913090000_notify_and_driver_order_access.sql). The
+  // driver/buyer display-name columns are denormalized onto `delivery`
+  // at assignment time specifically so the driver's calendar can show
+  // "Pickup at <farmer>" without needing broader read access to the
+  // farmer/buyer profile rows.
+  Table('delivery', [
+    Column.text('order_id'),
+    Column.text('journey_id'),
+    Column.text('pickup_location_text'),
+    Column.text('dropoff_location_text'),
+    Column.text('farmer_display_name'),
+    Column.text('buyer_display_name'),
+    Column.text('status'),
+    Column.text('assigned_at'),
+    Column.text('picked_up_at'),
+    Column.text('delivered_at'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  Table('delivery_assignment', [
+    Column.text('delivery_id'),
+    Column.text('driver_profile_id'),
+    Column.text('vehicle_id'),
+    Column.text('assigned_at'),
+    Column.text('unassigned_at'),
+    Column.integer('is_current'),
+  ]),
   // no client insert/update RLS policy exists for this table.
   Table('pricing_rule', [
     Column.text('name'),

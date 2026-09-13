@@ -84,6 +84,8 @@
   "district_duration": "{district} • මිනිත්තු {minutes}",
   "district_pallets_crop": "{district} • පැලට් {pallets} • {crop}",
   "route_completed": "මාර්ගය {route} • සම්පූර්ණයි",
+  "crop_summary": "{crop}",
+  "order_total": "වැඩැත සගළ: {amount}",
   "done": "සිදු කළා",
   "details": "විස්තර",
   "step_x_of_n": "පියවර {step} න් {total}",
