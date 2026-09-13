@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../media/media_service.dart';
+import '../media/media_size.dart';
 
 /// Displays a media file by its storage `bucket`/`path` pair, resolving
 /// through the shared MediaService cache (so offline-queued photos show
@@ -14,6 +15,7 @@ class MediaImage extends StatefulWidget {
   final Widget placeholder;
   final BoxFit fit;
   final bool public;
+  final MediaSize size;
 
   const MediaImage({
     super.key,
@@ -22,6 +24,7 @@ class MediaImage extends StatefulWidget {
     required this.placeholder,
     this.fit = BoxFit.cover,
     this.public = false,
+    this.size = MediaSize.thumbnail,
   });
 
   @override
@@ -41,7 +44,7 @@ class _MediaImageState extends State<MediaImage> {
   @override
   void didUpdateWidget(covariant MediaImage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.path != oldWidget.path) {
+    if (widget.path != oldWidget.path || widget.size != oldWidget.size) {
       _loadedFor = null;
       _file = null;
       _load();
@@ -58,6 +61,7 @@ class _MediaImageState extends State<MediaImage> {
         bucket: widget.bucket,
         remotePath: path,
         public: widget.public,
+        size: widget.size,
       );
       if (mounted) setState(() => _file = file);
     } catch (_) {
