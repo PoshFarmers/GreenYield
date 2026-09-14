@@ -620,51 +620,78 @@ class _CropListingTile extends StatelessWidget {
     final fraction = initial <= 0 ? 0.0 : (available / initial).clamp(0, 1);
     final soldOut = available <= 0;
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  listing.harvestedOn != null
-                      ? 'Harvested ${DateFormat('MMM d, yyyy').format(listing.harvestedOn!)}'
-                      : 'Published ${DateFormat('MMM d, yyyy').format(listing.publishedAt)}',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ),
-              Text(
-                '${available.toStringAsFixed(0)}/${initial.toStringAsFixed(0)} kg',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: soldOut
-                      ? theme.colorScheme.onSurfaceVariant
-                      : theme.colorScheme.primary,
-                ),
-              ),
-            ],
+    return Stack(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: soldOut
+                ? theme.colorScheme.surfaceContainerHighest
+                : theme.colorScheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
           ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: fraction.toDouble(),
-              minHeight: 6,
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              color: soldOut
-                  ? theme.colorScheme.outline
-                  : theme.colorScheme.primary,
+          child: Opacity(
+            opacity: soldOut ? 0.5 : 1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        listing.harvestedOn != null
+                            ? 'Harvested ${DateFormat('MMM d, yyyy').format(listing.harvestedOn!)}'
+                            : 'Published ${DateFormat('MMM d, yyyy').format(listing.publishedAt)}',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                    Text(
+                      '${available.toStringAsFixed(0)}/${initial.toStringAsFixed(0)} kg',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: fraction.toDouble(),
+                    minHeight: 6,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+        if (soldOut)
+          Positioned.fill(
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'Sold out',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
