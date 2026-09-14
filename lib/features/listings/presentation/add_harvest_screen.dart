@@ -10,6 +10,7 @@ import '../../../core/widgets/app_secondary_header.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/image_source_sheet.dart';
 import '../../../core/widgets/media_image.dart';
+import '../../../core/media/media_size.dart';
 import '../../../models/farmer_profile.dart';
 import '../../../models/profile.dart';
 import '../../pricing/presentation/widgets/market_price_comparison_card.dart';
@@ -631,6 +632,7 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
                           path: _crop?.displayImage.path,
                           bucket: _crop?.displayImage.bucket ?? 'crop-photos',
                           public: _crop?.displayImage.isFallback ?? false,
+                          size: MediaSize.full,
                           placeholder: Container(
                             color: theme.colorScheme.surfaceContainerHighest,
                             child: Icon(
@@ -732,6 +734,7 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
                               bucket:
                                   crop?.displayImage.bucket ?? 'crop-photos',
                               public: crop?.displayImage.isFallback ?? false,
+                              size: MediaSize.full,
                               placeholder: Container(
                                 color:
                                     theme.colorScheme.surfaceContainerHighest,

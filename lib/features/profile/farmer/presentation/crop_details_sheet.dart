@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/widgets/media_image.dart';
+import '../../../../core/media/media_size.dart';
 import '../crop_price_bounds.dart';
 
 /// What the farmer entered for one crop. [imageBytes] is null when they
@@ -170,6 +171,7 @@ class _CropDetailsSheetState extends State<_CropDetailsSheet> {
                       ? MediaImage(
                           path: widget.existingImagePath,
                           bucket: 'crop-photos',
+                          size: MediaSize.full,
                           placeholder: Container(
                             color: theme.colorScheme.surfaceContainerHighest,
                           ),
@@ -178,6 +180,7 @@ class _CropDetailsSheetState extends State<_CropDetailsSheet> {
                           path: widget.fallbackImageUrl,
                           bucket: 'crop-fallback-images',
                           public: true,
+                          size: MediaSize.full,
                           placeholder: Container(
                             color: theme.colorScheme.surfaceContainerHighest,
                           ),

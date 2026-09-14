@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/widgets/app_secondary_header.dart';
 import '../../../core/widgets/avatar_image.dart';
 import '../../../core/widgets/media_image.dart';
+import '../../../core/media/media_size.dart';
 import '../../../models/marketplace_listing.dart';
 import '../../../models/profile.dart';
 import '../../cart/cart_service.dart';
@@ -281,6 +282,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
               path: listing.displayImage.path,
               bucket: listing.displayImage.bucket,
               public: listing.displayImage.isFallback,
+              size: MediaSize.full,
               placeholder: Container(
                 color: theme.colorScheme.surfaceContainerHighest,
                 child: Icon(

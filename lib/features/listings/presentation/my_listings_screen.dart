@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/media_image.dart';
+import '../../../core/media/media_size.dart';
 import '../../../models/produce_listing.dart';
 import '../../../models/profile.dart';
 import '../../pricing/presentation/widgets/market_price_comparison_card.dart';
@@ -351,6 +352,7 @@ class _ListingCard extends StatelessWidget {
                         path: listing.displayImage.path,
                         bucket: listing.displayImage.bucket,
                         public: listing.displayImage.isFallback,
+                        size: MediaSize.full,
                         placeholder: Container(
                           color: theme.colorScheme.surfaceContainerHighest,
                           child: Icon(
