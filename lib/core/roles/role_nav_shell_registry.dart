@@ -6,6 +6,7 @@ import '../../features/cart/presentation/widgets/cart_nav_badge_icon.dart';
 import '../../features/chat/presentation/chat_threads_screen.dart';
 import '../../features/chat/presentation/widgets/chat_nav_badge_icon.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/home/presentation/driver_home_screen.dart';
 import '../../features/home/presentation/farmer_home_screen.dart';
 import '../../features/listings/presentation/my_listings_screen.dart';
 import '../../features/marketplace/presentation/marketplace_screen.dart';
@@ -94,7 +95,11 @@ Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
     case 'driver':
       return AppNavShell(
         tabs: [
-          homeTab,
+          NavTab(
+            label: 'Home',
+            icon: Icons.home_outlined,
+            builder: (_) => DriverHomeScreen(profile: profile),
+          ),
           NavTab(
             label: 'Calendar',
             icon: Icons.calendar_today_outlined,
