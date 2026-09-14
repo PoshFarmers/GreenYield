@@ -10,6 +10,7 @@ import 'media_attachment.dart';
 import 'media_cache.dart';
 import 'media_queue_db.dart';
 import 'media_uploader.dart';
+import 'media_size.dart';
 
 /// Generic media API for the whole app — the replacement for
 /// avatar-only upload/cache code. Any feature (avatars, marketplace
@@ -99,12 +100,14 @@ class MediaService {
     required String remotePath,
     bool public = false,
     int signedUrlExpiresIn = 3600,
+    MediaSize size = MediaSize.full,
   }) {
     return _cache.getFile(
       bucket: bucket,
       remotePath: remotePath,
       public: public,
       signedUrlExpiresIn: signedUrlExpiresIn,
+      size: size,
     );
   }
 
