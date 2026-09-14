@@ -74,6 +74,7 @@ class CheckoutService {
     required Profile buyerProfile,
     required List<CartLineItem> items,
     required String paymentMethod, // 'wallet' | 'card'
+    required DateTime orderDate,
     String? requestId,
   }) async {
     if (items.isEmpty) {
@@ -101,6 +102,10 @@ class CheckoutService {
         'p_delivery_address': buyerProfile.address.isEmpty
             ? null
             : buyerProfile.address.toMap(),
+        'p_order_date':
+            '${orderDate.year.toString().padLeft(4, '0')}-'
+            '${orderDate.month.toString().padLeft(2, '0')}-'
+            '${orderDate.day.toString().padLeft(2, '0')}',
       },
     );
 
@@ -118,6 +123,12 @@ class CheckoutService {
         .map((order) => Map<String, dynamic>.from(order as Map))
         .toList();
 
+    // Parse the order_date returned by the RPC (format: 'YYYY-MM-DD').
+    final rawOrderDate = result['order_date'];
+    final parsedOrderDate = rawOrderDate is String
+        ? DateTime.tryParse(rawOrderDate) ?? orderDate
+        : orderDate;
+
     return PlacedOrderGroup(
       checkoutGroupId: result['checkout_group_id'] as String,
       orderIds: orderData.map((order) => order['order_id'] as String).toList(),
@@ -126,6 +137,7 @@ class CheckoutService {
       ),
       placedAt: DateTime.parse(result['placed_at'] as String),
       deliveryAddress: buyerProfile.address,
+      orderDate: parsedOrderDate,
     );
   }
 
