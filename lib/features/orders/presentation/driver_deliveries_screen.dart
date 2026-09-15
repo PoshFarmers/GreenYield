@@ -2,25 +2,14 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/theme/theme_provider.dart';
-import '../../../core/widgets/app_secondary_header.dart';
+import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/media_image.dart';
 import '../../../models/profile.dart';
-import '../order_providers.dart';
 import '../order_detail_models.dart';
+import '../order_providers.dart';
 import 'order_detail_screen.dart';
 import 'widgets/order_status_chip.dart';
 
-/// Sprint 3 — Driver: 3-tab Deliveries screen.
-/// Tab 1: Pickup Requests (assigned, packed)
-/// Tab 2: Active Deliveries (picked_up, in_transit)
-/// Tab 3: Completed (delivered)
-///
-/// Responsive: a single column on phones, and a wrapping multi-column
-/// layout on tablets/desktop (see [_ResponsiveDeliveryGrid]). Theme
-/// (light/dark/system) and language can be changed right from this
-/// screen's header via [_DeliverySettingsMenu], in addition to the
-/// Home screen's controls.
 class DriverDeliveriesScreen extends ConsumerStatefulWidget {
   final Profile profile;
 
@@ -52,158 +41,57 @@ class _DriverDeliveriesScreenState extends ConsumerState<DriverDeliveriesScreen>
     final profileId = widget.profile.id;
 
     return Scaffold(
-      appBar: AppSecondaryHeader(
-        title: 'deliveries_title'.tr(),
-        showBackButton: false,
-        actions: const [_DeliverySettingsMenu()],
-        bottom: TabBar(
-          controller: _tabs,
-          isScrollable: true,
-          tabs: [
-            Tab(text: 'tab_pickup_requests'.tr()),
-            Tab(text: 'tab_active_deliveries'.tr()),
-            Tab(text: 'tab_completed'.tr()),
-          ],
-          labelStyle: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-          unselectedLabelStyle: const TextStyle(fontSize: 13),
-          indicatorSize: TabBarIndicatorSize.tab,
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabs,
+      appBar: AppHeader(profile: widget.profile),
+      body: Column(
         children: [
-          _DeliveryList(
-            key: const ValueKey('driver_pickup'),
-            provider: ref.watch(driverPickupRequestsProvider(profileId)),
-            emptyMessage: 'empty_pickup_requests'.tr(),
-            emptyIcon: Icons.storefront_outlined,
-          ),
-          _DeliveryList(
-            key: const ValueKey('driver_active'),
-            provider: ref.watch(driverActiveDeliveriesProvider(profileId)),
-            emptyMessage: 'empty_active_deliveries'.tr(),
-            emptyIcon: Icons.local_shipping_outlined,
-          ),
-          _DeliveryList(
-            key: const ValueKey('driver_completed'),
-            provider: ref.watch(driverCompletedDeliveriesProvider(profileId)),
-            emptyMessage: 'empty_completed'.tr(),
-            emptyIcon: Icons.task_alt_outlined,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Theme (light/dark/system) + language switcher, available inline on
-/// this screen's header so a driver never has to leave Deliveries to
-/// change either.
-class _DeliverySettingsMenu extends ConsumerWidget {
-  const _DeliverySettingsMenu();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return PopupMenuButton<String>(
-      tooltip: 'settings'.tr(),
-      icon: const Icon(Icons.tune),
-      itemBuilder: (context) => [
-        PopupMenuItem<String>(
-          enabled: false,
-          child: Text(
-            'toggle_theme'.tr(),
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+          TabBar(
+            controller: _tabs,
+            isScrollable: true,
+            tabs: [
+              Tab(text: 'tab_pickup_requests'.tr()),
+              Tab(text: 'tab_active_deliveries'.tr()),
+              Tab(text: 'tab_completed'.tr()),
+            ],
+            labelStyle: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
+            unselectedLabelStyle: const TextStyle(fontSize: 13),
+            indicatorSize: TabBarIndicatorSize.tab,
           ),
-        ),
-        _themeItem(context, ref, ThemeMode.light, Icons.light_mode, 'light'),
-        _themeItem(context, ref, ThemeMode.dark, Icons.dark_mode, 'dark'),
-        _themeItem(
-          context,
-          ref,
-          ThemeMode.system,
-          Icons.settings_suggest,
-          'system',
-        ),
-        const PopupMenuDivider(),
-        PopupMenuItem<String>(
-          enabled: false,
-          child: Text(
-            'language'.tr(),
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        for (final locale in context.supportedLocales)
-          PopupMenuItem<String>(
-            value: 'locale:${locale.languageCode}',
-            child: Row(
+          Expanded(
+            child: TabBarView(
+              controller: _tabs,
               children: [
-                if (context.locale == locale)
-                  Icon(
-                    Icons.check,
-                    size: 18,
-                    color: Theme.of(context).colorScheme.primary,
-                  )
-                else
-                  const SizedBox(width: 18),
-                const SizedBox(width: 8),
-                Text(_localeLabel(locale.languageCode)),
+                _DeliveryList(
+                  key: const ValueKey('driver_pickup'),
+                  provider: ref.watch(driverPickupRequestsProvider(profileId)),
+                  emptyMessage: 'empty_pickup_requests'.tr(),
+                  emptyIcon: Icons.storefront_outlined,
+                ),
+                _DeliveryList(
+                  key: const ValueKey('driver_active'),
+                  provider: ref.watch(
+                    driverActiveDeliveriesProvider(profileId),
+                  ),
+                  emptyMessage: 'empty_active_deliveries'.tr(),
+                  emptyIcon: Icons.local_shipping_outlined,
+                ),
+                _DeliveryList(
+                  key: const ValueKey('driver_completed'),
+                  provider: ref.watch(
+                    driverCompletedDeliveriesProvider(profileId),
+                  ),
+                  emptyMessage: 'empty_completed'.tr(),
+                  emptyIcon: Icons.task_alt_outlined,
+                ),
               ],
             ),
           ),
-      ],
-      onSelected: (value) {
-        if (value.startsWith('locale:')) {
-          final code = value.substring('locale:'.length);
-          final locale = context.supportedLocales.firstWhere(
-            (l) => l.languageCode == code,
-          );
-          context.setLocale(locale);
-        } else if (value.startsWith('theme:')) {
-          final mode = ThemeMode.values.firstWhere(
-            (m) => m.name == value.substring('theme:'.length),
-          );
-          ref.read(themeModeProvider.notifier).setThemeMode(mode);
-        }
-      },
-    );
-  }
-
-  PopupMenuItem<String> _themeItem(
-    BuildContext context,
-    WidgetRef ref,
-    ThemeMode mode,
-    IconData icon,
-    String labelKey,
-  ) {
-    final selected = ref.watch(themeModeProvider) == mode;
-    return PopupMenuItem<String>(
-      value: 'theme:${mode.name}',
-      child: Row(
-        children: [
-          if (selected)
-            Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary)
-          else
-            Icon(icon, size: 18),
-          const SizedBox(width: 8),
-          Text(labelKey.tr()),
         ],
       ),
     );
   }
-
-  String _localeLabel(String code) => switch (code) {
-    'en' => 'English',
-    'si' => 'සිංහල',
-    'ta' => 'தமிழ்',
-    _ => code.toUpperCase(),
-  };
 }
 
 class _DeliveryList extends ConsumerWidget {
