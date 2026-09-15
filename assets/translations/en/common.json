@@ -59,5 +59,8 @@
   "month_short_sep": "Sep",
   "month_short_oct": "Oct",
   "month_short_nov": "Nov",
-  "month_short_dec": "Dec"
+  "month_short_dec": "Dec",
+  "light": "Light",
+  "dark": "Dark",
+  "system": "System"
 }

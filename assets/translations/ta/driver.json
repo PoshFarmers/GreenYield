@@ -120,5 +120,13 @@
   "change_locations": "இடங்களை மாற்று",
   "complete_registration": "பதிவை முடிக்கவும்",
   "required_fields_filled": "தேவையான புலங்கள் நிரப்பப்பட்டன ({count}/3)",
-  "route_selection_mandatory_hint": "ஆரம்ப ஓட்டுநர் பதிவின் போது வழி தேர்வை தவிர்க்க முடியாது"
+  "route_selection_mandatory_hint": "ஆரம்ப ஓட்டுநர் பதிவின் போது வழி தேர்வை தவிர்க்க முடியாது",
+  "deliveries_title": "விநியோகங்கள்",
+  "tab_pickup_requests": "சேகரிப்பு கோரிக்கைகள்",
+  "tab_active_deliveries": "செயலில் உள்ள விநியோகங்கள்",
+  "tab_completed": "முடிந்தது",
+  "empty_pickup_requests": "தற்போது சேகரிப்பு கோரிக்கைகள் இல்லை.",
+  "empty_active_deliveries": "செயலில் விநியோகங்கள் இல்லை.",
+  "empty_completed": "இன்னும் விநியோகங்கள் முடிக்கப்படவில்லை.",
+  "error_loading_deliveries": "விநியோகங்களை ஏற்றுவதில் பிழை:\n{error}"
 }
