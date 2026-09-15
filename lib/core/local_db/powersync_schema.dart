@@ -165,6 +165,9 @@ const schema = Schema([
     Column.real('delivery_fee_amount'),
     Column.real('total_amount'),
     Column.text('delivery_address'),
+    Column.text(
+      'order_date',
+    ), // buyer-selected delivery date (added in 20260914000000)
     Column.text('placed_at'),
     Column.text('created_at'),
     Column.text('updated_at'),
