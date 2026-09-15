@@ -31,7 +31,9 @@ class DriverScheduleService {
           .eq('is_current', true);
 
       // ignore: avoid_print
-      print('📦 [DriverScheduleService] Raw rows for driver $driverProfileId: ${response.length}');
+      print(
+        '📦 [DriverScheduleService] Raw rows for driver $driverProfileId: ${response.length}',
+      );
       final byDay = <DateTime, List<DriverTask>>{};
       for (final raw in (response as List)) {
         final d = raw['delivery'] as Map<String, dynamic>?;
@@ -40,7 +42,8 @@ class DriverScheduleService {
         final items = (o?['order_item'] as List?) ?? [];
         final cropNamesSet = <String>{};
         for (final item in items) {
-          final crop = (item as Map<String, dynamic>)['crop'] as Map<String, dynamic>?;
+          final crop =
+              (item as Map<String, dynamic>)['crop'] as Map<String, dynamic>?;
           if (crop != null && crop['name'] != null) {
             cropNamesSet.add(crop['name'] as String);
           }
@@ -59,7 +62,9 @@ class DriverScheduleService {
 
         final day = DriverTask.dayOf(row);
         // ignore: avoid_print
-        print('  ➜ Task found for date: $day | Order Date: ${o?['order_date']} | Delivery ID: ${d['id']}');
+        print(
+          '  ➜ Task found for date: $day | Order Date: ${o?['order_date']} | Delivery ID: ${d['id']}',
+        );
         byDay.putIfAbsent(day, () => []).add(DriverTask.fromDeliveryRow(row));
       }
       return byDay;

@@ -53,8 +53,6 @@ class OrderService {
     return result;
   }
 
-
-
   // =========================================================================
   // Stream queries — PowerSync local mirror
   // =========================================================================
@@ -259,9 +257,15 @@ class OrderService {
             deliveryStatus: DeliveryStatus.fromDb(dStatus),
             farmerDisplayName: farmerName,
             buyerDisplayName: buyerName,
-            assignedAt: d['assigned_at'] != null ? DateTime.parse(d['assigned_at'] as String) : null,
-            pickedUpAt: d['picked_up_at'] != null ? DateTime.parse(d['picked_up_at'] as String) : null,
-            deliveredAt: d['delivered_at'] != null ? DateTime.parse(d['delivered_at'] as String) : null,
+            assignedAt: d['assigned_at'] != null
+                ? DateTime.parse(d['assigned_at'] as String)
+                : null,
+            pickedUpAt: d['picked_up_at'] != null
+                ? DateTime.parse(d['picked_up_at'] as String)
+                : null,
+            deliveredAt: d['delivered_at'] != null
+                ? DateTime.parse(d['delivered_at'] as String)
+                : null,
             order: orderSummary,
           ),
         );

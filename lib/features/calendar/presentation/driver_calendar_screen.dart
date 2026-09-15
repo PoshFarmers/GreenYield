@@ -112,7 +112,9 @@ class _DriverCalendarScreenState extends State<DriverCalendarScreen> {
 
             // Debug log
             // ignore: avoid_print
-            print('📅 [Calendar Debug] Driver ID: ${widget.profile.id} | Selected Date: ${_selectedDay.toIso8601String().split('T').first} | Assigned Tasks: ${tasks.length} | All Dates With Tasks: ${tasksByDay.keys.map((k) => k.toIso8601String().split('T').first).toList()}');
+            print(
+              '📅 [Calendar Debug] Driver ID: ${widget.profile.id} | Selected Date: ${_selectedDay.toIso8601String().split('T').first} | Assigned Tasks: ${tasks.length} | All Dates With Tasks: ${tasksByDay.keys.map((k) => k.toIso8601String().split('T').first).toList()}',
+            );
 
             return Center(
               child: ConstrainedBox(
