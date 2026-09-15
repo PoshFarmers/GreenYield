@@ -87,11 +87,24 @@ class DriverTask {
     );
   }
 
-  /// The calendar day this task belongs on — the day the order was
-  /// assigned to this driver (there's no separate "scheduled delivery
-  /// date" in the schema yet, so a freshly placed order shows up on the
-  /// driver's calendar the same day it's placed).
+  /// The calendar day this task belongs on — the buyer's requested
+  /// `order_date` (see `20260914000000_add_order_date.sql`), not the
+  /// day the order happened to be assigned to this driver. Falls back
+  /// to `assigned_at`'s day for any older/synced row that predates the
+  /// `order_date` column.
   static DateTime dayOf(Map<String, dynamic> row) {
+    final orderDate = row['order_date'] as String?;
+    if (orderDate != null && orderDate.isNotEmpty) {
+      final parts = orderDate.split('T').first.split('-');
+      if (parts.length == 3) {
+        final year = int.parse(parts[0]);
+        final month = int.parse(parts[1]);
+        final day = int.parse(parts[2]);
+        return DateTime(year, month, day);
+      }
+      final parsed = DateTime.parse(orderDate).toLocal();
+      return DateTime(parsed.year, parsed.month, parsed.day);
+    }
     final assignedAt = DateTime.parse(row['assigned_at'] as String).toLocal();
     return DateTime(assignedAt.year, assignedAt.month, assignedAt.day);
   }

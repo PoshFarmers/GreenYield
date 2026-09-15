@@ -101,8 +101,18 @@ class _DriverCalendarScreenState extends State<DriverCalendarScreen> {
         child: StreamBuilder<Map<DateTime, List<DriverTask>>>(
           stream: _tasksByDay,
           builder: (context, snapshot) {
-            final tasksByDay = snapshot.data ?? const {};
+            final rawTasksByDay = snapshot.data ?? const {};
+            final tasksByDay = <DateTime, List<DriverTask>>{};
+            for (final entry in rawTasksByDay.entries) {
+              final d = entry.key;
+              final key = DateTime(d.year, d.month, d.day);
+              tasksByDay.putIfAbsent(key, () => []).addAll(entry.value);
+            }
             final tasks = tasksByDay[_selectedDay] ?? const <DriverTask>[];
+
+            // Debug log
+            // ignore: avoid_print
+            print('📅 [Calendar Debug] Driver ID: ${widget.profile.id} | Selected Date: ${_selectedDay.toIso8601String().split('T').first} | Assigned Tasks: ${tasks.length} | All Dates With Tasks: ${tasksByDay.keys.map((k) => k.toIso8601String().split('T').first).toList()}');
 
             return Center(
               child: ConstrainedBox(
@@ -184,7 +194,8 @@ class _WeekCard extends StatelessWidget {
   /// tasks — mirrors the amber/green/gray dots in Weekly_Schedule.png.
   Color? _dotColor(BuildContext context, DateTime day) {
     final theme = Theme.of(context);
-    final tasks = tasksByDay[day] ?? const <DriverTask>[];
+    final key = DateTime(day.year, day.month, day.day);
+    final tasks = tasksByDay[key] ?? const <DriverTask>[];
     if (tasks.isEmpty) return null;
     final hasPickup = tasks.any((t) => t.type == DriverTaskType.pickup);
     final allDone = tasks.every((t) => t.isDone);
