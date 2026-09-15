@@ -1,18 +1,15 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/widgets/app_secondary_header.dart';
+import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/media_image.dart';
 import '../../../models/profile.dart';
-import '../order_providers.dart';
 import '../order_detail_models.dart';
+import '../order_providers.dart';
 import 'order_detail_screen.dart';
 import 'widgets/order_status_chip.dart';
 
-/// Sprint 3 — Driver: 3-tab Deliveries screen.
-/// Tab 1: Pickup Requests (assigned, packed)
-/// Tab 2: Active Deliveries (picked_up, in_transit)
-/// Tab 3: Completed (delivered)
 class DriverDeliveriesScreen extends ConsumerStatefulWidget {
   final Profile profile;
 
@@ -44,45 +41,52 @@ class _DriverDeliveriesScreenState extends ConsumerState<DriverDeliveriesScreen>
     final profileId = widget.profile.id;
 
     return Scaffold(
-      appBar: AppSecondaryHeader(
-        title: 'Deliveries',
-        showBackButton: false,
-        bottom: TabBar(
-          controller: _tabs,
-          isScrollable: true,
-          tabs: const [
-            Tab(text: 'Pickup Requests'),
-            Tab(text: 'Active Deliveries'),
-            Tab(text: 'Completed'),
-          ],
-          labelStyle: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-          unselectedLabelStyle: const TextStyle(fontSize: 13),
-          indicatorSize: TabBarIndicatorSize.tab,
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabs,
+      appBar: AppHeader(profile: widget.profile),
+      body: Column(
         children: [
-          _DeliveryList(
-            key: const ValueKey('driver_pickup'),
-            provider: ref.watch(driverPickupRequestsProvider(profileId)),
-            emptyMessage: 'No pickup requests right now.',
-            emptyIcon: Icons.storefront_outlined,
+          TabBar(
+            controller: _tabs,
+            isScrollable: true,
+            tabs: [
+              Tab(text: 'tab_pickup_requests'.tr()),
+              Tab(text: 'tab_active_deliveries'.tr()),
+              Tab(text: 'tab_completed'.tr()),
+            ],
+            labelStyle: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+            unselectedLabelStyle: const TextStyle(fontSize: 13),
+            indicatorSize: TabBarIndicatorSize.tab,
           ),
-          _DeliveryList(
-            key: const ValueKey('driver_active'),
-            provider: ref.watch(driverActiveDeliveriesProvider(profileId)),
-            emptyMessage: 'No active deliveries in transit.',
-            emptyIcon: Icons.local_shipping_outlined,
-          ),
-          _DeliveryList(
-            key: const ValueKey('driver_completed'),
-            provider: ref.watch(driverCompletedDeliveriesProvider(profileId)),
-            emptyMessage: 'No completed deliveries yet.',
-            emptyIcon: Icons.task_alt_outlined,
+          Expanded(
+            child: TabBarView(
+              controller: _tabs,
+              children: [
+                _DeliveryList(
+                  key: const ValueKey('driver_pickup'),
+                  provider: ref.watch(driverPickupRequestsProvider(profileId)),
+                  emptyMessage: 'empty_pickup_requests'.tr(),
+                  emptyIcon: Icons.storefront_outlined,
+                ),
+                _DeliveryList(
+                  key: const ValueKey('driver_active'),
+                  provider: ref.watch(
+                    driverActiveDeliveriesProvider(profileId),
+                  ),
+                  emptyMessage: 'empty_active_deliveries'.tr(),
+                  emptyIcon: Icons.local_shipping_outlined,
+                ),
+                _DeliveryList(
+                  key: const ValueKey('driver_completed'),
+                  provider: ref.watch(
+                    driverCompletedDeliveriesProvider(profileId),
+                  ),
+                  emptyMessage: 'empty_completed'.tr(),
+                  emptyIcon: Icons.task_alt_outlined,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -108,7 +112,7 @@ class _DeliveryList extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(
         child: Text(
-          'Error loading deliveries:\n$e',
+          'error_loading_deliveries'.tr(namedArgs: {'error': '$e'}),
           textAlign: TextAlign.center,
         ),
       ),
@@ -139,10 +143,52 @@ class _DeliveryList extends ConsumerWidget {
             ),
           );
         }
-        return ListView.builder(
+        return _ResponsiveDeliveryGrid(deliveries: deliveries);
+      },
+    );
+  }
+}
+
+/// Lays [deliveries] out as a single column on narrow (phone) screens,
+/// and as a wrapping multi-column grid as width grows (tablet/desktop/
+/// web). Cards have variable height, so this uses [Wrap] rather than a
+/// [GridView] — no need to force a fixed aspect ratio per tile.
+class _ResponsiveDeliveryGrid extends StatelessWidget {
+  final List<DeliverySummary> deliveries;
+
+  const _ResponsiveDeliveryGrid({required this.deliveries});
+
+  static const _spacing = 12.0;
+  static const _maxTileWidth = 420.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        // 1 column under ~700px (phones), growing by one column per
+        // extra ~420px of width beyond that, capped so tiles never
+        // stretch absurdly thin on ultra-wide screens.
+        final columns = width < 700
+            ? 1
+            : (width / _maxTileWidth).floor().clamp(1, 4);
+        final tileWidth = columns == 1
+            ? width
+            : (width - _spacing * (columns - 1)) / columns;
+
+        return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          itemCount: deliveries.length,
-          itemBuilder: (context, i) => _DeliveryTile(delivery: deliveries[i]),
+          child: Wrap(
+            spacing: _spacing,
+            runSpacing: _spacing,
+            children: [
+              for (final delivery in deliveries)
+                SizedBox(
+                  width: tileWidth,
+                  child: _DeliveryTile(delivery: delivery),
+                ),
+            ],
+          ),
         );
       },
     );
@@ -171,7 +217,6 @@ class _DeliveryTile extends StatelessWidget {
         ),
       ),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,

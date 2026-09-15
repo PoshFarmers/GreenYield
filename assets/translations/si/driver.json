@@ -120,5 +120,13 @@
   "change_locations": "ස්ථාන වෙනස් කරන්න",
   "complete_registration": "ලියාපදිංචිය සම්පූර්ණ කරන්න",
   "required_fields_filled": "අවශ්‍ය ක්ෂේත්‍ර පිරවීම ({count}/3)",
-  "route_selection_mandatory_hint": "ආරම්භක රියදුරු ලියාපදිංචියේදී මාර්ග තේරීම මඟ හැරිය නොහැක"
+  "route_selection_mandatory_hint": "ආරම්භක රියදුරු ලියාපදිංචියේදී මාර්ග තේරීම මඟ හැරිය නොහැක",
+  "deliveries_title": "බෙදාහැරීම්",
+  "tab_pickup_requests": "රැගෙන යාමේ ඉල්ලීම්",
+  "tab_active_deliveries": "සක්‍රීය බෙදාහැරීම්",
+  "tab_completed": "සම්පූර්ණයි",
+  "empty_pickup_requests": "දැනට රැගෙන යාමේ ඉල්ලීම් නොමැත.",
+  "empty_active_deliveries": "සක්‍රීය බෙදාහැරීම් නොමැත.",
+  "empty_completed": "තවම සම්පූර්ණ කළ බෙදාහැරීම් නොමැත.",
+  "error_loading_deliveries": "බෙදාහැරීම් පූරණය කිරීමේ දෝෂයකි:\n{error}"
 }

@@ -53,62 +53,6 @@ class OrderService {
     return result;
   }
 
-  Future<List<DeliverySummary>> _enrichDeliverySummaries(
-    List<DeliverySummary> deliveries,
-  ) async {
-    final result = <DeliverySummary>[];
-    for (final d in deliveries) {
-      final order = d.order;
-      if (_firstImageUrlCache.containsKey(order.id)) {
-        final newOrder = order.copyWith(
-          firstImageUrl: _firstImageUrlCache[order.id],
-        );
-        result.add(
-          DeliverySummary(
-            deliveryId: d.deliveryId,
-            deliveryStatus: d.deliveryStatus,
-            farmerDisplayName: d.farmerDisplayName,
-            buyerDisplayName: d.buyerDisplayName,
-            assignedAt: d.assignedAt,
-            pickedUpAt: d.pickedUpAt,
-            deliveredAt: d.deliveredAt,
-            order: newOrder,
-          ),
-        );
-      } else {
-        String? resolvedImg;
-        try {
-          final detail = await fetchOrderDetailFromServer(order.id);
-          if (detail != null && detail.items.isNotEmpty) {
-            final img = detail.items.first.imageUrl;
-            if (img != null && img.isNotEmpty) {
-              resolvedImg = img;
-            }
-          }
-        } catch (_) {}
-
-        resolvedImg ??= order.firstImageUrl;
-        if (resolvedImg != null && resolvedImg.isNotEmpty) {
-          _firstImageUrlCache[order.id] = resolvedImg;
-        }
-        final newOrder = order.copyWith(firstImageUrl: resolvedImg);
-        result.add(
-          DeliverySummary(
-            deliveryId: d.deliveryId,
-            deliveryStatus: d.deliveryStatus,
-            farmerDisplayName: d.farmerDisplayName,
-            buyerDisplayName: d.buyerDisplayName,
-            assignedAt: d.assignedAt,
-            pickedUpAt: d.pickedUpAt,
-            deliveredAt: d.deliveredAt,
-            order: newOrder,
-          ),
-        );
-      }
-    }
-    return result;
-  }
-
   // =========================================================================
   // Stream queries — PowerSync local mirror
   // =========================================================================
@@ -221,59 +165,115 @@ class OrderService {
   Stream<List<DeliverySummary>> watchDeliveriesForDriver({
     required String driverProfileId,
     required List<String> deliveryStatuses,
-  }) {
-    final placeholders = List.filled(deliveryStatuses.length, '?').join(', ');
-    return db
-        .watch(
-          '''
-          SELECT
-            d.id           AS delivery_id,
-            d.status       AS delivery_status,
-            COALESCE(p_farmer.first_name || ' ' || p_farmer.last_name, d.farmer_display_name) AS farmer_display_name,
-            COALESCE(p_buyer.first_name || ' ' || p_buyer.last_name, d.buyer_display_name) AS buyer_display_name,
-            d.assigned_at,
-            d.picked_up_at,
-            d.delivered_at,
-            o.id           AS order_id,
-            o.checkout_group_id,
-            o.status       AS order_status,
-            o.total_amount,
-            o.placed_at,
-            o.order_date,
-            (SELECT SUM(quantity_kg) FROM order_item oi WHERE oi.order_id = o.id) AS total_quantity,
-            (
-              SELECT GROUP_CONCAT(oi2.crop_name, ', ')
-              FROM (
-                SELECT c.name AS crop_name
-                FROM order_item oi
-                JOIN crop c ON c.id = oi.crop_id
-                WHERE oi.order_id = o.id
-                LIMIT 3
-              ) oi2
-            ) AS crop_names,
-            (
-              SELECT COALESCE(pl.image_url, fc.image_url, c.fallback_image_url)
-              FROM order_item oi
-              JOIN crop c ON c.id = oi.crop_id
-              LEFT JOIN produce_listing pl ON pl.id = oi.produce_listing_id
-              LEFT JOIN farmer_crop fc ON fc.farmer_profile_id = o.farmer_profile_id AND fc.crop_id = oi.crop_id
-              WHERE oi.order_id = o.id
-              LIMIT 1
-            ) AS first_image_url
-          FROM delivery d
-          JOIN delivery_assignment da
-               ON da.delivery_id = d.id AND da.is_current = 1
-          JOIN orders o ON o.id = d.order_id
-          LEFT JOIN profile p_farmer ON p_farmer.id = o.farmer_profile_id
-          LEFT JOIN profile p_buyer ON p_buyer.id = o.buyer_profile_id
-          WHERE da.driver_profile_id = ?
-            AND d.status IN ($placeholders)
-          ORDER BY d.assigned_at DESC
-          ''',
-          parameters: [driverProfileId, ...deliveryStatuses],
-        )
-        .map((rows) => rows.map(DeliverySummary.fromMap).toList())
-        .asyncMap(_enrichDeliverySummaries);
+  }) async* {
+    Future<List<DeliverySummary>> fetchDeliveries() async {
+      final response = await supabase
+          .from('delivery_assignment')
+          .select('''
+            delivery:delivery_id (
+              id,
+              status,
+              assigned_at,
+              picked_up_at,
+              delivered_at,
+              farmer_display_name,
+              buyer_display_name,
+              order:order_id (
+                id,
+                checkout_group_id,
+                status,
+                total_amount,
+                placed_at,
+                order_date,
+                farmer_profile_id,
+                buyer_profile_id,
+                order_item (
+                  quantity_kg,
+                  produce_listing_id,
+                  crop:crop_id (
+                    name,
+                    fallback_image_url
+                  )
+                )
+              )
+            )
+          ''')
+          .eq('driver_profile_id', driverProfileId)
+          .eq('is_current', true);
+
+      final list = <DeliverySummary>[];
+      for (final raw in (response as List)) {
+        final d = raw['delivery'] as Map<String, dynamic>?;
+        if (d == null) continue;
+
+        final dStatus = d['status'] as String? ?? '';
+        if (!deliveryStatuses.contains(dStatus)) continue;
+
+        final o = d['order'] as Map<String, dynamic>?;
+        if (o == null) continue;
+
+        final farmerName = d['farmer_display_name'] as String?;
+        final buyerName = d['buyer_display_name'] as String?;
+
+        final items = (o['order_item'] as List?) ?? [];
+        double totalQty = 0;
+        final cropNamesSet = <String>{};
+        String? firstImg;
+
+        for (final item in items) {
+          final itemMap = item as Map<String, dynamic>;
+          final qty = (itemMap['quantity_kg'] as num?)?.toDouble() ?? 0;
+          totalQty += qty;
+
+          final crop = itemMap['crop'] as Map<String, dynamic>?;
+          if (crop != null) {
+            if (crop['name'] != null) {
+              cropNamesSet.add(crop['name'] as String);
+            }
+            if (firstImg == null && crop['fallback_image_url'] != null) {
+              firstImg = crop['fallback_image_url'] as String;
+            }
+          }
+        }
+
+        final orderSummary = OrderSummary(
+          id: o['id'] as String,
+          checkoutGroupId: o['checkout_group_id'] as String,
+          status: OrderStatus.fromDb(o['status'] as String?),
+          totalAmount: (o['total_amount'] as num).toDouble(),
+          totalQuantity: totalQty,
+          counterpartName: farmerName ?? buyerName ?? '',
+          cropNames: cropNamesSet.toList(),
+          firstImageUrl: firstImg,
+          placedAt: DateTime.parse(o['placed_at'] as String),
+          orderDate: o['order_date'] != null
+              ? DateTime.tryParse(o['order_date'] as String)
+              : null,
+        );
+
+        list.add(
+          DeliverySummary(
+            deliveryId: d['id'] as String,
+            deliveryStatus: DeliveryStatus.fromDb(dStatus),
+            farmerDisplayName: farmerName,
+            buyerDisplayName: buyerName,
+            assignedAt: d['assigned_at'] != null
+                ? DateTime.parse(d['assigned_at'] as String)
+                : null,
+            pickedUpAt: d['picked_up_at'] != null
+                ? DateTime.parse(d['picked_up_at'] as String)
+                : null,
+            deliveredAt: d['delivered_at'] != null
+                ? DateTime.parse(d['delivered_at'] as String)
+                : null,
+            order: orderSummary,
+          ),
+        );
+      }
+      return list;
+    }
+
+    yield await fetchDeliveries();
   }
 
   /// Watch the full detail of a single order.
