@@ -53,6 +53,10 @@ final Map<String, TableConfig> tableRegistry = {
   // --- Farmer rating & reviews ---
   'farmer_review': const TableConfig(tableName: 'farmer_review'),
 
+  // --- Driver dispatch: nearest-driver auto-assignment at checkout ---
+  'delivery': const TableConfig(tableName: 'delivery'),
+  'delivery_assignment': const TableConfig(tableName: 'delivery_assignment'),
+
   // --- add new tables here as wallet lands ---
   // 'listing': TableConfig(tableName: 'listing', remotePkColumn: 'id'),
 };

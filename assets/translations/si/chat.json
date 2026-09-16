@@ -15,5 +15,10 @@
   "failed_to_load_chats": "සංවාද පූරණය කළ නොහැක.",
   "failed_to_send_message": "පණිවිඩය යැවීමට අසමත් විය. නැවත උත්සාහ කරන්න.",
   "retry": "නැවත උත්සාහ කරන්න",
-  "you": "ඔබ"
+  "you": "ඔබ",
+  "filter_all": "සියල්ල",
+  "filter_unread": "නොකියවූ",
+  "role_farmers": "ගොවීන්",
+  "role_buyers": "ගැනුම්කරුවන්",
+  "role_drivers": "රියදුරන්"
 }

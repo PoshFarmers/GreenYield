@@ -9,10 +9,13 @@ import '../../../../core/widgets/avatar_image.dart';
 import '../../../../features/navigation/presentation/app_nav_shell.dart';
 import '../../../../models/driver_profile.dart';
 import '../../../../models/profile.dart';
+import '../../../../models/wallet.dart';
+import '../../../wallet/wallet_service.dart';
 import '../driver_profile_service.dart';
 import 'driver_manage_routes_screen.dart';
 import 'driver_profile_edit_screen.dart';
 import 'widgets/route_draft_editor.dart'; // weekdayKeys, RouteDayPill
+import '../../../wallet/presentation/wallet_screen.dart';
 
 /// Driver's profile screen — mirrors the Figma "Profile" design.
 ///
@@ -214,7 +217,7 @@ class _ProfileBody extends ConsumerWidget {
               const SizedBox(height: 20),
               const _StatsCard(),
               const SizedBox(height: 16),
-              const _WalletCard(),
+              _WalletCard(profileId: driverProfile.profileId),
               const SizedBox(height: 24),
               _VehiclesSection(vehicle: vehicle, onEdit: onEditVehicle),
               const SizedBox(height: 24),
@@ -501,13 +504,13 @@ class _StatItem extends StatelessWidget {
 // --- Wallet card --------------------------------------------------------
 
 class _WalletCard extends StatelessWidget {
-  const _WalletCard();
+  final String profileId;
+
+  const _WalletCard({required this.profileId});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Placeholder — no wallet backend/provider yet (features/wallet is
-    // still an empty stub).
     return _CardShell(
       child: Row(
         children: [
@@ -533,16 +536,32 @@ class _WalletCard extends StatelessWidget {
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
-                Text(
-                  'LKR 28,400',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                StreamBuilder<Wallet?>(
+                  stream: const WalletService().watchBalance(profileId),
+                  builder: (context, snapshot) {
+                    final wallet = snapshot.data;
+                    final text = wallet == null
+                        ? '${'LKR'} 0.00'
+                        : '${wallet.currency} ${wallet.balance.toStringAsFixed(2)}';
+                    return Text(
+                      text,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
           ),
-          TextButton(onPressed: () {}, child: Text('view'.tr())),
+          TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => WalletScreen(profileId: profileId),
+              ),
+            ),
+            child: Text('view'.tr()),
+          ),
         ],
       ),
     );

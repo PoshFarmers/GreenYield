@@ -100,6 +100,26 @@ class MarketplaceListing {
     );
   }
 
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'farmer_profile_id': farmerProfileId,
+    'farmer_name': farmerName,
+    'farmer_avatar_url': farmerAvatarUrl,
+    'farmer_location_text': farmerLocationText,
+    'crop_id': cropId,
+    'crop_name': cropName,
+    'crop_category': cropCategory,
+    'listing_image_url': listingImageUrl,
+    'farmer_crop_image_url': farmerCropImageUrl,
+    'crop_fallback_image_url': cropFallbackImageUrl,
+    'description': description,
+    'price_per_kg': pricePerKg,
+    'available_quantity_kg': availableQuantityKg,
+    'harvested_on': harvestedOn?.toIso8601String(),
+    'published_at': publishedAt?.toIso8601String(),
+    'distance_km': distanceKm,
+  };
+
   static double? _toDouble(dynamic value) {
     if (value == null) return null;
     if (value is num) return value.toDouble();

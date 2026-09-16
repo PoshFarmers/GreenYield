@@ -9,6 +9,7 @@ import '../../../core/widgets/avatar_image.dart';
 import '../../../models/marketplace_listing.dart';
 import '../../../models/profile.dart';
 import '../marketplace_service.dart';
+import '../marketplace_cache.dart';
 import 'listing_detail_screen.dart';
 import 'produce_card.dart';
 
@@ -55,6 +56,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
   static const _debounce = Duration(milliseconds: 350);
 
   final _service = const MarketplaceService();
+  final _cache = MarketplaceCache();
+  bool _isShowingCachedData = false;
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
 
@@ -110,6 +113,12 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
       _errorMessage = null;
     });
 
+    final cacheKey = _cache.keyFor(
+      query: _query,
+      category: _category,
+      farmerId: _farmerFilter?.farmerProfileId,
+    );
+
     try {
       if (_tab == _MarketTab.produce) {
         final results = await _service.search(
@@ -124,7 +133,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
           _listings = results;
           _hasMore = results.length == _pageSize;
           _isLoading = false;
+          _isShowingCachedData = false;
         });
+        unawaited(_cache.save(cacheKey, results));
       } else {
         final farmers = await _service.farmers(
           buyerLocation: widget.profile.locationPoint,
@@ -137,6 +148,20 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
         });
       }
     } catch (e) {
+      if (_tab == _MarketTab.produce) {
+        final cached = await _cache.load(cacheKey);
+        if (!mounted) return;
+        if (cached != null && cached.isNotEmpty) {
+          setState(() {
+            _listings = cached;
+            _hasMore = false;
+            _isLoading = false;
+            _isShowingCachedData = true;
+            _errorMessage = null;
+          });
+          return;
+        }
+      }
       if (!mounted) return;
       setState(() {
         _errorMessage = e.toString();
@@ -414,6 +439,10 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           sliver: SliverList.list(
             children: [
+              if (_isShowingCachedData) ...[
+                const _OfflineCachedBanner(),
+                const SizedBox(height: 12),
+              ],
               _EvenSegments(
                 selected: _category,
                 onSelected: _setCategory,
@@ -1029,6 +1058,40 @@ class _SortOptionTile extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _OfflineCachedBanner extends StatelessWidget {
+  const _OfflineCachedBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.tertiaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.cloud_off_outlined,
+            size: 18,
+            color: theme.colorScheme.onTertiaryContainer,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'showing_saved_results_offline'.tr(),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onTertiaryContainer,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

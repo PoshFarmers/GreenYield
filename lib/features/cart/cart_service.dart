@@ -73,12 +73,12 @@ class CartService {
         .map((rows) => rows.map(CartLineItem.fromMap).toList());
   }
 
-  /// Total item count across the whole cart — for a nav-bar badge.
+  /// Total unique item count across the whole cart — for a nav-bar badge.
   Stream<double> watchItemCount(String buyerProfileId) {
     return db
         .watch(
           '''
-      SELECT COALESCE(SUM(ci.quantity_kg), 0) AS total
+      SELECT COUNT(ci.id) AS total
       FROM cart_item ci
       JOIN cart c2 ON c2.id = ci.cart_id
       WHERE c2.buyer_profile_id = ?

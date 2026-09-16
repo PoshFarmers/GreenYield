@@ -15,5 +15,10 @@
   "failed_to_load_chats": "Couldn't load your conversations.",
   "failed_to_send_message": "Message failed to send. Try again.",
   "retry": "Retry",
-  "you": "You"
+  "you": "You",
+  "filter_all": "All",
+  "filter_unread": "Unread",
+  "role_farmers": "Farmers",
+  "role_buyers": "Buyers",
+  "role_drivers": "Drivers"
 }

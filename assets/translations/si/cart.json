@@ -11,5 +11,9 @@
   "cart_item_sold_out": "විකුණා අවසන්",
   "cart_item_unavailable": "තවදුරටත් නොමැත",
   "cart_item_only_x_left": "තොගයේ ඉතිරිව ඇත්තේ කිලෝ {qty} පමණි",
-  "cart_has_unavailable_items": "ඔබේ කරත්තයේ ඇති සමහර අයිතම තවදුරටත් නොමැති අතර ඒවා පිටවීමේදී ඇතුළත් නොවේ."
+  "cart_has_unavailable_items": "ඔබේ කරත්තයේ ඇති සමහර අයිතම තවදුරටත් නොමැති අතර ඒවා පිටවීමේදී ඇතුළත් නොවේ.",
+  "cart_order_date_label": "බෙදාහැරීමේ දිනය",
+  "cart_order_date_hint": "ඔබේ ඇණවුම ලැබීමට අවශ්‍ය දිනය තෝරන්න",
+  "cart_order_date_not_selected": "දිනයක් තෝරා නොමැත",
+  "cart_select_order_date_first": "ඉදිරියට යාමට පෙර බෙදාහැරීමේ දිනයක් තෝරන්න."
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../models/driver_task.dart';
 import '../../../models/profile.dart';
+import '../driver_schedule_service.dart';
 
 /// Short month-name translation keys, indexed 1..12 (index 0 unused),
 /// so the week-range/day headers never hardcode English month names.
@@ -34,9 +35,10 @@ const _monthShortKeys = [
 /// phones) and theme/locale-aware throughout — no hardcoded colors or
 /// user-facing strings.
 ///
-/// Data is placeholder ([sampleDriverTasksFor]) until a real
-/// delivery/pickup table exists in the schema — see that file's doc
-/// comment for the swap-in plan.
+/// Backed by [DriverScheduleService], which streams the driver's real
+/// assigned deliveries from PowerSync (see that file's doc comment) —
+/// [sampleDriverTasksFor] is kept only as an empty-state/demo fallback
+/// for other call sites, not used here anymore.
 class DriverCalendarScreen extends StatefulWidget {
   final Profile profile;
 
@@ -49,6 +51,9 @@ class DriverCalendarScreen extends StatefulWidget {
 class _DriverCalendarScreenState extends State<DriverCalendarScreen> {
   late DateTime _weekStart;
   late DateTime _selectedDay;
+  final _scheduleService = DriverScheduleService();
+  late final Stream<Map<DateTime, List<DriverTask>>> _tasksByDay =
+      _scheduleService.watchTasksForDriver(widget.profile.id);
 
   static const _weekdayShortKeys = [
     'day_short_mon',
@@ -89,54 +94,76 @@ class _DriverCalendarScreenState extends State<DriverCalendarScreen> {
     final hPad = width < 360 ? 12.0 : 16.0;
 
     final weekDays = List.generate(7, (i) => _weekStart.add(Duration(days: i)));
-    final tasks = sampleDriverTasksFor(_selectedDay);
 
     return Scaffold(
       appBar: AppHeader(profile: widget.profile),
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxWidth),
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 24),
-              children: [
-                Text(
-                  'weekly_schedule'.tr(),
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'manage_deliveries_pickups'.tr(),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                _WeekCard(
-                  weekDays: weekDays,
-                  selectedDay: _selectedDay,
-                  weekdayShortKeys: _weekdayShortKeys,
-                  onPrevWeek: () => _shiftWeek(-1),
-                  onNextWeek: () => _shiftWeek(1),
-                  onSelectDay: _selectDay,
-                ),
-                const SizedBox(height: 24),
-                _DayTasksHeader(day: _selectedDay, taskCount: tasks.length),
-                const SizedBox(height: 12),
-                if (tasks.isEmpty)
-                  _EmptyDayCard(theme: theme)
-                else
-                  ...tasks.map(
-                    (task) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _TaskCard(task: task),
+        child: StreamBuilder<Map<DateTime, List<DriverTask>>>(
+          stream: _tasksByDay,
+          builder: (context, snapshot) {
+            final rawTasksByDay = snapshot.data ?? const {};
+            final tasksByDay = <DateTime, List<DriverTask>>{};
+            for (final entry in rawTasksByDay.entries) {
+              final d = entry.key;
+              final key = DateTime(d.year, d.month, d.day);
+              tasksByDay.putIfAbsent(key, () => []).addAll(entry.value);
+            }
+            final tasks = tasksByDay[_selectedDay] ?? const <DriverTask>[];
+
+            // Debug log
+            // ignore: avoid_print
+            print(
+              '📅 [Calendar Debug] Driver ID: ${widget.profile.id} | Selected Date: ${_selectedDay.toIso8601String().split('T').first} | Assigned Tasks: ${tasks.length} | All Dates With Tasks: ${tasksByDay.keys.map((k) => k.toIso8601String().split('T').first).toList()}',
+            );
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 24),
+                  children: [
+                    Text(
+                      'weekly_schedule'.tr(),
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-              ],
-            ),
-          ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'manage_deliveries_pickups'.tr(),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _WeekCard(
+                      weekDays: weekDays,
+                      selectedDay: _selectedDay,
+                      weekdayShortKeys: _weekdayShortKeys,
+                      tasksByDay: tasksByDay,
+                      onPrevWeek: () => _shiftWeek(-1),
+                      onNextWeek: () => _shiftWeek(1),
+                      onSelectDay: _selectDay,
+                    ),
+                    const SizedBox(height: 24),
+                    _DayTasksHeader(day: _selectedDay, taskCount: tasks.length),
+                    const SizedBox(height: 12),
+                    if (tasks.isEmpty)
+                      _EmptyDayCard(theme: theme)
+                    else
+                      ...tasks.map(
+                        (task) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _TaskCard(task: task),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -147,6 +174,7 @@ class _WeekCard extends StatelessWidget {
   final List<DateTime> weekDays;
   final DateTime selectedDay;
   final List<String> weekdayShortKeys;
+  final Map<DateTime, List<DriverTask>> tasksByDay;
   final VoidCallback onPrevWeek;
   final VoidCallback onNextWeek;
   final ValueChanged<DateTime> onSelectDay;
@@ -155,6 +183,7 @@ class _WeekCard extends StatelessWidget {
     required this.weekDays,
     required this.selectedDay,
     required this.weekdayShortKeys,
+    required this.tasksByDay,
     required this.onPrevWeek,
     required this.onNextWeek,
     required this.onSelectDay,
@@ -163,12 +192,12 @@ class _WeekCard extends StatelessWidget {
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
-  /// Deterministic placeholder "load" dot color per day, standing in for
-  /// a real task-count aggregate — mirrors the amber/green/gray dots in
-  /// Weekly_Schedule.png. Swapped for real data alongside driver_task.dart.
+  /// "Load" dot color per day, driven by that day's real assigned
+  /// tasks — mirrors the amber/green/gray dots in Weekly_Schedule.png.
   Color? _dotColor(BuildContext context, DateTime day) {
     final theme = Theme.of(context);
-    final tasks = sampleDriverTasksFor(day);
+    final key = DateTime(day.year, day.month, day.day);
+    final tasks = tasksByDay[key] ?? const <DriverTask>[];
     if (tasks.isEmpty) return null;
     final hasPickup = tasks.any((t) => t.type == DriverTaskType.pickup);
     final allDone = tasks.every((t) => t.isDone);

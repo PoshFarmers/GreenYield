@@ -27,7 +27,15 @@ enum _PaymentMethod { wallet, card }
 class CheckoutScreen extends StatefulWidget {
   final Profile buyerProfile;
 
-  const CheckoutScreen({super.key, required this.buyerProfile});
+  /// Buyer-selected delivery date passed from [CartScreen].
+  /// Editable on this screen via the "Change" button.
+  final DateTime orderDate;
+
+  const CheckoutScreen({
+    super.key,
+    required this.buyerProfile,
+    required this.orderDate,
+  });
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -47,16 +55,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   _PaymentMethod _paymentMethod = _PaymentMethod.wallet;
   Address? _deliveryAddress;
 
+  /// The delivery date. Initialised from [widget.orderDate], editable here.
+  late DateTime _orderDate;
+
   /// produceListingId -> enrichment, same best-effort pattern as the
   /// cart screen — only used here to label each group with a farmer
   /// name instead of a raw id.
   final Map<String, MarketplaceListing> _enrichment = {};
+  CheckoutSummary? _summary;
 
   String get _buyerProfileId => widget.buyerProfile.id;
 
   @override
   void initState() {
     super.initState();
+    _orderDate = widget.orderDate;
     _deliveryAddress = widget.buyerProfile.address;
     _sub = _cartService.watchCartItems(_buyerProfileId).listen((items) {
       if (!mounted) return;
@@ -65,6 +78,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _isLoading = false;
       });
       _enrichMissing(items);
+      if (items.isEmpty) {
+        setState(() => _summary = const CheckoutSummary(subOrders: []));
+      }
     });
   }
 
@@ -82,7 +98,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     for (final id in missingIds) {
       try {
-        final listing = await _marketplaceService.getListing(id);
+        final listing = await _marketplaceService.getListing(
+          id,
+          buyerLocation: widget.buyerProfile.locationPoint,
+        );
         if (!mounted) return;
         if (listing != null) {
           setState(() => _enrichment[id] = listing);
@@ -92,6 +111,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // label, same as the cart screen.
       }
     }
+    unawaited(_recomputeSummary());
+  }
+
+  Future<void> _recomputeSummary() async {
+    final distances = <String, double?>{};
+    for (final entry in _enrichment.entries) {
+      distances[entry.value.farmerProfileId] = entry.value.distanceKm;
+    }
+    final summary = await _checkoutService.buildSummary(
+      _items,
+      farmerDistanceKm: distances,
+    );
+    if (!mounted) return;
+    setState(() => _summary = summary);
   }
 
   List<CartFarmerGroup> get _groups {
@@ -131,6 +164,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         buyerProfile: widget.buyerProfile.copyWith(address: _deliveryAddress),
         items: _items,
         paymentMethod: _paymentMethod.name,
+        orderDate: _orderDate,
         requestId: _checkoutRequestId ??= const Uuid().v4(),
       );
       if (!mounted) return;
@@ -257,6 +291,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  Future<void> _changeOrderDate(BuildContext context) async {
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    final firstDate = DateTime(tomorrow.year, tomorrow.month, tomorrow.day);
+    final lastDate = DateTime.now().add(const Duration(days: 90));
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _orderDate.isBefore(firstDate) ? firstDate : _orderDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+    );
+    if (picked != null && mounted) {
+      setState(() => _orderDate = picked);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -281,8 +331,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildContent(BuildContext context) {
     final theme = Theme.of(context);
-    final summary = _checkoutService.buildSummary(_items);
+    final summary = _summary;
     final groups = _groups;
+    if (summary == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return Column(
       children: [
@@ -294,6 +347,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 profile: widget.buyerProfile,
                 address: _deliveryAddress ?? const Address(),
                 onEdit: () => _showAddressEditSheet(context),
+              ),
+              const SizedBox(height: 16),
+              // Order date card — editable with same date restrictions as cart.
+              _OrderDateCard(
+                orderDate: _orderDate,
+                onChangeDate: () => _changeOrderDate(context),
               ),
               const SizedBox(height: 16),
               _SectionHeader(title: 'order_summary'.tr()),
@@ -421,6 +480,67 @@ class _DeliveryDetailsCard extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Card showing the selected order delivery date in the checkout Order Summary.
+/// The "Change" button re-opens the date picker with the same constraints
+/// (tomorrow or later) used on the cart screen.
+class _OrderDateCard extends StatelessWidget {
+  final DateTime orderDate;
+  final VoidCallback onChangeDate;
+
+  const _OrderDateCard({required this.orderDate, required this.onChangeDate});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final formatted = DateFormat.yMMMMd(context.locale.toString())
+        .format(orderDate);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.5),
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.calendar_month_outlined,
+            size: 20,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'order_date'.tr(),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  formatted,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(onPressed: onChangeDate, child: Text('change_date'.tr())),
         ],
       ),
     );

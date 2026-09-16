@@ -5,75 +5,70 @@ import 'package:uuid/uuid.dart';
 import '../../core/supabase/client.dart';
 import '../../models/cart_item.dart';
 import '../../models/profile.dart';
+import '../pricing/delivery_fee_service.dart';
 import 'order_models.dart';
 
-/// Sprint 2 — Task 3.2: Order Creation & Checkout Flow.
-///
-/// Cart reads remain local-first, but order creation is performed by the
-/// authenticated Supabase `place_checkout` RPC so validation, stock changes,
-/// order rows, and payment rows share one server transaction.
-///
-/// There is no `sub_orders` table server-side (see
-/// `supabase/migrations/20260827093223_orders.sql`): a multi-farmer
-/// checkout is represented as one `orders` row *per farmer*, all
-/// sharing the same `checkout_group_id`. That shared id is what lets
-/// the UI treat "one checkout" as a single unit even though each
-/// farmer's slice is its own order/payment row under the hood, e.g.
-/// for independent status tracking per farmer later.
-///
-/// `delivery_fee_amount` and tax are hardcoded for now (Sprint 2 scope
-/// doesn't include live delivery pricing yet — that's `pricing_rule`,
-/// wired up in a later sprint). Because `orders` has no separate tax
-/// column, tax is folded into `total_amount` and simply broken out as
-/// its own line in the UI for transparency.
+/// Order Creation & Checkout Flow.
 class CheckoutService {
   static const _uuid = Uuid();
 
-  /// Flat delivery fee charged per farmer sub-order (LKR), until
-  /// `pricing_rule` is wired up for real distance-based delivery
-  /// pricing.
-  static const double flatDeliveryFeePerSubOrder = 0;
-
-  /// Flat tax rate applied to each farmer's subtotal, until proper
-  /// tax handling lands.
+  /// Flat tax rate applied to each farmer's subtotal.
   static const double taxRate = 0.02;
 
   const CheckoutService();
 
-  /// Splits [items] into one [CheckoutSubOrder] per farmer and computes
-  /// the same subtotal/fee/tax/total breakdown [placeOrder] will
-  /// actually charge — so the checkout screen can render an accurate
-  /// price breakdown before the buyer taps "Place Order".
-  CheckoutSummary buildSummary(List<CartLineItem> items) {
+  /// Splits [items] into one [CheckoutSubOrder] per farmer and
+  /// estimates the same delivery-fee formula place_checkout will
+  /// actually charge — via [DeliveryFeeService], using [farmerDistanceKm]
+  /// (farmerProfileId -> distance from the buyer) supplied by the
+  /// caller from whatever marketplace enrichment it already has on
+  /// hand. Falls back to an unknown/0 fee per farmer when no distance
+  /// is available yet, same as PriceBreakdownCard's fallback.
+  Future<CheckoutSummary> buildSummary(
+    List<CartLineItem> items, {
+    Map<String, double?> farmerDistanceKm = const {},
+  }) async {
     final byFarmer = <String, List<CartLineItem>>{};
     for (final item in items) {
       byFarmer.putIfAbsent(item.farmerProfileId, () => []).add(item);
     }
 
-    final subOrders = byFarmer.entries.map((entry) {
+    final deliveryFeeService = const DeliveryFeeService();
+    final subOrders = <CheckoutSubOrder>[];
+
+    for (final entry in byFarmer.entries) {
       final subtotal = entry.value.fold<double>(
         0,
         (sum, item) => sum + item.lineTotal,
       );
       final tax = subtotal * taxRate;
-      return CheckoutSubOrder(
-        farmerProfileId: entry.key,
-        items: entry.value,
-        subtotal: subtotal,
-        deliveryFee: flatDeliveryFeePerSubOrder,
-        tax: tax,
+      final fee =
+          await deliveryFeeService.estimateFee(farmerDistanceKm[entry.key]) ??
+          0;
+      subOrders.add(
+        CheckoutSubOrder(
+          farmerProfileId: entry.key,
+          items: entry.value,
+          subtotal: subtotal,
+          deliveryFee: fee,
+          tax: tax,
+        ),
       );
-    }).toList();
+    }
 
     return CheckoutSummary(subOrders: subOrders);
   }
 
   /// Creates one order per farmer through the server-side checkout
-  /// transaction. The RPC also clears the submitted cart items.
+  /// transaction. The RPC computes the real delivery fee itself
+  /// (calculate_delivery_fee) — this client-side [buildSummary] is
+  /// only a preview and may differ slightly if a location changed
+  /// between preview and confirm; the RPC's number is authoritative.
   Future<PlacedOrderGroup> placeOrder({
     required Profile buyerProfile,
     required List<CartLineItem> items,
     required String paymentMethod, // 'wallet' | 'card'
+    required DateTime orderDate,
     String? requestId,
   }) async {
     if (items.isEmpty) {
@@ -101,12 +96,11 @@ class CheckoutService {
         'p_delivery_address': buyerProfile.address.isEmpty
             ? null
             : buyerProfile.address.toMap(),
+        'p_order_date':
+            '${orderDate.year.toString().padLeft(4, '0')}-'
+            '${orderDate.month.toString().padLeft(2, '0')}-'
+            '${orderDate.day.toString().padLeft(2, '0')}',
       },
-    );
-
-    developer.log(
-      'place_checkout RPC response type: ${response.runtimeType}',
-      name: 'GreenYield.CheckoutService',
     );
 
     if (response == null) {
@@ -118,6 +112,11 @@ class CheckoutService {
         .map((order) => Map<String, dynamic>.from(order as Map))
         .toList();
 
+    final rawOrderDate = result['order_date'];
+    final parsedOrderDate = rawOrderDate is String
+        ? DateTime.tryParse(rawOrderDate) ?? orderDate
+        : orderDate;
+
     return PlacedOrderGroup(
       checkoutGroupId: result['checkout_group_id'] as String,
       orderIds: orderData.map((order) => order['order_id'] as String).toList(),
@@ -126,6 +125,7 @@ class CheckoutService {
       ),
       placedAt: DateTime.parse(result['placed_at'] as String),
       deliveryAddress: buyerProfile.address,
+      orderDate: parsedOrderDate,
     );
   }
 
@@ -156,9 +156,6 @@ class CheckoutService {
     );
   }
 
-  /// Supabase RPC returns PostgreSQL `numeric` columns as JSON strings
-  /// (e.g. "5.00") rather than JSON numbers to preserve decimal precision.
-  /// This helper handles both forms so the caller doesn't crash.
   double _toDouble(dynamic value) {
     if (value == null) return 0.0;
     if (value is num) return value.toDouble();

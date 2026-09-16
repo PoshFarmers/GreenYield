@@ -28,5 +28,7 @@
   "return_to_marketplace": "වෙළඳපොළට ආපසු යන්න",
   "orders_placed_count": "ඔබේ ගොවීන් සමඟ ඇණවුම් {count}ක් තබන ලදී",
   "edit_address_coming_soon": "බෙදාහැරීමේ ලිපිනය සංස්කරණය කිරීම ඉක්මනින් එනවා.",
-  "track_order_coming_soon": "ඇණවුම් නිරීක්ෂණය ඉක්මනින් එනවා."
+  "track_order_coming_soon": "ඇණවුම් නිරීක්ෂණය ඉක්මනින් එනවා.",
+  "order_date": "බෙදාහැරීමේ දිනය",
+  "change_date": "වෙනස් කරන්න"
 }

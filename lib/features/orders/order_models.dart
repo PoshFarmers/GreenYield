@@ -46,12 +46,17 @@ class PlacedOrderGroup {
   final DateTime placedAt;
   final Address deliveryAddress;
 
+  /// The buyer-selected delivery date (always tomorrow or later).
+  /// Stored in `orders.order_date` on the server side.
+  final DateTime orderDate;
+
   const PlacedOrderGroup({
     required this.checkoutGroupId,
     required this.orderIds,
     required this.summary,
     required this.placedAt,
     required this.deliveryAddress,
+    required this.orderDate,
   });
 
   /// Short, human-friendly id for display — the full
