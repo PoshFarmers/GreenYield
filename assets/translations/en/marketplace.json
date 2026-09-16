@@ -47,5 +47,6 @@
   "estimated_delivery_fee": "Estimated delivery fee",
   "estimated_total": "Estimated total",
   "delivery_fee_unknown": "Calculated at checkout",
-  "delivery_fee_unknown_hint": "We don't have enough location data yet to estimate delivery cost."
+  "delivery_fee_unknown_hint": "We don't have enough location data yet to estimate delivery cost.",
+  "showing_saved_results_offline": "You're offline — showing your last saved results"
 }
