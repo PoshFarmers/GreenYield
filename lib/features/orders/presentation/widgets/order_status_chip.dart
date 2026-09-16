@@ -78,9 +78,17 @@ class OrderStatusChip extends StatelessWidget {
           Icons.directions_car_outlined,
         );
       case OrderStatus.delivered:
-        return (cs.primaryContainer, cs.primary, Icons.check_circle_outline);
+        return (
+          const Color(0xFFE8F5E9),
+          const Color(0xFF1B5E20),
+          Icons.verified_outlined,
+        );
       case OrderStatus.completed:
-        return (cs.primaryContainer, cs.primary, Icons.verified_outlined);
+        return (
+          const Color(0xFFE8F5E9),
+          const Color(0xFF1B5E20),
+          Icons.verified_outlined,
+        );
       case OrderStatus.cancelled:
         return (cs.errorContainer, cs.error, Icons.cancel_outlined);
     }

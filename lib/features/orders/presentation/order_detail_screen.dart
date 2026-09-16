@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/supabase/client.dart';
 import '../../../core/widgets/app_secondary_header.dart';
+import '../../chat/chat_service.dart';
+import '../../chat/presentation/chat_screen.dart';
+import '../../navigation/presentation/app_nav_shell.dart';
 import '../order_providers.dart';
 import '../order_service.dart';
 import '../order_detail_models.dart';
@@ -28,6 +32,47 @@ class OrderDetailScreen extends ConsumerStatefulWidget {
 class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
   final _service = const OrderService();
   bool _isLoadingAction = false;
+
+  Future<void> _openChat({
+    required String targetUserId,
+    required String targetRole,
+    required String targetName,
+  }) async {
+    if (targetUserId.isEmpty) return;
+    final callerRole = widget.viewerRole;
+    final currentUserId = supabase.auth.currentUser?.id;
+    if (currentUserId == null) return;
+
+    try {
+      const chatService = ChatService();
+      final conversationId = await chatService.getOrCreateConversation(
+        callerRole: callerRole,
+        otherUserId: targetUserId,
+        otherRole: targetRole,
+      );
+      if (!mounted) return;
+
+      final navigator = Navigator.of(context);
+      navigator.popUntil((route) => route.isFirst);
+      ref.read(navShellIndexProvider.notifier).select(3);
+
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            conversationId: conversationId,
+            otherName: targetName,
+            otherAvatarUrl: null,
+            currentUserId: currentUserId,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to open chat: $e')));
+      }
+    }
+  }
 
   Future<void> _handleAction(Future<void> Function() action) async {
     setState(() => _isLoadingAction = true);
@@ -160,7 +205,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           title: detail.farmerName,
           phone: detail.farmerPhone,
           address: detail.farmerAddress,
-          extraAction: ChatActionButton(id: 'chat_farmer', onTap: () {}),
+          extraAction: ChatActionButton(
+            id: 'chat_farmer',
+            onTap: () => _openChat(
+              targetUserId: detail.farmerProfileId,
+              targetRole: 'farmer',
+              targetName: detail.farmerName,
+            ),
+          ),
         ),
         if (detail.driverProfileId != null) ...[
           const SizedBox(height: 20),
@@ -171,7 +223,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             phone: detail.driverPhone,
             subtitle:
                 '${detail.vehicleType ?? 'Vehicle'} • ${detail.vehiclePlate ?? ''}',
-            extraAction: ChatActionButton(id: 'chat_driver', onTap: () {}),
+            extraAction: ChatActionButton(
+              id: 'chat_driver',
+              onTap: () => _openChat(
+                targetUserId: detail.driverProfileId!,
+                targetRole: 'driver',
+                targetName: detail.driverName ?? 'Driver',
+              ),
+            ),
           ),
         ] else if (detail.status == OrderStatus.placed ||
             detail.status == OrderStatus.confirmed) ...[
@@ -196,7 +255,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           leadingIcon: Icons.person_outlined,
           title: detail.buyerName,
           phone: detail.buyerPhone,
-          extraAction: ChatActionButton(id: 'chat_buyer', onTap: () {}),
+          extraAction: ChatActionButton(
+            id: 'chat_buyer',
+            onTap: () => _openChat(
+              targetUserId: detail.buyerProfileId,
+              targetRole: 'buyer',
+              targetName: detail.buyerName,
+            ),
+          ),
         ),
         if (detail.driverProfileId != null) ...[
           const SizedBox(height: 20),
@@ -207,7 +273,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             phone: detail.driverPhone,
             subtitle:
                 '${detail.vehicleType ?? 'Vehicle'} • ${detail.vehiclePlate ?? ''}',
-            extraAction: ChatActionButton(id: 'chat_driver', onTap: () {}),
+            extraAction: ChatActionButton(
+              id: 'chat_driver',
+              onTap: () => _openChat(
+                targetUserId: detail.driverProfileId!,
+                targetRole: 'driver',
+                targetName: detail.driverName ?? 'Driver',
+              ),
+            ),
           ),
         ],
       ],
@@ -224,7 +297,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           title: detail.farmerName,
           phone: detail.farmerPhone,
           address: detail.farmerAddress,
-          extraAction: ChatActionButton(id: 'chat_farmer', onTap: () {}),
+          extraAction: ChatActionButton(
+            id: 'chat_farmer',
+            onTap: () => _openChat(
+              targetUserId: detail.farmerProfileId,
+              targetRole: 'farmer',
+              targetName: detail.farmerName,
+            ),
+          ),
         ),
         const SizedBox(height: 20),
         InfoCard(
@@ -233,7 +313,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           title: detail.buyerName,
           phone: detail.buyerPhone,
           address: detail.buyerAddress,
-          extraAction: ChatActionButton(id: 'chat_buyer', onTap: () {}),
+          extraAction: ChatActionButton(
+            id: 'chat_buyer',
+            onTap: () => _openChat(
+              targetUserId: detail.buyerProfileId,
+              targetRole: 'buyer',
+              targetName: detail.buyerName,
+            ),
+          ),
         ),
       ],
     );

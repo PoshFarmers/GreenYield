@@ -76,7 +76,7 @@ enum OrderStatus {
       case OrderStatus.inTransit:
         return 'On The Way';
       case OrderStatus.delivered:
-        return 'Delivered';
+        return 'Completed';
       case OrderStatus.completed:
         return 'Completed';
       case OrderStatus.cancelled:

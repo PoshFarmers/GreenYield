@@ -291,20 +291,21 @@ class OrderService {
   Stream<OrderDetail?> watchOrderDetail(String orderId) {
     return db
         .watch(
-          'SELECT id, status FROM orders WHERE id = ? LIMIT 1',
-          parameters: [orderId],
+          'SELECT id, status FROM orders WHERE id = ? UNION SELECT order_id AS id, status FROM delivery WHERE order_id = ? LIMIT 1',
+          parameters: [orderId, orderId],
         )
         .asyncMap((rows) async {
-          if (rows.isEmpty) return null;
           try {
-            return await fetchOrderDetailFromServer(orderId);
+            final serverDetail = await fetchOrderDetailFromServer(orderId);
+            if (serverDetail != null) return serverDetail;
           } catch (e) {
             developer.log(
               'get_order_detail RPC failed, falling back to local: $e',
               name: 'GreenYield.OrderService',
             );
-            return _fetchOrderDetailLocally(orderId);
           }
+          if (rows.isEmpty) return null;
+          return _fetchOrderDetailLocally(orderId);
         });
   }
 
@@ -397,10 +398,10 @@ class OrderService {
                 ON da.delivery_id = d.id AND da.is_current = 1
       LEFT JOIN profile p_driver ON p_driver.id = da.driver_profile_id
       LEFT JOIN vehicle v ON v.driver_profile_id = da.driver_profile_id
-      WHERE o.id = ?
+      WHERE o.id = ? OR d.order_id = ?
       LIMIT 1
       ''',
-      [orderId],
+      [orderId, orderId],
     );
 
     if (rows.isEmpty) return null;
