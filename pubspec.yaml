@@ -55,6 +55,7 @@ dependencies:
   uuid: ^4.6.0
   google_fonts: ^6.2.1
   intl: ^0.20.3
+  fl_chart: ^1.2.0
 
 dev_dependencies:
   flutter_test:

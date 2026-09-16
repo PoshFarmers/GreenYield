@@ -37,5 +37,8 @@
   "tap_crop_to_edit": "புகைப்படம், விளக்கம், விலையைத் திருத்த ஒரு பயிரைத் தட்டவும்.",
   "market_prices_title": "சந்தை விலைகள்",
   "market_prices_subtitle": "உங்கள் பயிர்களுக்கான இன்றைய சராசரி விலை",
-  "no_market_data_short": "தரவு இல்லை"
+  "no_market_data_short": "தரவு இல்லை",
+  "farmer_home_subtitle": "இன்று உங்கள் விளைபொருட்கள் எப்படி உள்ளன என்பது இங்கே",
+  "price_history_title": "விலை வரலாறு (30 நாட்கள்)",
+  "no_price_history_yet": "இந்தப் பயிருக்கு இன்னும் போதுமான விலை வரலாறு இல்லை"
 }
