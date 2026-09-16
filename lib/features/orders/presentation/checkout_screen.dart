@@ -62,6 +62,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// cart screen — only used here to label each group with a farmer
   /// name instead of a raw id.
   final Map<String, MarketplaceListing> _enrichment = {};
+  CheckoutSummary? _summary;
 
   String get _buyerProfileId => widget.buyerProfile.id;
 
@@ -77,6 +78,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _isLoading = false;
       });
       _enrichMissing(items);
+      if (items.isEmpty) {
+        setState(() => _summary = const CheckoutSummary(subOrders: []));
+      }
     });
   }
 
@@ -94,7 +98,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     for (final id in missingIds) {
       try {
-        final listing = await _marketplaceService.getListing(id);
+        final listing = await _marketplaceService.getListing(
+          id,
+          buyerLocation: widget.buyerProfile.locationPoint,
+        );
         if (!mounted) return;
         if (listing != null) {
           setState(() => _enrichment[id] = listing);
@@ -104,6 +111,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // label, same as the cart screen.
       }
     }
+    unawaited(_recomputeSummary());
+  }
+
+  Future<void> _recomputeSummary() async {
+    final distances = <String, double?>{};
+    for (final entry in _enrichment.entries) {
+      distances[entry.value.farmerProfileId] = entry.value.distanceKm;
+    }
+    final summary = await _checkoutService.buildSummary(
+      _items,
+      farmerDistanceKm: distances,
+    );
+    if (!mounted) return;
+    setState(() => _summary = summary);
   }
 
   List<CartFarmerGroup> get _groups {
@@ -310,8 +331,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildContent(BuildContext context) {
     final theme = Theme.of(context);
-    final summary = _checkoutService.buildSummary(_items);
+    final summary = _summary;
     final groups = _groups;
+    if (summary == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return Column(
       children: [
