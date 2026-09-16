@@ -2,25 +2,25 @@ import 'package:flutter/material.dart';
 
 import '../../features/calendar/presentation/driver_calendar_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
+import '../../features/cart/presentation/widgets/cart_nav_badge_icon.dart';
 import '../../features/chat/presentation/chat_threads_screen.dart';
 import '../../features/chat/presentation/widgets/chat_nav_badge_icon.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/home/presentation/driver_home_screen.dart';
+import '../../features/home/presentation/farmer_home_screen.dart';
 import '../../features/listings/presentation/my_listings_screen.dart';
 import '../../features/marketplace/presentation/marketplace_screen.dart';
 import '../../features/navigation/presentation/app_nav_shell.dart';
+import '../../features/orders/presentation/buyer_orders_screen.dart';
+import '../../features/orders/presentation/driver_deliveries_screen.dart';
+import '../../features/orders/presentation/farmer_orders_screen.dart';
 import '../../models/profile.dart';
-import '../widgets/coming_soon_screen.dart';
 
 /// Builds the correct bottom-nav shell for [profile]'s active role.
 /// Each role gets its own tab set (per the Figma):
 ///   Farmer -> Home, Harvest,  Orders, Chat
 ///   Buyer  -> Home, Cart,     Orders, Chat
 ///   Driver -> Home, Calendar, Deliveries, Chat
-///
-/// Only Home, Cart, Harvest, Calendar and Chat are wired to real
-/// screens right now. Orders/Deliveries are still `ComingSoonScreen`
-/// placeholders. Swap those out in place; the shell itself never
-/// needs to change.
 Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
   // AuthGate falls back to `roles.first` when profile.active_role is
   // null, but that fallback lived only in its local variable — anything
@@ -36,6 +36,11 @@ Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
     icon: Icons.home_outlined,
     builder: (_) => HomeScreen(profile: profile),
   );
+  final farmerHomeTab = NavTab(
+    label: 'Home',
+    icon: Icons.home_outlined,
+    builder: (_) => FarmerHomeScreen(profile: profile),
+  );
   final chatTab = NavTab(
     label: 'Chat',
     icon: Icons.chat_bubble_outline,
@@ -47,7 +52,7 @@ Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
     case 'farmer':
       return AppNavShell(
         tabs: [
-          homeTab,
+          farmerHomeTab,
           NavTab(
             label: 'Harvest',
             icon: Icons.grass_outlined,
@@ -56,7 +61,7 @@ Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
           NavTab(
             label: 'Orders',
             icon: Icons.receipt_long_outlined,
-            builder: (_) => const ComingSoonScreen(title: 'Orders'),
+            builder: (_) => FarmerOrdersScreen(profile: profile),
           ),
           chatTab,
         ],
@@ -75,12 +80,13 @@ Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
           NavTab(
             label: 'Cart',
             icon: Icons.shopping_cart_outlined,
+            iconBuilder: (_) => CartNavBadgeIcon(buyerProfileId: profile.id),
             builder: (_) => CartScreen(profile: profile),
           ),
           NavTab(
             label: 'Orders',
             icon: Icons.receipt_long_outlined,
-            builder: (_) => const ComingSoonScreen(title: 'Orders'),
+            builder: (_) => BuyerOrdersScreen(profile: profile),
           ),
           chatTab,
         ],
@@ -89,7 +95,11 @@ Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
     case 'driver':
       return AppNavShell(
         tabs: [
-          homeTab,
+          NavTab(
+            label: 'Home',
+            icon: Icons.home_outlined,
+            builder: (_) => DriverHomeScreen(profile: profile),
+          ),
           NavTab(
             label: 'Calendar',
             icon: Icons.calendar_today_outlined,
@@ -98,7 +108,7 @@ Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
           NavTab(
             label: 'Deliveries',
             icon: Icons.local_shipping_outlined,
-            builder: (_) => const ComingSoonScreen(title: 'Deliveries'),
+            builder: (_) => DriverDeliveriesScreen(profile: profile),
           ),
           chatTab,
         ],

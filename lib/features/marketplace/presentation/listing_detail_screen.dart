@@ -16,6 +16,8 @@ import '../../chat/presentation/chat_screen.dart';
 import '../../navigation/presentation/app_nav_shell.dart';
 import '../../pricing/presentation/widgets/price_breakdown_card.dart';
 import '../marketplace_service.dart';
+import '../../../core/animations/add_to_cart_animator.dart';
+import '../../cart/presentation/widgets/floating_cart_badge.dart';
 
 /// Full detail for one listing, with the quantity stepper and the entry
 /// point into a conversation with the farmer.
@@ -31,6 +33,7 @@ class ListingDetailScreen extends ConsumerStatefulWidget {
   /// Index of the Chat tab in the buyer's nav shell
   /// (Home, Cart, Orders, Chat) — see role_nav_shell_registry.dart.
   static const chatTabIndex = 3;
+  static const cartTabIndex = 1;
 
   const ListingDetailScreen({
     super.key,
@@ -58,6 +61,10 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   bool _isOffline = false;
   bool _isAddingToCart = false;
   String? _errorMessage;
+
+  final GlobalKey _imageKey = GlobalKey();
+  final GlobalKey _cartIconKey = GlobalKey();
+  final GlobalKey _addToCartButtonKey = GlobalKey();
 
   @override
   void initState() {
@@ -124,8 +131,26 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
         quantityKg: _quantity,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('added_to_cart'.tr())));
+
+      AddToCartAnimator.animate(
+        context: context,
+        startKey: _addToCartButtonKey,
+        endKey: _cartIconKey,
+        imageWidget: Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary,
+            shape: BoxShape.circle,
+          ),
+        ),
+        onComplete: () {
+          final state = _cartIconKey.currentState;
+          if (state is FloatingCartBadgeState) {
+            state.pulse();
+          }
+        },
+      );
     } finally {
       if (mounted) setState(() => _isAddingToCart = false);
     }
@@ -183,6 +208,17 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
 
     return Scaffold(
       appBar: AppSecondaryHeader(title: 'listing'.tr()),
+      floatingActionButton: FloatingCartBadge(
+        buyerProfileId: widget.buyerProfile.id,
+        cartIconKey: _cartIconKey,
+        onTap: () {
+          final navigator = Navigator.of(context);
+          navigator.popUntil((route) => route.isFirst);
+          ref
+              .read(navShellIndexProvider.notifier)
+              .select(ListingDetailScreen.cartTabIndex);
+        },
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -241,6 +277,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
             height: 220,
             width: double.infinity,
             child: MediaImage(
+              key: _imageKey,
               path: listing.displayImage.path,
               bucket: listing.displayImage.bucket,
               public: listing.displayImage.isFallback,
@@ -415,6 +452,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
+                    key: _addToCartButtonKey,
                     onPressed: _isAddingToCart
                         ? null
                         : () => _addToCart(listing),

@@ -37,5 +37,8 @@
   "tap_crop_to_edit": "ඡායාරූපය, විස්තරය සහ මිල සංස්කරණය කිරීමට බෝගයක් ඔබන්න.",
   "market_prices_title": "වෙළඳපොල මිල ගණන්",
   "market_prices_subtitle": "ඔබේ බෝග සඳහා අද සාමාන්‍ය මිල",
-  "no_market_data_short": "දත්ත නැත"
+  "no_market_data_short": "දත්ත නැත",
+  "farmer_home_subtitle": "අද ඔබේ අස්වැන්න පවතින්නේ මෙයයි",
+  "price_history_title": "මිල ඉතිහාසය (දින 30)",
+  "no_price_history_yet": "මෙම බෝගය සඳහා තවම ප්‍රමාණවත් මිල ඉතිහාසයක් නැත"
 }

@@ -165,6 +165,9 @@ const schema = Schema([
     Column.real('delivery_fee_amount'),
     Column.real('total_amount'),
     Column.text('delivery_address'),
+    Column.text(
+      'order_date',
+    ), // buyer-selected delivery date (added in 20260914000000)
     Column.text('placed_at'),
     Column.text('created_at'),
     Column.text('updated_at'),
@@ -186,6 +189,52 @@ const schema = Schema([
     Column.text('gateway_reference'),
     Column.text('created_at'),
     Column.text('updated_at'),
+  ]),
+  // --- Driver dispatch: nearest-driver auto-assignment at checkout ---
+  // Mirrors `delivery` / `delivery_assignment` (see
+  // .../20260827094000_delivery_and_assignment.sql and
+  // .../20260913090000_notify_and_driver_order_access.sql). The
+  // driver/buyer display-name columns are denormalized onto `delivery`
+  // at assignment time specifically so the driver's calendar can show
+  // "Pickup at <farmer>" without needing broader read access to the
+  // farmer/buyer profile rows.
+  Table('delivery', [
+    Column.text('order_id'),
+    Column.text('journey_id'),
+    Column.text('pickup_location_text'),
+    Column.text('dropoff_location_text'),
+    Column.text('farmer_display_name'),
+    Column.text('buyer_display_name'),
+    Column.text('status'),
+    Column.text('assigned_at'),
+    Column.text('picked_up_at'),
+    Column.text('delivered_at'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  Table('delivery_assignment', [
+    Column.text('delivery_id'),
+    Column.text('driver_profile_id'),
+    Column.text('vehicle_id'),
+    Column.text('assigned_at'),
+    Column.text('unassigned_at'),
+    Column.integer('is_current'),
+  ]),
+  Table('wallet', [
+    Column.text('profile_id'),
+    Column.real('balance'),
+    Column.text('currency'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  Table('wallet_transaction', [
+    Column.text('wallet_id'),
+    Column.text('type'),
+    Column.real('amount'),
+    Column.real('balance_after'),
+    Column.text('reference_table'),
+    Column.text('reference_id'),
+    Column.text('created_at'),
   ]),
   // no client insert/update RLS policy exists for this table.
   Table('pricing_rule', [

@@ -40,6 +40,10 @@ class _CartScreenState extends State<CartScreen> {
   final Map<String, MarketplaceListing> _enrichment = {};
   final Set<String> _pendingRemovals = {};
 
+  /// Buyer-selected delivery date. Must be set (tomorrow or later) before
+  /// the user can proceed to checkout.
+  DateTime? _selectedOrderDate;
+
   String get _buyerProfileId => widget.profile.id;
 
   @override
@@ -110,6 +114,42 @@ class _CartScreenState extends State<CartScreen> {
     setState(() => _pendingRemovals.remove(item.cartItemId));
   }
 
+  Future<void> _pickOrderDate(BuildContext context) async {
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    final firstDate = DateTime(tomorrow.year, tomorrow.month, tomorrow.day);
+    final lastDate = DateTime.now().add(const Duration(days: 90));
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedOrderDate ?? firstDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+    );
+    if (picked != null && mounted) {
+      setState(() => _selectedOrderDate = picked);
+    }
+  }
+
+  void _onProceedToCheckout(BuildContext context) {
+    if (_selectedOrderDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('cart_select_order_date_first'.tr()),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CheckoutScreen(
+          buyerProfile: widget.profile,
+          orderDate: _selectedOrderDate!,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -138,9 +178,16 @@ class _CartScreenState extends State<CartScreen> {
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            itemCount: groups.length,
+            itemCount: groups.length + 1, // +1 for the date picker card
             itemBuilder: (context, index) {
-              final group = groups[index];
+              // The date picker card is rendered at the top, before groups.
+              if (index == 0) {
+                return _OrderDatePickerCard(
+                  selectedDate: _selectedOrderDate,
+                  onTap: () => _pickOrderDate(context),
+                );
+              }
+              final group = groups[index - 1];
               final enrichment =
                   _enrichment[group.items.first.produceListingId];
               return _FarmerGroupCard(
@@ -158,11 +205,7 @@ class _CartScreenState extends State<CartScreen> {
         _CartSummaryBar(
           grandTotal: _grandTotal,
           hasUnavailableItems: _items.any((item) => item.isUnavailable),
-          onCheckout: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => CheckoutScreen(buyerProfile: widget.profile),
-            ),
-          ),
+          onCheckout: () => _onProceedToCheckout(context),
           theme: theme,
         ),
       ],
@@ -204,6 +247,83 @@ class _EmptyCart extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Tappable card that shows the selected delivery date or a prompt to pick one.
+/// Sits at the top of the cart item list.
+class _OrderDatePickerCard extends StatelessWidget {
+  final DateTime? selectedDate;
+  final VoidCallback onTap;
+
+  const _OrderDatePickerCard({required this.selectedDate, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasDate = selectedDate != null;
+    final borderColor = hasDate
+        ? theme.colorScheme.primary
+        : theme.colorScheme.error;
+    final iconColor = hasDate
+        ? theme.colorScheme.primary
+        : theme.colorScheme.error;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: hasDate
+              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.18)
+              : theme.colorScheme.errorContainer.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: borderColor.withValues(alpha: 0.6),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.calendar_month_outlined, size: 22, color: iconColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'cart_order_date_label'.tr(),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    hasDate
+                        ? DateFormat.yMMMMd(context.locale.toString())
+                              .format(selectedDate!)
+                        : 'cart_order_date_hint'.tr(),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: hasDate
+                          ? theme.colorScheme.onSurface
+                          : theme.colorScheme.onSurfaceVariant,
+                      fontWeight: hasDate ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              size: 20,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
       ),
     );
   }
