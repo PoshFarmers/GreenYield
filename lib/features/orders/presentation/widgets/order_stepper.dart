@@ -10,7 +10,7 @@ class OrderStepper extends StatelessWidget {
 
   const OrderStepper({super.key, required this.currentStep});
 
-  static const _steps = ['Placed', 'Packed', 'On The Way', 'Delivered'];
+  static const _steps = ['Placed', 'Packed', 'On The Way', 'Completed'];
 
   @override
   Widget build(BuildContext context) {
