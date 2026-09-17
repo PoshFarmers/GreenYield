@@ -102,6 +102,13 @@ enum OrderStatus {
       this == OrderStatus.confirmed ||
       this == OrderStatus.assigned ||
       this == OrderStatus.packed;
+
+  /// Whether the buyer can rate/review the farmer for this order —
+  /// mirrors the `status = 'delivered'` check in the
+  /// `submit_farmer_review` RPC. Doesn't account for a review already
+  /// existing (edit vs. first-time add) — check
+  /// `FarmerReviewService.watchReviewForOrder` for that.
+  bool get isReviewable => this == OrderStatus.delivered;
 }
 
 enum DeliveryStatus {
