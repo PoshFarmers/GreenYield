@@ -240,6 +240,7 @@ const schema = Schema([
     Column.text('reference_table'),
     Column.text('reference_id'),
     Column.text('description'),
+    Column.text('metadata'),
     Column.text('created_at'),
   ]),
   // --- Farmer rating & reviews (see .../20260916120000_farmer_review.sql) ---
