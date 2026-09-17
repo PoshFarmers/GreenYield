@@ -1,0 +1,2 @@
+-- Placeholder for 20260913141214_add_order_date.sql
+-- Order date schema was established in 20260914000000_add_order_date.sql and subsequent checkout migrations.
