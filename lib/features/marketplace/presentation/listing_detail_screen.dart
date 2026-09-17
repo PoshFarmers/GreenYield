@@ -15,6 +15,7 @@ import '../../chat/chat_service.dart';
 import '../../chat/presentation/chat_screen.dart';
 import '../../navigation/presentation/app_nav_shell.dart';
 import '../../pricing/presentation/widgets/price_breakdown_card.dart';
+import '../../reviews/presentation/farmer_public_profile_screen.dart';
 import '../marketplace_service.dart';
 import '../../../core/animations/add_to_cart_animator.dart';
 import '../../cart/presentation/widgets/floating_cart_badge.dart';
@@ -475,29 +476,46 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
         _Card(
           child: Column(
             children: [
-              Row(
-                children: [
-                  AvatarImage(path: listing.farmerAvatarUrl, radius: 24),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          listing.farmerName,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (listing.distanceKm != null)
-                          Text(
-                            '${listing.distanceKm!.toStringAsFixed(1)} km ${'away'.tr()}',
-                            style: theme.textTheme.bodySmall,
-                          ),
-                      ],
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => FarmerPublicProfileScreen(
+                      farmerProfileId: listing.farmerProfileId,
+                      buyerProfile: widget.buyerProfile,
+                      initialFarmerName: listing.farmerName,
+                      initialFarmerAvatarUrl: listing.farmerAvatarUrl,
                     ),
                   ),
-                ],
+                ),
+                child: Row(
+                  children: [
+                    AvatarImage(path: listing.farmerAvatarUrl, radius: 24),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            listing.farmerName,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (listing.distanceKm != null)
+                            Text(
+                              '${listing.distanceKm!.toStringAsFixed(1)} km ${'away'.tr()}',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
               SizedBox(
