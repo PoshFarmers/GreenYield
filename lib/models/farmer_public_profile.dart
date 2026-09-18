@@ -110,6 +110,12 @@ class FarmerCropListing {
   final String status;
   final DateTime? harvestedOn;
   final DateTime publishedAt;
+  final double? pricePerKg;
+
+  /// Per-batch overrides only (null = falls back to the crop's own
+  /// description/photo on [FarmerPublicCrop]).
+  final String? description;
+  final String? listingImageUrl;
 
   const FarmerCropListing({
     required this.id,
@@ -118,7 +124,14 @@ class FarmerCropListing {
     required this.status,
     this.harvestedOn,
     required this.publishedAt,
+    this.pricePerKg,
+    this.description,
+    this.listingImageUrl,
   });
+
+  /// Only active batches with stock left link through to the listing
+  /// detail screen; past/sold-out ones are shown for context only.
+  bool get isPurchasable => status == 'active' && availableQuantityKg > 0;
 
   factory FarmerCropListing.fromMap(Map<String, dynamic> map) {
     return FarmerCropListing(
@@ -126,6 +139,9 @@ class FarmerCropListing {
       availableQuantityKg:
           (map['available_quantity_kg'] as num?)?.toDouble() ?? 0,
       initialQuantityKg: (map['initial_quantity_kg'] as num?)?.toDouble() ?? 0,
+      pricePerKg: (map['price_per_kg'] as num?)?.toDouble(),
+      description: map['description'] as String?,
+      listingImageUrl: map['listing_image_url'] as String?,
       status: (map['status'] as String?) ?? 'active',
       harvestedOn: map['harvested_on'] == null
           ? null

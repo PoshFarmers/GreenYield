@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -6,10 +8,13 @@ import '../../../core/widgets/avatar_image.dart';
 import '../../../core/widgets/media_image.dart';
 import '../../../models/farmer_public_profile.dart';
 import '../../../models/farmer_review.dart';
+import '../../../models/marketplace_listing.dart';
 import '../../../models/profile.dart';
+import '../../marketplace/presentation/listing_detail_screen.dart';
 import '../farmer_public_profile_service.dart';
 import '../farmer_review_service.dart';
 import 'widgets/review_dialog.dart';
+import 'widgets/review_tile.dart';
 import 'widgets/star_rating.dart';
 
 /// A farmer's public-facing profile — reached by tapping the farmer card
@@ -24,12 +29,19 @@ class FarmerPublicProfileScreen extends StatefulWidget {
   final String? initialFarmerName;
   final String? initialFarmerAvatarUrl;
 
+  /// When set (opened from the marketplace's Farmers tab), shows a
+  /// "Shop all produce" button that hands back to the marketplace's
+  /// farmer-filtered grid. Left null where that grid isn't reachable,
+  /// e.g. when opened from a listing's farmer card.
+  final VoidCallback? onShopAll;
+
   const FarmerPublicProfileScreen({
     super.key,
     required this.farmerProfileId,
     required this.buyerProfile,
     this.initialFarmerName,
     this.initialFarmerAvatarUrl,
+    this.onShopAll,
   });
 
   @override
@@ -121,10 +133,33 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen> {
 
   Widget _buildContent(BuildContext context, FarmerPublicProfile profile) {
     final theme = Theme.of(context);
+    // In-stock crops first, so what a buyer can actually order is on top;
+    // the RPC's alphabetical order is kept within each group.
+    final crops = [
+      ...profile.crops.where((c) => c.availableQuantityKg > 0),
+      ...profile.crops.where((c) => c.availableQuantityKg <= 0),
+    ];
+    final inStockCount = profile.crops
+        .where((c) => c.availableQuantityKg > 0)
+        .length;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
         _buildHeaderCard(theme, profile),
+        if (widget.onShopAll != null && inStockCount > 0) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.onShopAll!();
+              },
+              icon: const Icon(Icons.storefront_outlined),
+              label: const Text('Shop all produce'),
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         _ReviewCallToAction(
           buyerProfileId: widget.buyerProfile.id,
@@ -133,17 +168,31 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen> {
           onSubmitted: _reload,
         ),
         const SizedBox(height: 24),
-        _buildSectionHeader(theme, 'Crops Grown'),
+        _buildSectionHeader(theme, 'Produce'),
+        if (profile.crops.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            inStockCount == 0
+                ? 'Nothing in stock right now'
+                : '$inStockCount of ${profile.crops.length} in stock · tap to see batches',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
-        if (profile.crops.isEmpty)
+        if (crops.isEmpty)
           const _EmptyState(
             icon: Icons.eco_outlined,
             message: "This farmer hasn't added any crops yet.",
           )
         else
-          ...profile.crops.map(
-            (crop) =>
-                _CropTile(crop: crop, farmerProfileId: profile.farmerProfileId),
+          ...crops.map(
+            (crop) => _CropTile(
+              crop: crop,
+              farmer: profile,
+              buyerProfile: widget.buyerProfile,
+            ),
           ),
         const SizedBox(height: 24),
         _buildSectionHeader(theme, 'Reviews (${profile.reviewCount})'),
@@ -154,7 +203,17 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen> {
             message: 'No reviews yet — be the first to share your experience.',
           )
         else
-          ...profile.reviews.map((review) => _ReviewTile(review: review)),
+          ...profile.reviews.map(
+            (review) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: ReviewTile(
+                buyerName: review.buyerName,
+                rating: review.rating,
+                comment: review.comment,
+                createdAt: review.createdAt,
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -311,25 +370,120 @@ class _ReviewCallToAction extends StatelessWidget {
   }
 }
 
-class _CropTile extends StatelessWidget {
-  final FarmerPublicCrop crop;
-  final String farmerProfileId;
+/// Opens [ListingDetailScreen] for one batch, pre-filled with a
+/// [MarketplaceListing] assembled from what the profile already has, so
+/// the detail screen paints immediately instead of showing a spinner
+/// while it fetches the fresh copy.
+void _openListing(
+  BuildContext context, {
+  required FarmerPublicProfile farmer,
+  required FarmerPublicCrop crop,
+  required FarmerCropListing listing,
+  required Profile buyerProfile,
+}) {
+  final initial = MarketplaceListing(
+    id: listing.id,
+    farmerProfileId: farmer.farmerProfileId,
+    farmerName: farmer.farmerName,
+    farmerAvatarUrl: farmer.farmerAvatarUrl,
+    farmerLocationText: farmer.farmerLocationText,
+    cropId: crop.cropId,
+    cropName: crop.cropName,
+    cropCategory: crop.cropCategory,
+    listingImageUrl: listing.listingImageUrl,
+    farmerCropImageUrl: crop.farmerCropImageUrl,
+    cropFallbackImageUrl: crop.cropFallbackImageUrl,
+    description: listing.description ?? crop.description,
+    pricePerKg: listing.pricePerKg ?? crop.defaultPricePerKg ?? 0,
+    availableQuantityKg: listing.availableQuantityKg,
+    harvestedOn: listing.harvestedOn,
+    publishedAt: listing.publishedAt,
+  );
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => ListingDetailScreen(
+        listingId: listing.id,
+        initialListing: initial,
+        buyerProfile: buyerProfile,
+      ),
+    ),
+  );
+}
 
-  const _CropTile({required this.crop, required this.farmerProfileId});
+/// One crop on the farmer's menu. Tapping it goes straight to the
+/// listing when there's exactly one batch to buy (the common case — no
+/// point making the buyer pick from a list of one), and opens the batch
+/// sheet otherwise (several prices/harvests to choose from, or nothing
+/// buyable and only history to show).
+class _CropTile extends StatefulWidget {
+  final FarmerPublicCrop crop;
+  final FarmerPublicProfile farmer;
+  final Profile buyerProfile;
+
+  const _CropTile({
+    required this.crop,
+    required this.farmer,
+    required this.buyerProfile,
+  });
+
+  @override
+  State<_CropTile> createState() => _CropTileState();
+}
+
+class _CropTileState extends State<_CropTile> {
+  final _service = const FarmerPublicProfileService();
+  bool _isOpening = false;
+
+  Future<void> _onTap() async {
+    if (_isOpening) return;
+    setState(() => _isOpening = true);
+
+    List<FarmerCropListing>? listings;
+    try {
+      listings = await _service.fetchCropListings(
+        farmerProfileId: widget.farmer.farmerProfileId,
+        cropId: widget.crop.cropId,
+      );
+    } catch (_) {
+      // Fall through to the sheet, which fetches again and has its own
+      // error/retry state — better than a silent dead tap.
+    }
+    if (!mounted) return;
+    setState(() => _isOpening = false);
+
+    final buyable = listings?.where((l) => l.isPurchasable).toList();
+    if (buyable != null && buyable.length == 1) {
+      _openListing(
+        context,
+        farmer: widget.farmer,
+        crop: widget.crop,
+        listing: buyable.single,
+        buyerProfile: widget.buyerProfile,
+      );
+      return;
+    }
+
+    unawaited(
+      _CropListingsSheet.show(
+        context,
+        farmer: widget.farmer,
+        crop: widget.crop,
+        buyerProfile: widget.buyerProfile,
+        initialListings: listings,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final crop = widget.crop;
     final image = crop.displayImage;
     final available = crop.availableQuantityKg > 0;
 
     return InkWell(
       borderRadius: BorderRadius.circular(14),
-      onTap: () => _CropListingsSheet.show(
-        context,
-        farmerProfileId: farmerProfileId,
-        crop: crop,
-      ),
+      onTap: _onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
@@ -392,62 +546,23 @@ class _CropTile extends StatelessWidget {
                 ),
               ),
             const SizedBox(width: 4),
-            Icon(
-              Icons.chevron_right,
-              size: 20,
-              color: theme.colorScheme.outline,
+            // Same footprint as the chevron so the row doesn't jump.
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: _isOpening
+                  ? const Padding(
+                      padding: EdgeInsets.all(2),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: theme.colorScheme.outline,
+                    ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ReviewTile extends StatelessWidget {
-  final FarmerPublicReview review;
-
-  const _ReviewTile({required this.review});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  review.buyerName,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Text(
-                DateFormat('MMM d, yyyy').format(review.createdAt),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          StarRatingDisplay(rating: review.rating.toDouble(), size: 16),
-          if (review.comment != null && review.comment!.trim().isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(review.comment!, style: theme.textTheme.bodyMedium),
-          ],
-        ],
       ),
     );
   }
@@ -488,24 +603,42 @@ class _EmptyState extends StatelessWidget {
 }
 
 /// Bottom sheet showing every listing batch the farmer has published for
-/// one crop — including past/inactive ones — with how much of each is
-/// still left. Shown when a buyer taps a crop tile on the profile.
+/// one crop — including past/inactive ones — with price and how much of
+/// each is still left. Shown when a buyer taps a crop tile on the
+/// profile; buyable batches open [ListingDetailScreen].
 class _CropListingsSheet extends StatefulWidget {
-  final String farmerProfileId;
+  final FarmerPublicProfile farmer;
   final FarmerPublicCrop crop;
+  final Profile buyerProfile;
 
-  const _CropListingsSheet({required this.farmerProfileId, required this.crop});
+  /// Already fetched by the tapped tile; when null (that fetch failed)
+  /// the sheet fetches itself and shows its own error state.
+  final List<FarmerCropListing>? initialListings;
+
+  const _CropListingsSheet({
+    required this.farmer,
+    required this.crop,
+    required this.buyerProfile,
+    this.initialListings,
+  });
 
   static Future<void> show(
     BuildContext context, {
-    required String farmerProfileId,
+    required FarmerPublicProfile farmer,
     required FarmerPublicCrop crop,
+    required Profile buyerProfile,
+    List<FarmerCropListing>? initialListings,
   }) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) =>
-          _CropListingsSheet(farmerProfileId: farmerProfileId, crop: crop),
+      showDragHandle: true,
+      builder: (_) => _CropListingsSheet(
+        farmer: farmer,
+        crop: crop,
+        buyerProfile: buyerProfile,
+        initialListings: initialListings,
+      ),
     );
   }
 
@@ -520,21 +653,27 @@ class _CropListingsSheetState extends State<_CropListingsSheet> {
   @override
   void initState() {
     super.initState();
-    _future = _service.fetchCropListings(
-      farmerProfileId: widget.farmerProfileId,
-      cropId: widget.crop.cropId,
-    );
+    final initial = widget.initialListings;
+    _future = initial != null ? Future.value(initial) : _fetch();
   }
+
+  Future<List<FarmerCropListing>> _fetch() => _service.fetchCropListings(
+    farmerProfileId: widget.farmer.farmerProfileId,
+    cropId: widget.crop.cropId,
+  );
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final crop = widget.crop;
+    final image = crop.displayImage;
+    final description = crop.description?.trim();
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7,
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -542,28 +681,64 @@ class _CropListingsSheetState extends State<_CropListingsSheet> {
             children: [
               Row(
                 children: [
-                  Expanded(
-                    child: Text(
-                      widget.crop.cropName,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 64,
+                      height: 64,
+                      child: MediaImage(
+                        path: image.path,
+                        bucket: image.bucket,
+                        public: image.isFallback,
+                        placeholder: Container(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          child: Icon(
+                            Icons.eco_outlined,
+                            color: theme.colorScheme.outline,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          crop.cropName,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          crop.availableQuantityKg > 0
+                              ? '${crop.availableQuantityKg.toStringAsFixed(0)} kg available in total'
+                              : 'Currently unavailable',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: crop.availableQuantityKg > 0
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
+              if (description != null && description.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(description, style: theme.textTheme.bodyMedium),
+              ],
+              const SizedBox(height: 16),
               Text(
                 'Harvest batches',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Flexible(
                 child: FutureBuilder<List<FarmerCropListing>>(
                   future: _future,
@@ -577,7 +752,22 @@ class _CropListingsSheetState extends State<_CropListingsSheet> {
                     if (snapshot.hasError) {
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 24),
-                        child: Center(child: Text(snapshot.error.toString())),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              "Couldn't load harvest batches.",
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton.tonalIcon(
+                              onPressed: () =>
+                                  setState(() => _future = _fetch()),
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                            ),
+                          ],
+                        ),
                       );
                     }
                     final listings = snapshot.data ?? const [];
@@ -593,8 +783,12 @@ class _CropListingsSheetState extends State<_CropListingsSheet> {
                       shrinkWrap: true,
                       itemCount: listings.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) =>
-                          _CropListingTile(listing: listings[index]),
+                      itemBuilder: (context, index) => _CropListingTile(
+                        listing: listings[index],
+                        farmer: widget.farmer,
+                        crop: widget.crop,
+                        buyerProfile: widget.buyerProfile,
+                      ),
                     );
                   },
                 ),
@@ -609,8 +803,16 @@ class _CropListingsSheetState extends State<_CropListingsSheet> {
 
 class _CropListingTile extends StatelessWidget {
   final FarmerCropListing listing;
+  final FarmerPublicProfile farmer;
+  final FarmerPublicCrop crop;
+  final Profile buyerProfile;
 
-  const _CropListingTile({required this.listing});
+  const _CropListingTile({
+    required this.listing,
+    required this.farmer,
+    required this.crop,
+    required this.buyerProfile,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -619,56 +821,135 @@ class _CropListingTile extends StatelessWidget {
     final available = listing.availableQuantityKg;
     final fraction = initial <= 0 ? 0.0 : (available / initial).clamp(0, 1);
     final soldOut = available <= 0;
+    // Has stock but was paused/expired by the farmer — not buyable either.
+    final inactive = !soldOut && !listing.isPurchasable;
+    final dimmed = soldOut || inactive;
+    final description = listing.description?.trim();
 
-    return Stack(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: soldOut
-                ? theme.colorScheme.surfaceContainerHighest
-                : theme.colorScheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
-          ),
-          child: Opacity(
-            opacity: soldOut ? 0.5 : 1,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        listing.harvestedOn != null
-                            ? 'Harvested ${DateFormat('MMM d, yyyy').format(listing.harvestedOn!)}'
-                            : 'Published ${DateFormat('MMM d, yyyy').format(listing.publishedAt)}',
-                        style: theme.textTheme.bodySmall,
-                      ),
+    final tile = Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: dimmed
+            ? theme.colorScheme.surfaceContainerHighest
+            : theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Opacity(
+        opacity: dimmed ? 0.5 : 1,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Only a batch-specific photo is worth repeating here; the
+            // crop's standing photo is already in the sheet header.
+            if (listing.listingImageUrl != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 52,
+                  height: 52,
+                  child: MediaImage(
+                    path: listing.listingImageUrl,
+                    bucket: 'crop-photos',
+                    placeholder: Container(
+                      color: theme.colorScheme.surfaceContainerHighest,
                     ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          listing.harvestedOn != null
+                              ? 'Harvested ${DateFormat('MMM d, yyyy').format(listing.harvestedOn!)}'
+                              : 'Published ${DateFormat('MMM d, yyyy').format(listing.publishedAt)}',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                      if (listing.pricePerKg != null)
+                        Text(
+                          'LKR ${listing.pricePerKg!.toStringAsFixed(2)}/kg',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (description != null && description.isNotEmpty) ...[
+                    const SizedBox(height: 4),
                     Text(
-                      '${available.toStringAsFixed(0)}/${initial.toStringAsFixed(0)} kg',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                      description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: fraction.toDouble(),
-                    minHeight: 6,
-                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                    color: theme.colorScheme.primary,
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: fraction.toDouble(),
+                            minHeight: 6,
+                            backgroundColor:
+                                theme.colorScheme.surfaceContainerHighest,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '${available.toStringAsFixed(0)}/${initial.toStringAsFixed(0)} kg left',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+            if (listing.isPurchasable) ...[
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: theme.colorScheme.outline,
+              ),
+            ],
+          ],
         ),
-        if (soldOut)
+      ),
+    );
+
+    return Stack(
+      children: [
+        if (listing.isPurchasable)
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _openListing(
+              context,
+              farmer: farmer,
+              crop: crop,
+              listing: listing,
+              buyerProfile: buyerProfile,
+            ),
+            child: tile,
+          )
+        else
+          tile,
+        if (soldOut || inactive)
           Positioned.fill(
             child: Center(
               child: Container(
@@ -681,7 +962,7 @@ class _CropListingTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'Sold out',
+                  soldOut ? 'Sold out' : 'Not available',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
