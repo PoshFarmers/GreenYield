@@ -175,6 +175,8 @@ class OrderSummary {
   /// Optional thumbnail of the first item
   final String? firstImageUrl;
 
+  final String source;
+
   const OrderSummary({
     required this.id,
     required this.checkoutGroupId,
@@ -187,6 +189,7 @@ class OrderSummary {
     this.orderDate,
     this.deliveryId,
     this.firstImageUrl,
+    this.source = 'manual',
   });
 
   /// Short human-readable order id: GY-XXXXXX
@@ -208,6 +211,7 @@ class OrderSummary {
           : null,
       deliveryId: row['delivery_id'] as String?,
       firstImageUrl: row['first_image_url'] as String?,
+      source: row['source'] as String? ?? 'manual',
     );
   }
 
@@ -300,6 +304,7 @@ class DeliverySummary {
             : null,
         deliveryId: row['delivery_id'] as String?,
         firstImageUrl: row['first_image_url'] as String?,
+        source: row['source'] as String? ?? 'manual',
       ),
     );
   }
