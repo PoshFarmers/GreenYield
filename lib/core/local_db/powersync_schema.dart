@@ -167,6 +167,7 @@ const schema = Schema([
     Column.text('payment_id'),
     Column.real('subtotal_amount'),
     Column.real('delivery_fee_amount'),
+    Column.real('tax_amount'),
     Column.real('total_amount'),
     Column.text('delivery_address'),
     Column.text(
