@@ -14,6 +14,7 @@ import '../../orders/presentation/recurring/recurring_orders_screen.dart';
 import '../marketplace_service.dart';
 import '../marketplace_cache.dart';
 import '../../pricing/presentation/market_prices_screen.dart';
+import '../../reviews/presentation/farmer_public_profile_screen.dart';
 import 'listing_detail_screen.dart';
 import 'produce_card.dart';
 
@@ -37,6 +38,57 @@ enum _SortOption {
   final String labelKey;
 
   const _SortOption(this.icon, this.labelKey);
+}
+
+/// Width-driven layout metrics, so the marketplace adapts from small
+/// phones up to landscape tablets instead of being a fixed 480px strip.
+/// Driven by the actual available width (LayoutBuilder), not the screen,
+/// so split-screen / multi-window behave too.
+class _MarketLayout {
+  final double hPad;
+  final int columns;
+  final double spacing;
+
+  /// Tablet-ish widths: controls go side by side, farmers in 2 columns.
+  final bool wide;
+
+  const _MarketLayout({
+    required this.hPad,
+    required this.columns,
+    required this.spacing,
+    required this.wide,
+  });
+
+  /// Content stops growing past this on very large screens.
+  static const maxContentWidth = 1280.0;
+
+  factory _MarketLayout.of(double width) {
+    if (width < 340) {
+      // Small phones: 2 columns keeps prices legible.
+      return const _MarketLayout(
+        hPad: 12,
+        columns: 2,
+        spacing: 10,
+        wide: false,
+      );
+    }
+    if (width < 600) {
+      return const _MarketLayout(
+        hPad: 16,
+        columns: 3,
+        spacing: 10,
+        wide: false,
+      );
+    }
+    if (width < 840) {
+      // Tablet portrait / large foldables.
+      return const _MarketLayout(hPad: 24, columns: 4, spacing: 14, wide: true);
+    }
+    if (width < 1100) {
+      return const _MarketLayout(hPad: 24, columns: 5, spacing: 16, wide: true);
+    }
+    return const _MarketLayout(hPad: 32, columns: 6, spacing: 16, wide: true);
+  }
 }
 
 /// Buyer home — the marketplace feed of every farmer's active listings,
@@ -238,7 +290,25 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
     _load();
   }
 
-  /// Jumps from a farmer row (Farmers tab) to their produce, filtered.
+  /// A farmer row (Farmers tab) opens that farmer's profile — who they
+  /// are, ratings, and everything they grow — rather than dropping the
+  /// buyer straight into a filtered grid. The grid is still one tap away
+  /// via the profile's "Shop all produce" button.
+  void _openFarmerProfile(MarketplaceFarmer farmer) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FarmerPublicProfileScreen(
+          farmerProfileId: farmer.farmerProfileId,
+          buyerProfile: widget.profile,
+          initialFarmerName: farmer.farmerName,
+          initialFarmerAvatarUrl: farmer.farmerAvatarUrl,
+          onShopAll: () => _viewFarmerProduce(farmer),
+        ),
+      ),
+    );
+  }
+
+  /// Switches to the Produce tab, filtered to one farmer's listings.
   void _viewFarmerProduce(MarketplaceFarmer farmer) {
     setState(() {
       _tab = _MarketTab.produce;
@@ -310,6 +380,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      // Edge-to-edge on phones; a centred card-width sheet on tablets.
+      constraints: const BoxConstraints(maxWidth: 560),
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheetState) {
           final theme = Theme.of(sheetContext);
@@ -400,33 +472,61 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
     );
   }
 
+  /// Set at the top of each [build] from the available width.
+  _MarketLayout _layout = _MarketLayout.of(400);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppHeader(profile: widget.profile),
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Column(
-              children: [
-                if (widget.profile.activeRole == 'buyer')
-                  _BuyerRecurringOrdersBanner(profileId: widget.profile.id),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: _MarketTabBar(selected: _tab, onSelected: _setTab),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth < _MarketLayout.maxContentWidth
+                ? constraints.maxWidth
+                : _MarketLayout.maxContentWidth;
+            _layout = _MarketLayout.of(width);
+
+            return Center(
+              child: SizedBox(
+                width: width,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        _layout.hPad,
+                        12,
+                        _layout.hPad,
+                        0,
+                      ),
+                      // A full-bleed segmented control looks stretched on
+                      // tablets; cap it and keep it left-aligned there.
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: _layout.wide ? 420 : double.infinity,
+                          ),
+                          child: _MarketTabBar(
+                            selected: _tab,
+                            onSelected: _setTab,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: _load,
+                        child: _tab == _MarketTab.produce
+                            ? _buildProduceBody()
+                            : _buildFarmersBody(),
+                      ),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: _load,
-                    child: _tab == _MarketTab.produce
-                        ? _buildProduceBody()
-                        : _buildFarmersBody(),
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -438,14 +538,28 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
         ? const <MarketplaceListing>[]
         : _visibleListings;
 
+    final categories = _EvenSegments(
+      selected: _category,
+      onSelected: _setCategory,
+      options: const [
+        (null, 'crop_category_all'),
+        ('fruit', 'crop_category_fruit'),
+        ('vegetable', 'crop_category_vegetable'),
+      ],
+    );
+
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       controller: _scrollController,
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          padding: EdgeInsets.fromLTRB(_layout.hPad, 12, _layout.hPad, 0),
           sliver: SliverList.list(
             children: [
+              // Scrolls away with the feed, rather than permanently
+              // eating vertical space above the tabs.
+              if (widget.profile.activeRole == 'buyer')
+                _BuyerRecurringOrdersBanner(profileId: widget.profile.id),
               _MarketPricesEntry(
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const MarketPricesScreen()),
@@ -456,36 +570,20 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                 const _OfflineCachedBanner(),
                 const SizedBox(height: 12),
               ],
-              _EvenSegments(
-                selected: _category,
-                onSelected: _setCategory,
-                options: const [
-                  (null, 'crop_category_all'),
-                  ('fruit', 'crop_category_fruit'),
-                  ('vegetable', 'crop_category_vegetable'),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'marketplace_search_hint'.tr(),
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchController.text.isEmpty
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () {
-                            _searchController.clear();
-                            _onQueryChanged('');
-                          },
-                        ),
-                ),
-                onChanged: (value) {
-                  setState(() {}); // refresh the clear button
-                  _onQueryChanged(value);
-                },
-              ),
+              // Phones: categories above search. Tablets: one row.
+              if (_layout.wide)
+                Row(
+                  children: [
+                    Expanded(child: _buildSearchField()),
+                    const SizedBox(width: 16),
+                    SizedBox(width: 340, child: categories),
+                  ],
+                )
+              else ...[
+                categories,
+                const SizedBox(height: 12),
+                _buildSearchField(),
+              ],
               if (_farmerFilter != null) ...[
                 const SizedBox(height: 12),
                 InputChip(
@@ -508,11 +606,15 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  _SortPillButton(
-                    icon: _sortOption.icon,
-                    label: _sortOption.labelKey.tr(),
-                    highlighted: _minStockKg > 0,
-                    onTap: _openFilterSheet,
+                  // Flexible: long (si/ta) sort labels ellipsize on
+                  // narrow phones instead of overflowing the row.
+                  Flexible(
+                    child: _SortPillButton(
+                      icon: _sortOption.icon,
+                      label: _sortOption.labelKey.tr(),
+                      highlighted: _minStockKg > 0,
+                      onTap: _openFilterSheet,
+                    ),
                   ),
                 ],
               ),
@@ -523,6 +625,29 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
         ..._buildProduceGrid(visible),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
+    );
+  }
+
+  Widget _buildSearchField() {
+    return TextField(
+      controller: _searchController,
+      decoration: InputDecoration(
+        hintText: 'marketplace_search_hint'.tr(),
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: _searchController.text.isEmpty
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  _searchController.clear();
+                  _onQueryChanged('');
+                },
+              ),
+      ),
+      onChanged: (value) {
+        setState(() {}); // refresh the clear button
+        _onQueryChanged(value);
+      },
     );
   }
 
@@ -571,35 +696,44 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
       ];
     }
 
-    final screenW = MediaQuery.sizeOf(context).width;
-    final gridW = (screenW < 480 ? screenW : 480.0) - 32;
-    final tileW = (gridW - 20) / 3;
+    final layout = _layout;
+    // Text below the square image: name + price, scaled with the user's
+    // font size so large text doesn't clip.
     final textScale = MediaQuery.textScalerOf(context).scale(1.0);
 
     return [
       SliverPadding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        sliver: SliverGrid.builder(
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            mainAxisExtent: tileW + 52 * textScale,
-          ),
-          itemCount: visible.length,
-          itemBuilder: (context, index) {
-            final listing = visible[index];
-            return ProduceCard(
-              listing: listing,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ListingDetailScreen(
-                    listingId: listing.id,
-                    initialListing: listing,
-                    buyerProfile: widget.profile,
-                  ),
-                ),
+        padding: EdgeInsets.symmetric(horizontal: layout.hPad),
+        sliver: SliverLayoutBuilder(
+          builder: (context, constraints) {
+            final tileW =
+                (constraints.crossAxisExtent -
+                    layout.spacing * (layout.columns - 1)) /
+                layout.columns;
+            return SliverGrid.builder(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: layout.columns,
+                crossAxisSpacing: layout.spacing,
+                mainAxisSpacing: layout.spacing,
+                // Square image + text block.
+                mainAxisExtent: tileW + (layout.wide ? 58 : 52) * textScale,
               ),
+              itemCount: visible.length,
+              itemBuilder: (context, index) {
+                final listing = visible[index];
+                return ProduceCard(
+                  listing: listing,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ListingDetailScreen(
+                        listingId: listing.id,
+                        initialListing: listing,
+                        buyerProfile: widget.profile,
+                      ),
+                    ),
+                  ),
+                );
+              },
             );
           },
         ),
@@ -624,7 +758,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          padding: EdgeInsets.fromLTRB(_layout.hPad, 12, _layout.hPad, 0),
           sliver: SliverList.list(
             children: [
               TextField(
@@ -735,17 +869,37 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
       ];
     }
 
+    // Tablets: two farmers per row (equal-height cards via
+    // IntrinsicHeight, since crop chips can wrap); phones: one.
+    final perRow = _layout.wide ? 2 : 1;
+    final rowCount = (visible.length / perRow).ceil();
+
+    Widget cell(int index) {
+      if (index >= visible.length) return const SizedBox.shrink();
+      final farmer = visible[index];
+      return _FarmerRow(
+        farmer: farmer,
+        onTap: () => _openFarmerProfile(farmer),
+      );
+    }
+
     return [
       SliverPadding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: EdgeInsets.symmetric(horizontal: _layout.hPad),
         sliver: SliverList.separated(
-          itemCount: visible.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 10),
-          itemBuilder: (context, index) {
-            final farmer = visible[index];
-            return _FarmerRow(
-              farmer: farmer,
-              onTap: () => _viewFarmerProduce(farmer),
+          itemCount: rowCount,
+          separatorBuilder: (_, _) => SizedBox(height: _layout.spacing),
+          itemBuilder: (context, row) {
+            if (perRow == 1) return cell(row);
+            return IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: cell(row * 2)),
+                  SizedBox(width: _layout.spacing),
+                  Expanded(child: cell(row * 2 + 1)),
+                ],
+              ),
             );
           },
         ),
@@ -937,26 +1091,32 @@ class _FarmerRow extends StatelessWidget {
                     Wrap(
                       spacing: 4,
                       runSpacing: 4,
-                      children: farmer.cropNames
-                          .take(3)
-                          .map(
-                            (name) => Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color:
-                                    theme.colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                name,
-                                style: theme.textTheme.labelSmall,
-                              ),
-                            ),
-                          )
-                          .toList(),
+                      children:
+                          [
+                                ...farmer.cropNames.take(3),
+                                // Signals there's more on the profile than fits here.
+                                if (farmer.cropNames.length > 3)
+                                  '+${farmer.cropNames.length - 3}',
+                              ]
+                              .map(
+                                (name) => Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: theme
+                                        .colorScheme
+                                        .surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    name,
+                                    style: theme.textTheme.labelSmall,
+                                  ),
+                                ),
+                              )
+                              .toList(),
                     ),
                   ],
                 ],
@@ -1013,11 +1173,15 @@ class _SortPillButton extends StatelessWidget {
           children: [
             Icon(icon, size: 16, color: color),
             const SizedBox(width: 6),
-            Text(
-              label,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             const SizedBox(width: 2),
@@ -1162,15 +1326,29 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
-class _BuyerRecurringOrdersBanner extends StatelessWidget {
+class _BuyerRecurringOrdersBanner extends StatefulWidget {
   final String profileId;
 
   const _BuyerRecurringOrdersBanner({required this.profileId});
 
   @override
+  State<_BuyerRecurringOrdersBanner> createState() =>
+      _BuyerRecurringOrdersBannerState();
+}
+
+class _BuyerRecurringOrdersBannerState
+    extends State<_BuyerRecurringOrdersBanner> {
+  // Created once — building it inside build() re-subscribed on every
+  // parent rebuild (e.g. each search keystroke), flickering the banner.
+  late final Stream<BuyerProfile?> _buyerStream = BuyerProfileService()
+      .watchOwnProfile(widget.profileId);
+
+  String get profileId => widget.profileId;
+
+  @override
   Widget build(BuildContext context) {
     return StreamBuilder<BuyerProfile?>(
-      stream: BuyerProfileService().watchOwnProfile(profileId),
+      stream: _buyerStream,
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox.shrink();
         final buyer = snapshot.data!;
@@ -1182,7 +1360,7 @@ class _BuyerRecurringOrdersBanner extends StatelessWidget {
         final theme = Theme.of(context);
         return Card(
           elevation: 0,
-          margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          margin: const EdgeInsets.only(bottom: 12),
           color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -1219,14 +1397,14 @@ class _BuyerRecurringOrdersBanner extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Schedule your weekly orders',
+                          'recurring_banner_title'.tr(),
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: theme.colorScheme.onPrimaryContainer,
                           ),
                         ),
                         Text(
-                          'Restock automatically',
+                          'recurring_banner_subtitle'.tr(),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onPrimaryContainer
                                 .withValues(alpha: 0.8),
@@ -1253,7 +1431,7 @@ class _BuyerRecurringOrdersBanner extends StatelessWidget {
                       minimumSize: const Size(0, 36),
                       elevation: 0,
                     ),
-                    child: const Text('Set up'),
+                    child: Text('recurring_banner_action'.tr()),
                   ),
                 ],
               ),

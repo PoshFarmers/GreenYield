@@ -1,4 +1,7 @@
 {
+  "recurring_banner_title": "Schedule your weekly orders",
+  "recurring_banner_subtitle": "Restock automatically",
+  "recurring_banner_action": "Set up",
   "marketplace_search_hint": "Search crops, farmers, or locations...",
   "search_farmers_hint": "Search farmers by name...",
   "tab_produce": "Fruits & Vegies",
