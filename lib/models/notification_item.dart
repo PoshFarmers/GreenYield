@@ -14,7 +14,9 @@ enum NotificationCategory {
     if (type.startsWith('order_') || type.startsWith('recurring_')) {
       return NotificationCategory.orders;
     }
-    if (type.startsWith('payment_') || type.startsWith('refund_')) {
+    if (type.startsWith('payment_') ||
+        type.startsWith('refund_') ||
+        type.startsWith('payout_')) {
       return NotificationCategory.payments;
     }
     if (type.startsWith('delivery_')) {
