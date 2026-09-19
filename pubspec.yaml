@@ -56,6 +56,9 @@ dependencies:
   google_fonts: ^6.2.1
   intl: ^0.20.3
   fl_chart: ^1.2.0
+  # Runtime dep (not dev): main() calls FlutterNativeSplash.preserve/remove
+  # to hold the native splash until the animated Flutter splash is ready.
+  flutter_native_splash: ^2.4.6
 
 dev_dependencies:
   flutter_test:
@@ -67,6 +70,32 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# Generates the Android/iOS launcher icons into android/ + ios/.
+# Re-run after changing the artwork:  dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/icon/app_icon.png
+  remove_alpha_ios: true
+  min_sdk_android: 21
+  # Same deep green as the logo tile, so the adaptive icon's background
+  # and the glyph's original tile read as one.
+  adaptive_icon_background: "#066A2B"
+  adaptive_icon_foreground: assets/icon/app_icon_fg.png
+
+# Generates the native (pre-Flutter) launch screen. It's a flat brand-
+# green screen with the logo glyph centred, which the animated Flutter
+# SplashScreen picks up from seamlessly.
+# Re-run after changing:  dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#066A2B"
+  image: assets/icon/app_icon_fg.png
+  android_12:
+    color: "#066A2B"
+    image: assets/icon/app_icon_fg.png
+  fullscreen: false
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -81,6 +110,9 @@ flutter:
 
   assets:
     - .env
+    - assets/images/
+    # Asset folders aren't recursive — subfolders need their own entry.
+    - assets/images/onboarding/
     - assets/translations/en/
     - assets/translations/si/
     - assets/translations/ta/
