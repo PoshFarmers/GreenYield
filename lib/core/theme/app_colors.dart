@@ -36,6 +36,12 @@ class AppColors {
   static const Color darkPrimary = Color(0xFF4CAF50);
   static const Color darkError = Color(0xFFE6867E);
 
+  // Brand (sampled from assets/icon/app_icon.png) ----------------------
+  // Used where the UI sits right next to the logo tile — splash,
+  // onboarding — so the tile and its surroundings read as one piece.
+  static const Color brandDeepGreen = Color(0xFF066A2B);
+  static const Color brandLeaf = Color(0xFF9DD636);
+
   // Notification palette -----------------------------------------------
   static const Color deepForestGreen = Color(0xFF1B4D3E);
   static const Color freshLeafGreen = Color(0xFF4CAF50);

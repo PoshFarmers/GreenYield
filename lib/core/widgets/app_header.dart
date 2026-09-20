@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../roles/role_profile_registry.dart';
 import '../../features/notifications/presentation/widgets/notification_badge_widget.dart';
 import '../../models/profile.dart';
+import 'app_logo.dart';
 import 'avatar_image.dart';
 
 /// The app's common header: brand mark on the left, notification bell
@@ -35,27 +36,13 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final roleScreens = profile.activeRole != null
         ? roleScreensRegistry[profile.activeRole]
         : null;
 
     return AppBar(
       titleSpacing: 16,
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.eco, color: theme.colorScheme.primary),
-          const SizedBox(width: 6),
-          Text(
-            'app_name'.tr(),
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
+      title: const AppLogo(size: 30, showName: true),
       actions: [
         const NotificationBadgeWidget(),
         if (roleScreens != null)
