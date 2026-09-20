@@ -1,11 +1,13 @@
 import 'dart:developer' as developer;
 
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/local_db/powersync.dart';
 import '../../core/supabase/client.dart';
 import '../../models/cart_item.dart';
 import '../../models/profile.dart';
+import '../payments/payment_gateway.dart';
 import '../pricing/delivery_fee_service.dart';
 import 'order_models.dart';
 
@@ -71,6 +73,7 @@ class CheckoutService {
     required String paymentMethod, // 'wallet' | 'card'
     required DateTime orderDate,
     String? requestId,
+    String? linkedCardId,
   }) async {
     if (items.isEmpty) {
       throw StateError('Cannot check out an empty cart');
@@ -89,25 +92,35 @@ class CheckoutService {
       name: 'GreenYield.CheckoutService',
     );
 
-    final response = await supabase.rpc(
-      'place_checkout',
-      params: {
-        'p_request_id': requestId ?? _uuid.v4(),
-        'p_cart_items': items
-            .map(
-              (item) => {'id': item.cartItemId, 'quantity_kg': item.quantityKg},
-            )
-            .toList(),
-        'p_payment_method': paymentMethod,
-        'p_delivery_address': buyerProfile.address.isEmpty
-            ? null
-            : buyerProfile.address.toMap(),
-        'p_order_date':
-            '${orderDate.year.toString().padLeft(4, '0')}-'
-            '${orderDate.month.toString().padLeft(2, '0')}-'
-            '${orderDate.day.toString().padLeft(2, '0')}',
-      },
-    );
+    final dynamic response;
+    try {
+      response = await supabase.rpc(
+        'place_checkout',
+        params: {
+          'p_request_id': requestId ?? _uuid.v4(),
+          'p_cart_items': items
+              .map(
+                (item) => {
+                  'id': item.cartItemId,
+                  'quantity_kg': item.quantityKg,
+                },
+              )
+              .toList(),
+          'p_payment_method': paymentMethod,
+          if (paymentMethod == 'card' && linkedCardId != null)
+            'p_linked_card_id': linkedCardId,
+          'p_delivery_address': buyerProfile.address.isEmpty
+              ? null
+              : buyerProfile.address.toMap(),
+          'p_order_date':
+              '${orderDate.year.toString().padLeft(4, '0')}-'
+              '${orderDate.month.toString().padLeft(2, '0')}-'
+              '${orderDate.day.toString().padLeft(2, '0')}',
+        },
+      );
+    } on PostgrestException catch (error) {
+      throw _mapCheckoutError(error);
+    }
 
     if (response == null) {
       throw StateError('place_checkout returned null response');
@@ -132,7 +145,18 @@ class CheckoutService {
       placedAt: DateTime.parse(result['placed_at'] as String),
       deliveryAddress: buyerProfile.address,
       orderDate: parsedOrderDate,
+      paymentMethod:
+          (result['payment'] as Map?)?['method'] as String? ?? paymentMethod,
+      cardLast4: (result['payment'] as Map?)?['card_last4'] as String?,
+      cardBrand: (result['payment'] as Map?)?['card_brand'] as String?,
     );
+  }
+
+  /// Known payment codes (declines, low wallet balance, card problems) become a
+  /// [PaymentException] with a localized message; anything else passes through.
+  Object _mapCheckoutError(PostgrestException error) {
+    final mapped = PaymentException.fromServerMessage(error.message);
+    return mapped.code == 'unknown' ? error : mapped;
   }
 
   /// PowerSync writes are queued locally and may not have reached Postgres
