@@ -12,10 +12,17 @@ import '../../../models/profile.dart';
 import '../../cart/cart_service.dart';
 import '../../marketplace/marketplace_service.dart';
 import '../checkout_service.dart';
-import '../order_models.dart';
-import 'order_confirmation_screen.dart';
 
-enum _PaymentMethod { wallet, card }
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../models/wallet.dart';
+import '../../payments/models/linked_card.dart';
+import '../../payments/payment_gateway.dart';
+import '../../payments/payment_providers.dart';
+import '../../wallet/wallet_service.dart';
+import '../order_models.dart';
+import 'widgets/checkout_payment_selector.dart';
+import 'order_confirmation_screen.dart';
 
 /// Sprint 2 — Task 3.2: Checkout screen.
 ///
@@ -24,7 +31,7 @@ enum _PaymentMethod { wallet, card }
 /// farmer plus a grand total — since a multi-farmer cart becomes one
 /// `orders` row per farmer at [CheckoutService.placeOrder] time. See
 /// that service for why there's no separate `sub_orders` table.
-class CheckoutScreen extends StatefulWidget {
+class CheckoutScreen extends ConsumerStatefulWidget {
   final Profile buyerProfile;
 
   /// Buyer-selected delivery date passed from [CartScreen].
@@ -38,10 +45,10 @@ class CheckoutScreen extends StatefulWidget {
   });
 
   @override
-  State<CheckoutScreen> createState() => _CheckoutScreenState();
+  ConsumerState<CheckoutScreen> createState() => _CheckoutScreenState();
 }
 
-class _CheckoutScreenState extends State<CheckoutScreen> {
+class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   final _cartService = const CartService();
   final _marketplaceService = const MarketplaceService();
   final _checkoutService = const CheckoutService();
@@ -52,7 +59,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _isPlacingOrder = false;
   String? _errorMessage;
   String? _checkoutRequestId;
-  _PaymentMethod _paymentMethod = _PaymentMethod.wallet;
+  CheckoutPaymentMethod _paymentMethod = CheckoutPaymentMethod.wallet;
+  String? _cardId;
+  LinkedCard? _extraCard;
+  StreamSubscription<Wallet?>? _walletSub;
+  double _walletBalance = 0;
+
+  LinkedCard? get _resolvedCard => resolveCheckoutCard(
+    ref.read(linkedCardsProvider).asData?.value,
+    _extraCard,
+    _cardId,
+  );
   Address? _deliveryAddress;
 
   /// The delivery date. Initialised from [widget.orderDate], editable here.
@@ -71,6 +88,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.initState();
     _orderDate = widget.orderDate;
     _deliveryAddress = widget.buyerProfile.address;
+    _walletSub = const WalletService().watchBalance(_buyerProfileId).listen((
+      wallet,
+    ) {
+      if (!mounted) return;
+      setState(() => _walletBalance = wallet?.balance ?? 0);
+    });
     _sub = _cartService.watchCartItems(_buyerProfileId).listen((items) {
       if (!mounted) return;
       setState(() {
@@ -87,6 +110,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void dispose() {
     _sub?.cancel();
+    _walletSub?.cancel();
     super.dispose();
   }
 
@@ -154,6 +178,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
+    if (_paymentMethod == CheckoutPaymentMethod.card && _resolvedCard == null) {
+      setState(() => _errorMessage = 'payments_error_card_required'.tr());
+      return;
+    }
+
     setState(() {
       _isPlacingOrder = true;
       _errorMessage = null;
@@ -164,6 +193,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         buyerProfile: widget.buyerProfile.copyWith(address: _deliveryAddress),
         items: _items,
         paymentMethod: _paymentMethod.name,
+        linkedCardId: _resolvedCard?.id,
         orderDate: _orderDate,
         requestId: _checkoutRequestId ??= const Uuid().v4(),
       );
@@ -185,7 +215,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
       if (!mounted) return;
       // Show the actual error detail in debug builds so problems are visible.
-      final detail = error.toString();
+      final detail = error is PaymentException
+          ? error.message
+          : error.toString();
       setState(() {
         _isPlacingOrder = false;
         _errorMessage = '${"checkout_failed".tr()}\n$detail';
@@ -333,6 +365,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final theme = Theme.of(context);
     final summary = _summary;
     final groups = _groups;
+    final card = resolveCheckoutCard(
+      ref.watch(linkedCardsProvider).asData?.value,
+      _extraCard,
+      _cardId,
+    );
     if (summary == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -370,9 +407,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 16),
               _SectionHeader(title: 'payment_method'.tr()),
               const SizedBox(height: 8),
-              _PaymentMethodSelector(
-                selected: _paymentMethod,
-                onChanged: (method) => setState(() => _paymentMethod = method),
+              CheckoutPaymentSelector(
+                method: _paymentMethod,
+                onMethodChanged: (method) =>
+                    setState(() => _paymentMethod = method),
+                selectedCard: card,
+                extraCard: _extraCard,
+                onCardSelected: (picked) => setState(() => _cardId = picked.id),
+                onCardAdded: (added) => setState(() {
+                  _extraCard = added;
+                  _cardId = added.id;
+                }),
+                walletBalance: _walletBalance,
+                total: summary.total,
               ),
               const SizedBox(height: 16),
               _PriceBreakdownCard(summary: summary),
@@ -391,7 +438,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
         _PlaceOrderBar(
           enabled:
-              _items.isNotEmpty && !_hasUnavailableItems && !_isPlacingOrder,
+              _items.isNotEmpty &&
+              !_hasUnavailableItems &&
+              !_isPlacingOrder &&
+              (_paymentMethod == CheckoutPaymentMethod.wallet
+                  ? _walletBalance >= summary.total
+                  : card != null),
           isLoading: _isPlacingOrder,
           onPressed: _placeOrder,
         ),
@@ -673,95 +725,6 @@ class _FarmerOrderCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _PaymentMethodSelector extends StatelessWidget {
-  final _PaymentMethod selected;
-  final ValueChanged<_PaymentMethod> onChanged;
-
-  const _PaymentMethodSelector({
-    required this.selected,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _PaymentOptionTile(
-          icon: Icons.account_balance_wallet_outlined,
-          label: 'greenyield_wallet'.tr(),
-          selected: selected == _PaymentMethod.wallet,
-          onTap: () => onChanged(_PaymentMethod.wallet),
-        ),
-        const SizedBox(height: 8),
-        _PaymentOptionTile(
-          icon: Icons.credit_card_outlined,
-          label: 'card_payment'.tr(),
-          selected: selected == _PaymentMethod.card,
-          onTap: () => onChanged(_PaymentMethod.card),
-        ),
-      ],
-    );
-  }
-}
-
-class _PaymentOptionTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _PaymentOptionTile({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: selected
-              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.35)
-              : theme.colorScheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected
-                ? theme.colorScheme.primary
-                : theme.colorScheme.outlineVariant,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: theme.colorScheme.primary),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            Icon(
-              selected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color: selected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.outline,
-            ),
-          ],
-        ),
       ),
     );
   }
