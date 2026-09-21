@@ -1,6 +1,6 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/supabase/client.dart';
 import '../../../core/widgets/app_secondary_header.dart';
@@ -13,6 +13,7 @@ import '../../reviews/presentation/widgets/review_dialog.dart';
 import '../../reviews/presentation/widgets/star_rating.dart';
 import '../order_providers.dart';
 import '../order_service.dart';
+import '../../payments/models/linked_card.dart';
 import '../order_detail_models.dart';
 import 'widgets/info_card.dart';
 import 'widgets/order_item_card.dart';
@@ -212,6 +213,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             _buildSectionHeader('Order Summary'),
             const SizedBox(height: 12),
             _buildSummaryCard(context, detail),
+            _buildPaymentInfo(context, detail),
           ],
         ),
 
@@ -558,6 +560,67 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     );
   }
 
+  /// Buyer: how it was paid. Farmer: commission + net payout. Driver: payout.
+  /// Payout rows only appear once the order is settled (server returns null before).
+  Widget _buildPaymentInfo(BuildContext context, OrderDetail detail) {
+    final theme = Theme.of(context);
+    String money(double v) => 'LKR ${v.toStringAsFixed(2)}';
+    final rows = <Widget>[];
+
+    if (widget.viewerRole == 'buyer' && detail.paymentMethod != null) {
+      rows.add(
+        _SummaryRow(
+          label: 'payments_payment_method'.tr(),
+          value: detail.paymentMethod == 'card'
+              ? 'payments_paid_with_card'.tr(
+                  namedArgs: {
+                    'card':
+                        '${CardBrand.fromDb(detail.paymentCardBrand).label} •••• ${detail.paymentCardLast4 ?? ''}',
+                  },
+                )
+              : 'payments_paid_with_wallet'.tr(),
+        ),
+      );
+    }
+    if (widget.viewerRole == 'farmer' && detail.netPayout != null) {
+      rows.add(
+        _SummaryRow(
+          label: 'payments_commission'.tr(),
+          value: '- ${money(detail.commissionAmount ?? 0)}',
+        ),
+      );
+      rows.add(const SizedBox(height: 8));
+      rows.add(
+        _SummaryRow(
+          label: 'payments_net_payout'.tr(),
+          value: money(detail.netPayout!),
+        ),
+      );
+    }
+    if (widget.viewerRole == 'driver' && detail.driverPayout != null) {
+      rows.add(
+        _SummaryRow(
+          label: 'payments_driver_payout'.tr(),
+          value: money(detail.driverPayout!),
+        ),
+      );
+    }
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+        ),
+        child: Column(children: rows),
+      ),
+    );
+  }
+
   Widget _buildSummaryCard(BuildContext context, OrderDetail detail) {
     final theme = Theme.of(context);
     return Container(
@@ -577,6 +640,11 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           _SummaryRow(
             label: 'Delivery Fee',
             value: 'LKR ${detail.deliveryFeeAmount.toStringAsFixed(2)}',
+          ),
+          const SizedBox(height: 8),
+          _SummaryRow(
+            label: 'tax'.tr(),
+            value: 'LKR ${detail.taxAmount.toStringAsFixed(2)}',
           ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
