@@ -16,7 +16,12 @@ import 'package:google_fonts/google_fonts.dart';
 /// it's provided.
 class AppSecondaryHeader extends StatelessWidget
     implements PreferredSizeWidget {
-  final String title;
+  final String? title;
+
+  /// Replaces the plain text [title] for screens whose title is richer
+  /// than a string (e.g. a chat header with the other person's avatar).
+  /// Exactly one of [title] / [titleWidget] must be given.
+  final Widget? titleWidget;
   final bool showBackButton;
 
   /// Overrides the default `Navigator.maybePop()` — e.g. a multi-step
@@ -31,13 +36,17 @@ class AppSecondaryHeader extends StatelessWidget
 
   const AppSecondaryHeader({
     super.key,
-    required this.title,
+    this.title,
+    this.titleWidget,
     this.showBackButton = true,
     this.onBackPressed,
     this.helpText,
     this.actions,
     this.bottom,
-  });
+  }) : assert(
+         (title == null) != (titleWidget == null),
+         'Pass exactly one of title / titleWidget',
+       );
 
   @override
   Size get preferredSize =>
@@ -54,12 +63,14 @@ class AppSecondaryHeader extends StatelessWidget
                   onBackPressed ?? () => Navigator.of(context).maybePop(),
             )
           : null,
-      title: Text(
-        title,
-        style: GoogleFonts.outfit(
-          textStyle: Theme.of(context).textTheme.titleLarge,
-        ),
-      ),
+      title:
+          titleWidget ??
+          Text(
+            title!,
+            style: GoogleFonts.outfit(
+              textStyle: Theme.of(context).textTheme.titleLarge,
+            ),
+          ),
       bottom: bottom,
       actions: [
         if (helpText != null)
