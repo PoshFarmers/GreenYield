@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_secondary_header.dart';
 import '../application/notification_providers.dart';
 import 'widgets/notification_card.dart';
 
@@ -47,8 +48,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     // No hardcoded background: the theme's scaffold colour handles
     // light and dark mode.
     return Scaffold(
-      appBar: AppBar(
-        title: Text('notifications_title'.tr()),
+      appBar: AppSecondaryHeader(
+        title: 'notifications_title'.tr(),
         actions: [
           TextButton(
             onPressed: unreadCount > 0 ? controller.markAllRead : null,

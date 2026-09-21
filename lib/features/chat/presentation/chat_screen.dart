@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/widgets/app_secondary_header.dart';
 import '../../../core/widgets/avatar_image.dart';
 import '../../../models/chat_models.dart';
 import '../application/chat_providers.dart';
@@ -257,13 +258,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         ?.value;
 
     return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 0,
-        title: Row(
+      appBar: AppSecondaryHeader(
+        titleWidget: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             AvatarImage(path: widget.otherAvatarUrl, radius: 18),
             const SizedBox(width: 10),
-            Expanded(
+            Flexible(
               child: Text(widget.otherName, overflow: TextOverflow.ellipsis),
             ),
           ],

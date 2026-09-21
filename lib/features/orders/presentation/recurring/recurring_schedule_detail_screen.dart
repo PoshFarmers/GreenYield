@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/local_db/powersync.dart';
 import '../../../../core/supabase/client.dart';
+import '../../../../core/widgets/app_secondary_header.dart';
 import '../../../../core/widgets/media_image.dart';
 import '../../../../models/notification_item.dart';
 import '../../recurring_order_models.dart';
@@ -24,7 +25,7 @@ class _RecurringScheduleDetailScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Schedule Details')),
+      appBar: const AppSecondaryHeader(title: 'Schedule Details'),
       body: StreamBuilder<List<Map<String, dynamic>>>(
         stream: supabase
             .from('recurring_schedule')

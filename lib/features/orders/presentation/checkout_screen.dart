@@ -5,6 +5,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/widgets/app_secondary_header.dart';
 import '../../../core/widgets/media_image.dart';
 import '../../../models/cart_item.dart';
 import '../../../models/marketplace_listing.dart';
@@ -342,8 +343,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('checkout_title'.tr()),
+      appBar: AppSecondaryHeader(
+        title: 'checkout_title'.tr(),
         actions: [
           IconButton(icon: const Icon(Icons.help_outline), onPressed: () {}),
         ],

@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/avatar_image.dart';
 import '../../../models/chat_models.dart';
 import '../../../models/profile.dart';
@@ -132,7 +133,7 @@ class _ChatThreadsScreenState extends ConsumerState<ChatThreadsScreen>
     ];
 
     return Scaffold(
-      appBar: AppBar(title: Text('chat_title'.tr())),
+      appBar: AppHeader(profile: widget.profile),
       body: Column(
         children: [
           Padding(

@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/local_db/powersync.dart';
+import '../../../../core/widgets/app_secondary_header.dart';
 import '../../../../core/widgets/media_image.dart';
 
 import 'package:greenyield/models/wallet.dart';
@@ -318,16 +319,19 @@ class _CreateRecurringScheduleScreenState
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.existingScheduleId != null
-              ? 'Edit Schedule'
-              : 'Create Schedule',
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => Navigator.pop(context),
-        ),
+      appBar: AppSecondaryHeader(
+        title: widget.existingScheduleId != null
+            ? 'Edit Schedule'
+            : 'Create Schedule',
+        // A close (not back) affordance: this is a dismissable flow, so
+        // the X moves to the actions slot rather than becoming an arrow.
+        showBackButton: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
       ),
       body: Stepper(
         type: StepperType.horizontal,
@@ -775,12 +779,15 @@ class _CreateRecurringScheduleScreenState
           heightFactor: 0.8,
           child: Column(
             children: [
-              AppBar(
-                title: const Text('Select Crop'),
-                leading: IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
+              AppSecondaryHeader(
+                title: 'Select Crop',
+                showBackButton: false,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
               ),
               Expanded(
                 child: ListView.builder(
@@ -1051,12 +1058,15 @@ class _CreateRecurringScheduleScreenState
               heightFactor: 0.8,
               child: Column(
                 children: [
-                  AppBar(
-                    title: const Text('Select Preferred Farmer'),
-                    leading: IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
+                  AppSecondaryHeader(
+                    title: 'Select Preferred Farmer',
+                    showBackButton: false,
+                    actions: [
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
                   ),
                   Padding(
                     padding: const EdgeInsets.all(16.0),

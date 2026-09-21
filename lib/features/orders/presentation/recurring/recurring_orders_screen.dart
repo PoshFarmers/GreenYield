@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/app_secondary_header.dart';
 import 'recurring_schedule_list_screen.dart';
 
 class RecurringOrdersScreen extends StatelessWidget {
@@ -10,7 +11,7 @@ class RecurringOrdersScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Recurring Orders')),
+      appBar: const AppSecondaryHeader(title: 'Recurring Orders'),
       body: RecurringScheduleListWidget(buyerProfileId: buyerProfileId),
     );
   }

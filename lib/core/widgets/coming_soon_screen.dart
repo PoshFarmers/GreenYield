@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'app_secondary_header.dart';
+
 /// Placeholder for a nav-bar tab whose feature hasn't been merged yet
 /// (e.g. Harvest, Cart, Deliveries, Chat). Swap this out for the real
 /// screen as each Epic's branch lands — the nav shell itself doesn't
@@ -12,7 +14,7 @@ class ComingSoonScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppSecondaryHeader(title: title, showBackButton: false),
       body: Center(
         child: Text(
           '$title — coming soon',
