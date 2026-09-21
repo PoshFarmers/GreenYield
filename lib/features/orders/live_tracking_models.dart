@@ -95,25 +95,13 @@ class LiveOrderTracking {
   });
 
   /// Check if the tracking button should be visible/active.
-  /// Needs to be visible ONLY on order day.
+  /// Visible until the order is completed or cancelled.
   bool get isOrderDay {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    if (orderDate != null) {
-      final target = DateTime(
-        orderDate!.year,
-        orderDate!.month,
-        orderDate!.day,
-      );
-      return target.isAtSameMomentAs(today);
-    }
-    if (placedAt != null) {
-      final target = DateTime(placedAt!.year, placedAt!.month, placedAt!.day);
-      return target.isAtSameMomentAs(today);
-    }
-    return true; // fallback if no date set
+    return status != 'delivered' &&
+        status != 'completed' &&
+        status != 'cancelled';
   }
+
 
   factory LiveOrderTracking.fromMap(Map<String, dynamic> map) {
     return LiveOrderTracking(
