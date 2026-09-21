@@ -2,6 +2,7 @@ import 'dart:developer' as developer;
 
 import 'package:uuid/uuid.dart';
 
+import '../../core/local_db/powersync.dart';
 import '../../core/supabase/client.dart';
 import '../../models/cart_item.dart';
 import '../../models/profile.dart';
@@ -78,6 +79,11 @@ class CheckoutService {
       throw StateError('Cart has unavailable items');
     }
 
+    await _ensureServerCart(
+      buyerProfileId: buyerProfile.id,
+      cartItemIds: items.map((item) => item.cartItemId).toSet(),
+    );
+
     developer.log(
       'Calling place_checkout RPC — items: ${items.length}, method: $paymentMethod',
       name: 'GreenYield.CheckoutService',
@@ -127,6 +133,61 @@ class CheckoutService {
       deliveryAddress: buyerProfile.address,
       orderDate: parsedOrderDate,
     );
+  }
+
+  /// PowerSync writes are queued locally and may not have reached Postgres
+  /// when the buyer confirms checkout. The checkout RPC runs against the
+  /// server cart, so mirror the local cart first to avoid a false "Cart not
+  /// found" error when the app is online.
+  Future<void> _ensureServerCart({
+    required String buyerProfileId,
+    required Set<String> cartItemIds,
+  }) async {
+    final cart = await db.getOptional(
+      'SELECT id, created_at, updated_at FROM cart '
+      'WHERE buyer_profile_id = ?',
+      [buyerProfileId],
+    );
+    if (cart == null) {
+      throw StateError('Local cart not found');
+    }
+
+    final localCartId = cart['id'] as String;
+    final serverCart = await supabase
+        .from('cart')
+        .select('id')
+        .eq('buyer_profile_id', buyerProfileId)
+        .maybeSingle();
+    final cartId = serverCart?['id'] as String? ?? localCartId;
+
+    if (serverCart == null) {
+      await supabase.from('cart').insert({
+        'id': cartId,
+        'buyer_profile_id': buyerProfileId,
+        'created_at': cart['created_at'],
+        'updated_at': cart['updated_at'],
+      });
+    }
+
+    final localItems = await db.getAll(
+      'SELECT id, produce_listing_id, quantity_kg, created_at, updated_at '
+      'FROM cart_item WHERE cart_id = ?',
+      [localCartId],
+    );
+    final selectedItems = localItems.where(
+      (item) => cartItemIds.contains(item['id'] as String),
+    );
+
+    for (final item in selectedItems) {
+      await supabase.from('cart_item').upsert({
+        'id': item['id'],
+        'cart_id': cartId,
+        'produce_listing_id': item['produce_listing_id'],
+        'quantity_kg': item['quantity_kg'],
+        'created_at': item['created_at'],
+        'updated_at': item['updated_at'],
+      });
+    }
   }
 
   CheckoutSubOrder _subOrderFromResponse(Map<String, dynamic> order) {
