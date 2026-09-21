@@ -102,7 +102,6 @@ class LiveOrderTracking {
         status != 'cancelled';
   }
 
-
   factory LiveOrderTracking.fromMap(Map<String, dynamic> map) {
     return LiveOrderTracking(
       orderId: map['order_id'] as String? ?? '',
