@@ -342,6 +342,19 @@ class OrderService {
       subtotalAmount: _toDouble(row['subtotal_amount']),
       deliveryFeeAmount: _toDouble(row['delivery_fee_amount']),
       totalAmount: _toDouble(row['total_amount']),
+      taxAmount: _toDouble(row['tax_amount']),
+      paymentMethod: row['payment_method'] as String?,
+      paymentCardLast4: row['payment_card_last4'] as String?,
+      paymentCardBrand: row['payment_card_brand'] as String?,
+      commissionAmount: row['commission_amount'] == null
+          ? null
+          : _toDouble(row['commission_amount']),
+      netPayout: row['net_payout'] == null
+          ? null
+          : _toDouble(row['net_payout']),
+      driverPayout: row['driver_payout'] == null
+          ? null
+          : _toDouble(row['driver_payout']),
       items: items,
       buyerProfileId: row['buyer_profile_id'] as String,
       buyerName: buyerName.isNotEmpty ? buyerName : 'Buyer',
@@ -380,6 +393,7 @@ class OrderService {
         o.total_amount,
         o.placed_at,
         o.order_date,
+        o.tax_amount,
         o.delivery_address,
         d.id              AS delivery_id,
         d.status          AS delivery_status,
@@ -438,6 +452,7 @@ class OrderService {
       subtotalAmount: _toDouble(row['subtotal_amount']),
       deliveryFeeAmount: _toDouble(row['delivery_fee_amount']),
       totalAmount: _toDouble(row['total_amount']),
+      taxAmount: _toDouble(row['tax_amount']),
       items: items,
       buyerProfileId: row['buyer_profile_id'] as String,
       buyerName: buyerDisplayName ?? 'Buyer',
