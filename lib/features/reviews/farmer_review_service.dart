@@ -63,7 +63,8 @@ class FarmerReviewService {
         .watch(
           '''
           SELECT id FROM orders
-          WHERE buyer_profile_id = ? AND farmer_profile_id = ? AND status = 'delivered'
+          WHERE buyer_profile_id = ? AND farmer_profile_id = ?
+            AND status IN ('delivered', 'completed')
           ORDER BY placed_at DESC
           LIMIT 1
           ''',
