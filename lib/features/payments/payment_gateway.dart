@@ -59,12 +59,20 @@ class PaymentException implements Exception {
     'invalid_amount',
     'invalid_request',
     'request_id_conflict',
+    'card_required',
+    'insufficient_wallet_balance',
     'network',
   };
 
-  /// The migration raises plain codes as the exception message.
+  /// The server raises plain codes as the exception message. Checkout raises
+  /// `card_declined:<reason>` (reason = card_declined | insufficient_funds |
+  /// expired_card | incorrect_cvc); the reason is what the user needs to see.
   factory PaymentException.fromServerMessage(String message) {
-    final code = message.trim();
+    final raw = message.trim();
+    const declinedPrefix = 'card_declined:';
+    final code = raw.startsWith(declinedPrefix)
+        ? raw.substring(declinedPrefix.length)
+        : raw;
     return PaymentException(_knownCodes.contains(code) ? code : 'unknown');
   }
 
