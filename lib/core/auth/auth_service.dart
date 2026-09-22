@@ -94,6 +94,18 @@ class AuthService {
     ]);
   }
 
+  /// No-op when signed out or before the profile row exists (the UPDATE
+  /// simply matches nothing) — the language still applies on-device via
+  /// easy_localization, and createOwnProfile picks it up later.
+  Future<void> updatePreferredLanguage(String code) async {
+    final userId = currentUser?.id;
+    if (userId == null) return;
+    await db.execute('UPDATE profile SET preferred_language = ? WHERE id = ?', [
+      code,
+      userId,
+    ]);
+  }
+
   Future<void> updateProfileLocation({
     required GeoPoint locationPoint,
     required String locationText,
