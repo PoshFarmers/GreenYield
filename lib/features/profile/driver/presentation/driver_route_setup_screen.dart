@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/app_secondary_header.dart';
 import '../../../../models/driver_profile.dart';
 import '../driver_profile_service.dart';
 import 'widgets/route_draft_editor.dart';
@@ -73,8 +74,8 @@ class _DriverRouteSetupScreenState extends State<DriverRouteSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('preferred_routes'.tr()),
+      appBar: AppSecondaryHeader(
+        title: 'preferred_routes'.tr(),
         actions: [
           IconButton(
             tooltip: 'help'.tr(),

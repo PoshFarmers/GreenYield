@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/widgets/app_logo.dart';
+import '../../../core/widgets/app_secondary_header.dart';
 
 class _RoleOption {
   const _RoleOption(this.value, this.icon, this.titleKey, this.subtitleKey);
@@ -64,21 +66,11 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.agriculture, color: theme.colorScheme.primary),
-            const SizedBox(width: 8),
-            Text(
-              'app_name'.tr(),
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
+      // Branded header (logo + name) rather than a step title — this is
+      // reached through AuthGate's state flow, so there's nothing to pop.
+      appBar: const AppSecondaryHeader(
+        titleWidget: AppLogo(size: 30, showName: true),
+        showBackButton: false,
       ),
       body: SafeArea(
         child: Center(

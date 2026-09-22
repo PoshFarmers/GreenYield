@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/auth/auth_providers.dart';
+import '../../../../core/widgets/app_secondary_header.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../models/buyer_profile.dart';
 import '../buyer_profile_service.dart';
@@ -63,7 +64,10 @@ class _BuyerCompleteProfileScreenState
   Widget build(BuildContext context) {
     final isOrganization = _buyerType == 'organization';
     return Scaffold(
-      appBar: AppBar(title: Text('buyer_profile_title'.tr())),
+      appBar: AppSecondaryHeader(
+        title: 'buyer_profile_title'.tr(),
+        showBackButton: false,
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

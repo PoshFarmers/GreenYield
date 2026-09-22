@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/auth/auth_providers.dart';
+import '../../../../core/widgets/app_secondary_header.dart';
 import '../../../../models/driver_profile.dart';
 import '../driver_profile_service.dart';
 import 'steps/route_selection_step.dart';
@@ -129,18 +130,15 @@ class _DriverRegistrationFlowState
         : 'select_preferred_route';
 
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (_stepIndex == 0) {
-              Navigator.of(context).maybePop();
-            } else {
-              _goToStep(0);
-            }
-          },
-        ),
-        title: Text(titleKey.tr()),
+      appBar: AppSecondaryHeader(
+        title: titleKey.tr(),
+        onBackPressed: () {
+          if (_stepIndex == 0) {
+            Navigator.of(context).maybePop();
+          } else {
+            _goToStep(0);
+          }
+        },
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/auth/auth_providers.dart';
 import '../../../../core/storage/avatar_cache_service.dart';
 import '../../../../core/storage/avatar_service.dart';
+import '../../../../core/widgets/app_secondary_header.dart';
 import '../../../../core/widgets/generic_profile_form.dart';
 import '../../../../models/profile.dart';
 
@@ -82,7 +83,7 @@ class _FarmerProfileEditScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('edit_profile'.tr())),
+      appBar: AppSecondaryHeader(title: 'edit_profile'.tr()),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

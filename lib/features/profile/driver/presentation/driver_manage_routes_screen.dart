@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/app_secondary_header.dart';
 import '../../../../models/driver_profile.dart';
 import '../driver_profile_service.dart';
 import 'driver_route_setup_screen.dart';
@@ -67,8 +68,8 @@ class _DriverManageRoutesScreenState extends State<DriverManageRoutesScreen> {
     final hPad = width < 360 ? 16.0 : 20.0;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('saved_routes'.tr()),
+      appBar: AppSecondaryHeader(
+        title: 'saved_routes'.tr(),
         actions: [
           IconButton(
             tooltip: 'help'.tr(),
