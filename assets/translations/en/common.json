@@ -1,5 +1,12 @@
 {
   "app_name": "GreenYield",
+  "nav_home": "Home",
+  "nav_cart": "Cart",
+  "nav_orders": "Orders",
+  "nav_chat": "Chat",
+  "nav_harvest": "Harvest",
+  "nav_calendar": "Calendar",
+  "nav_deliveries": "Deliveries",
   "welcome": "Welcome",
   "toggle_theme": "Theme",
   "language": "Language",
@@ -79,5 +86,12 @@
   "transaction_type_payout": "Payout",
   "transaction_type_refund": "Refund",
   "transaction_type_withdrawal": "Withdrawal",
-  "transaction_type_adjustment": "Adjustment"
+  "transaction_type_adjustment": "Adjustment",
+  "save_changes": "Save changes",
+  "discard": "Discard",
+  "keep_editing": "Keep editing",
+  "discard_changes_title": "Discard changes?",
+  "discard_changes_body": "Your unsaved changes will be lost.",
+  "not_set": "Not set",
+  "clear_date": "Clear date"
 }

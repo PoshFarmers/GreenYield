@@ -1,8 +1,10 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// One tab of a role's nav shell.
 class NavTab {
+  /// Translation key (e.g. 'nav_home'), translated when rendered.
   final String label;
   final IconData icon;
   final WidgetBuilder builder;
@@ -89,7 +91,7 @@ class _AppNavShellState extends ConsumerState<AppNavShell> {
               icon: tab.iconBuilder != null
                   ? Builder(builder: tab.iconBuilder!)
                   : Icon(tab.icon),
-              label: tab.label,
+              label: tab.label.tr(),
             ),
         ],
       ),

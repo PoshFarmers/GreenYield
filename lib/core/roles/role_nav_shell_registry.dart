@@ -32,17 +32,17 @@ Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
       : rawProfile;
 
   final homeTab = NavTab(
-    label: 'Home',
+    label: 'nav_home',
     icon: Icons.home_outlined,
     builder: (_) => HomeScreen(profile: profile),
   );
   final farmerHomeTab = NavTab(
-    label: 'Home',
+    label: 'nav_home',
     icon: Icons.home_outlined,
     builder: (_) => FarmerHomeScreen(profile: profile),
   );
   final chatTab = NavTab(
-    label: 'Chat',
+    label: 'nav_chat',
     icon: Icons.chat_bubble_outline,
     iconBuilder: (_) => ChatNavBadgeIcon(activeRole: activeRole),
     builder: (_) => ChatThreadsScreen(profile: profile),
@@ -54,12 +54,12 @@ Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
         tabs: [
           farmerHomeTab,
           NavTab(
-            label: 'Harvest',
+            label: 'nav_harvest',
             icon: Icons.grass_outlined,
             builder: (_) => MyListingsScreen(profile: profile),
           ),
           NavTab(
-            label: 'Orders',
+            label: 'nav_orders',
             icon: Icons.receipt_long_outlined,
             builder: (_) => FarmerOrdersScreen(profile: profile),
           ),
@@ -73,18 +73,18 @@ Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
           // The buyer's "home" is the marketplace, not the shared
           // HomeScreen the other roles still use.
           NavTab(
-            label: 'Home',
+            label: 'nav_home',
             icon: Icons.home_outlined,
             builder: (_) => MarketplaceScreen(profile: profile),
           ),
           NavTab(
-            label: 'Cart',
+            label: 'nav_cart',
             icon: Icons.shopping_cart_outlined,
             iconBuilder: (_) => CartNavBadgeIcon(buyerProfileId: profile.id),
             builder: (_) => CartScreen(profile: profile),
           ),
           NavTab(
-            label: 'Orders',
+            label: 'nav_orders',
             icon: Icons.receipt_long_outlined,
             builder: (_) => BuyerOrdersScreen(profile: profile),
           ),
@@ -96,17 +96,17 @@ Widget buildNavShellForRole(Profile rawProfile, String activeRole) {
       return AppNavShell(
         tabs: [
           NavTab(
-            label: 'Home',
+            label: 'nav_home',
             icon: Icons.home_outlined,
             builder: (_) => DriverHomeScreen(profile: profile),
           ),
           NavTab(
-            label: 'Calendar',
+            label: 'nav_calendar',
             icon: Icons.calendar_today_outlined,
             builder: (_) => DriverCalendarScreen(profile: profile),
           ),
           NavTab(
-            label: 'Deliveries',
+            label: 'nav_deliveries',
             icon: Icons.local_shipping_outlined,
             builder: (_) => DriverDeliveriesScreen(profile: profile),
           ),
