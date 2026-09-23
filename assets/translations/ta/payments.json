@@ -74,5 +74,18 @@
   "payments_error_amount_too_high": "ஒரு பரிவர்த்தனைக்கு அதிகபட்ச டாப் அப் தொகை LKR 100,000.",
   "payments_error_invalid_amount": "சரியான தொகையை உள்ளிடவும்.",
   "payments_error_invalid_request": "ஏதோ தவறு நடந்தது. மீண்டும் முயலவும்.",
-  "payments_error_request_id_conflict": "ஏதோ தவறு நடந்தது. மீண்டும் முயலவும்."
+  "payments_error_request_id_conflict": "ஏதோ தவறு நடந்தது. மீண்டும் முயலவும்.",
+  "payments_error_card_required": "பணம் செலுத்த ஒரு அட்டையைத் தேர்ந்தெடுக்கவும்.",
+  "payments_error_insufficient_wallet_balance": "உங்கள் பணப்பை இருப்பு போதாது. நிரப்பிவிட்டு மீண்டும் முயலவும்.",
+  "payments_checkout_wallet_balance": "இருப்பு: {amount}",
+  "payments_checkout_wallet_low": "உங்கள் பணப்பை இருப்பு இந்த ஆர்டரின் மொத்தத்தை விட குறைவு.",
+  "payments_checkout_top_up": "நிரப்பு",
+  "payments_checkout_add_card": "புதிய அட்டையைச் சேர்",
+  "payments_checkout_no_cards": "சேமித்த அட்டைகள் இல்லை. அட்டை மூலம் செலுத்த ஒன்றைச் சேர்க்கவும்.",
+  "payments_paid_with_wallet": "பணப்பை மூலம் செலுத்தப்பட்டது",
+  "payments_paid_with_card": "{card} மூலம் செலுத்தப்பட்டது",
+  "payments_payment_method": "கட்டணம்",
+  "payments_commission": "தளக் கமிஷன்",
+  "payments_net_payout": "நிகர கொடுப்பனவு",
+  "payments_driver_payout": "டெலிவரி கொடுப்பனவு"
 }

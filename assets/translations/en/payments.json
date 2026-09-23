@@ -74,5 +74,18 @@
   "payments_error_amount_too_high": "The maximum top-up is LKR 100,000 per transaction.",
   "payments_error_invalid_amount": "Enter a valid amount.",
   "payments_error_invalid_request": "Something went wrong. Please try again.",
-  "payments_error_request_id_conflict": "Something went wrong. Please try again."
+  "payments_error_request_id_conflict": "Something went wrong. Please try again.",
+  "payments_error_card_required": "Select a card to pay with.",
+  "payments_error_insufficient_wallet_balance": "Your wallet balance is too low. Top up and try again.",
+  "payments_checkout_wallet_balance": "Balance: {amount}",
+  "payments_checkout_wallet_low": "Your wallet balance is lower than this order's total.",
+  "payments_checkout_top_up": "Top up",
+  "payments_checkout_add_card": "Add a new card",
+  "payments_checkout_no_cards": "No saved cards yet. Add one to pay by card.",
+  "payments_paid_with_wallet": "Paid with wallet",
+  "payments_paid_with_card": "Paid with {card}",
+  "payments_payment_method": "Payment",
+  "payments_commission": "Platform commission",
+  "payments_net_payout": "Net payout",
+  "payments_driver_payout": "Delivery payout"
 }
