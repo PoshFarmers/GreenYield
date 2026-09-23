@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/app_language.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/avatar_image.dart';
@@ -95,20 +96,17 @@ class HomeScreen extends ConsumerWidget {
 
                 const SizedBox(height: 8),
 
-                DropdownButton<Locale>(
-                  value: context.locale,
-                  items: context.supportedLocales
-                      .map(
-                        (locale) => DropdownMenuItem(
-                          value: locale,
-                          child: Text(locale.languageCode.toUpperCase()),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (locale) {
-                    if (locale != null) {
-                      context.setLocale(locale);
-                    }
+                DropdownButton<String>(
+                  value: context.locale.languageCode,
+                  items: [
+                    for (final language in AppLanguage.all)
+                      DropdownMenuItem(
+                        value: language.code,
+                        child: Text(language.nativeName),
+                      ),
+                  ],
+                  onChanged: (code) {
+                    if (code != null) applyLanguage(context, ref, code);
                   },
                 ),
               ],

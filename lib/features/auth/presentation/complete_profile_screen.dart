@@ -37,13 +37,6 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   final _cityController = TextEditingController();
   final _postalCodeController = TextEditingController();
 
-  static const _languages = [
-    ('en', 'English'),
-    ('si', 'සිංහල'),
-    ('ta', 'தமிழ்'),
-  ];
-
-  String _preferredLanguage = 'en';
   Uint8List? _avatarBytes;
   String? _avatarFileName;
   bool _isSubmitting = false;
@@ -112,6 +105,9 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
     try {
       final authService = ref.read(authServiceProvider);
       final userId = authService.currentUser!.id;
+      // Already chosen on first launch (or via the login screen's
+      // language button) — no need to ask again here.
+      final languageCode = context.locale.languageCode;
 
       String? avatarUrl;
       if (_avatarBytes != null) {
@@ -130,7 +126,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
             ? null
             : _phoneController.text.trim(),
         avatarUrl: avatarUrl,
-        preferredLanguage: _preferredLanguage,
+        preferredLanguage: languageCode,
         address: Address(
           line1: _line1Controller.text.trim(),
           line2: _line2Controller.text.trim(),
@@ -258,21 +254,6 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 24),
-                    Text('language'.tr(), style: theme.textTheme.labelLarge),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      children: _languages.map((entry) {
-                        final (code, label) = entry;
-                        return ChoiceChip(
-                          label: Text(label),
-                          selected: _preferredLanguage == code,
-                          onSelected: (_) =>
-                              setState(() => _preferredLanguage = code),
-                        );
-                      }).toList(),
                     ),
                     if (_errorMessage != null) ...[
                       const SizedBox(height: 16),

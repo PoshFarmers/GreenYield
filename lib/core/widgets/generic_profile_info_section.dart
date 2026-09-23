@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import 'avatar_image.dart';
+import '../localization/app_language.dart';
 import '../../models/profile.dart';
 
 /// Renders the avatar, name, phone, address, location, and preferred
@@ -48,7 +49,9 @@ class GenericProfileInfoSection extends StatelessWidget {
         ListTile(
           leading: const Icon(Icons.language),
           title: Text('preferred_language'.tr()),
-          subtitle: Text(profile.preferredLanguage.toUpperCase()),
+          // The app's actual language (device is the source of truth;
+          // the profile value mirrors it).
+          subtitle: Text(AppLanguage.current(context).nativeName),
         ),
         const Divider(height: 32),
       ],

@@ -2,8 +2,10 @@ import 'dart:typed_data';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../localization/app_language.dart';
 import '../location/location_service.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/avatar_image.dart';
@@ -348,15 +350,31 @@ class GenericProfileFormSection extends StatelessWidget {
 
             const SizedBox(height: 8),
 
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'en', label: Text('EN')),
-                ButtonSegment(value: 'si', label: Text('SI')),
-                ButtonSegment(value: 'ta', label: Text('TA')),
-              ],
-              selected: {controller.preferredLanguage},
-              onSelectionChanged: (s) =>
-                  controller.setPreferredLanguage(s.first),
+            // Applies instantly (the whole form re-renders in the new
+            // language) rather than waiting for Save — the device locale
+            // is the source of truth, see applyLanguage.
+            Consumer(
+              builder: (context, ref, _) {
+                final current = AppLanguage.current(context);
+                // Keep the value Save writes in step with what's on
+                // screen, even if the stored profile value was stale.
+                controller.preferredLanguage = current.code;
+                return SegmentedButton<String>(
+                  showSelectedIcon: false,
+                  segments: [
+                    for (final language in AppLanguage.all)
+                      ButtonSegment(
+                        value: language.code,
+                        label: Text(language.nativeName),
+                      ),
+                  ],
+                  selected: {current.code},
+                  onSelectionChanged: (s) {
+                    controller.setPreferredLanguage(s.first);
+                    applyLanguage(context, ref, s.first);
+                  },
+                );
+              },
             ),
           ],
         );

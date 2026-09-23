@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -61,6 +64,24 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     return _completionFuture!;
   }
 
+  /// '$profileId:$code' last pushed by [_syncPreferredLanguage].
+  String? _languageSyncKey;
+
+  /// The device locale is the source of truth for the UI (it's picked
+  /// on first launch, before sign-in); the profile just mirrors it so
+  /// server-side features use the same language. Every profile created
+  /// before language selection worked is stuck on the 'en' default, so
+  /// this realigns it the first time we see a mismatch.
+  void _syncPreferredLanguage(String profileId, String storedCode) {
+    final code = context.locale.languageCode;
+    final key = '$profileId:$code';
+    if (storedCode == code || _languageSyncKey == key) return;
+    _languageSyncKey = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(ref.read(authServiceProvider).updatePreferredLanguage(code));
+    });
+  }
+
   void _resetCompletion() {
     _completionToken++;
     _completionKey = null;
@@ -111,6 +132,8 @@ class _AuthGateState extends ConsumerState<AuthGate> {
                 onComplete: () => ref.invalidate(ownProfileProvider),
               );
             }
+
+            _syncPreferredLanguage(profile.id, profile.preferredLanguage);
 
             final rolesAsync = ref.watch(ownRolesProvider);
 
