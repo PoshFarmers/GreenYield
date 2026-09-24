@@ -53,3 +53,7 @@ Definitions of project terms as used in these docs.
 | **Vehicle capacity** | Dart name for `vehicle.max_load_kg` (a legacy column name repurposed as passenger capacity). |
 | **Wallet / wallet transaction** | `wallet` (one per profile, balance never below 0) and `wallet_transaction` ledger rows. Types: `topup`, `payment`, `payout`, `refund`, `withdrawal`, `adjustment`; positive amount = credit. |
 | **`checkout_request`** | Idempotency table for `place_checkout`, keyed by the client `request_id`. |
+
+## Source files
+
+`lib/models/*.dart`, `lib/core/local_db/*`, `lib/features/orders/order_detail_models.dart`, sync-config (path unconfirmed), migrations `20260815155858_generic_profile.sql`, `20260817223627_profile_role.sql`, `20260827093223_orders.sql`, `20260827094613_wallet.sql`, `20260829153627_crop_produce_listing_rework.sql`, `20260904170222_checkout_transaction.sql`, `20260915195819_seed_pricing_rule.sql`, `20260916050421_wallet_topup_rpc.sql`.
