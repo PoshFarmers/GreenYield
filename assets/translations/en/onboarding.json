@@ -1,0 +1,22 @@
+{
+  "splash_tagline": "From the farm, straight to you",
+  "splash_role_farmers": "Farmers",
+  "splash_role_buyers": "Buyers",
+  "splash_role_drivers": "Drivers",
+
+  "language_continue": "Continue",
+  "language_change_later": "You can change this anytime from your profile.",
+
+  "onboarding_skip": "Skip",
+  "onboarding_next": "Next",
+  "onboarding_get_started": "Get started",
+
+  "onboarding_1_title": "Fresh produce, straight from the farm",
+  "onboarding_1_body": "Buy directly from farmers near you. See who grew it, when it was harvested, and pay a fair price with no middlemen.",
+
+  "onboarding_2_title": "Your harvest, your price",
+  "onboarding_2_body": "Farmers list a fresh batch in under a minute, set their own price, and get paid straight to their wallet.",
+
+  "onboarding_3_title": "Delivered by local drivers",
+  "onboarding_3_body": "Drivers pick up along routes they already travel and earn on every trip, while buyers track each order live."
+}

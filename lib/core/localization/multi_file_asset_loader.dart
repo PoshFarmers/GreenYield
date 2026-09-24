@@ -20,6 +20,7 @@ class MultiFileAssetLoader extends AssetLoader {
     'checkout',
     'chat',
     'payments',
+    'onboarding',
   ];
 
   const MultiFileAssetLoader();
