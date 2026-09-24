@@ -145,3 +145,13 @@ Buyer pays `subtotal + delivery_fee + tax` per order; wallet checkout debits it 
 Time zones: `orders.order_date` defaults to `now()::date + 1` in the DB time zone; the app sends the buyer's local calendar date; `get_driver_today_stops` compares with `current_date` (DB zone); `refresh_market_price_analytics` runs at 01:00 DB time for `current_date`; `placed_at::date` casts also use the DB zone.
 
 > ⚠ Unverified: DB `timezone` versus Sri Lanka (UTC+5:30); an order dated "today" may not show on the driver's home between 00:00 and 05:30 local time.
+
+## 4. How to modify safely
+
+1. When you redefine any function listed here, grep the migrations for earlier definitions and diff the whole body: several regressions came from copy-pasting an old body (`place_checkout` twice, `transition_order_status`).
+2. After any RLS change on `orders`, `delivery`, `profile` or `vehicle`, test buyer, farmer and driver access with the PostgREST API, not only the SQL editor.
+3. Keep this file and the per-area docs in step: change both in the same PR.
+
+## Source files
+
+`lib/features/orders/order_service.dart`, `order_detail_models.dart`, `checkout_service.dart`, `driver_home_service.dart`, `lib/core/local_db/powersync_schema.dart`, `table_registry.dart`, sync-config (path unconfirmed). Migrations: `20260827094859_powersync_compat_view.sql`, `20260830035655_powersync_compat_publication_updates.sql`, `20260905000001_disable_direct_order_writes.sql`, `20260913105709_notify_and_driver_order_access.sql`, `20260913170000_fix_driver_notifications_and_calendar.sql`, `20260913180000_apply_missing_schema_and_backfill.sql`, `20260914000000_add_order_date.sql`, `20260915000000_mark_order_packed.sql`, `20260915092115_fix_missing_driver_assignment_on_checkout.sql`, `20260915093000_fix_driver_schedule_uses_order_date.sql`, `20260915100000_widen_profile_rls_for_orders.sql`, `20260915110000_get_order_detail_rpc.sql`, `20260915120000_fix_get_order_detail_rpc.sql`, `20260915130000_fix_orders_rls_recursion.sql`, `20260915165125_schedule_market_price_refresh.sql`, `20260915190815_dynamic_delivery_fee_checkout.sql`, `20260916050308_wallet_payment_and_payout.sql`, `20260916090642_driver_home_today_stops.sql`, `20260916152234_farmer_review.sql`.
