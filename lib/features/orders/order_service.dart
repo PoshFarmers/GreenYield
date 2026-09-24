@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 
 import '../../core/local_db/powersync.dart';
 import '../../core/supabase/client.dart';
+import 'cancellation_models.dart';
 import 'order_detail_models.dart';
 
 /// Sprint 3 — Task: Multi-Role Order Management.
@@ -364,6 +365,8 @@ class OrderService {
       farmerName: farmerName.isNotEmpty ? farmerName : 'Farmer',
       farmerPhone: row['farmer_phone'] as String?,
       farmerAddress: null, // not included in RPC yet
+      refund: RefundInfo.fromDetailMap(row),
+      cancellationNote: row['cancellation_note'] as String?,
       deliveryId: row['delivery_id'] as String?,
       deliveryStatus: row['delivery_status'] != null
           ? DeliveryStatus.fromDb(row['delivery_status'] as String)
@@ -523,6 +526,15 @@ class OrderService {
       'transition_delivery_status',
       params: {'p_delivery_id': deliveryId, 'p_new_status': 'delivered'},
     );
+  }
+
+  /// What cancelling would refund (and where). Calls `get_cancellation_preview`.
+  Future<CancellationPreview> getCancellationPreview(String orderId) async {
+    final data = await supabase.rpc(
+      'get_cancellation_preview',
+      params: {'p_order_id': orderId},
+    );
+    return CancellationPreview.fromMap(Map<String, dynamic>.from(data as Map));
   }
 
   /// Buyer or driver cancels an order. Calls `cancel_order(p_order_id)`.

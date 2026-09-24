@@ -2,6 +2,8 @@
 // ENUMs — mirrors Postgres order_status and delivery_status ENUMs exactly.
 // ---------------------------------------------------------------------------
 
+import 'cancellation_models.dart';
+
 enum OrderStatus {
   placed,
   confirmed,
@@ -371,6 +373,10 @@ class OrderDetail {
   final double? netPayout;
   final double? driverPayout;
 
+  // Cancellation (Task 5). `refund` is buyer-only; null when nothing was refunded.
+  final RefundInfo? refund;
+  final String? cancellationNote;
+
   // Items
   final List<OrderItemDetail> items;
 
@@ -416,6 +422,8 @@ class OrderDetail {
     this.commissionAmount,
     this.netPayout,
     this.driverPayout,
+    this.refund,
+    this.cancellationNote,
     required this.buyerProfileId,
     required this.buyerName,
     this.buyerPhone,

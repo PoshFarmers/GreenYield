@@ -14,7 +14,9 @@ import '../../reviews/presentation/widgets/star_rating.dart';
 import '../order_providers.dart';
 import '../order_service.dart';
 import '../../payments/models/linked_card.dart';
+import '../cancellation_models.dart';
 import '../order_detail_models.dart';
+import 'widgets/cancel_order_dialog.dart';
 import 'widgets/info_card.dart';
 import 'widgets/order_item_card.dart';
 import 'widgets/order_status_chip.dart';
@@ -105,6 +107,46 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Failed to open chat: $e')));
       }
+    }
+  }
+
+  /// Buyer cancel flow: refund preview -> dialog (optional reason) -> cancel.
+  Future<void> _confirmCancel(OrderDetail detail) async {
+    setState(() => _isLoadingAction = true);
+    CancellationPreview? preview;
+    try {
+      preview = await _service.getCancellationPreview(detail.id);
+    } catch (_) {
+      // The preview is informational; the dialog works without it.
+    }
+    if (!mounted) return;
+    setState(() => _isLoadingAction = false);
+
+    final reason = await showCancelOrderDialog(
+      context,
+      orderDisplayId: detail.displayId,
+      preview: preview,
+    );
+    if (reason == null || !mounted) return;
+
+    setState(() => _isLoadingAction = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _service.cancelOrder(
+        detail.id,
+        note: reason.isEmpty ? null : reason,
+      );
+      ref.invalidate(orderDetailProvider(widget.orderId));
+      final refund = preview == null
+          ? ''
+          : ' ${cancellationRefundText(preview)}';
+      messenger.showSnackBar(
+        SnackBar(content: Text('${'payments_cancel_done'.tr()}$refund')),
+      );
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Action failed: $e')));
+    } finally {
+      if (mounted) setState(() => _isLoadingAction = false);
     }
   }
 
@@ -514,6 +556,8 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
       secondaryButton = TextButton(
         onPressed: _isLoadingAction
             ? null
+            : widget.viewerRole == 'buyer'
+            ? () => _confirmCancel(detail)
             : () => _handleAction(() => _service.cancelOrder(detail.id)),
         style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
         child: const Text('Cancel Order'),
@@ -579,6 +623,47 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                   },
                 )
               : 'payments_paid_with_wallet'.tr(),
+        ),
+      );
+    }
+    final refund = detail.refund;
+    if (widget.viewerRole == 'buyer' && refund != null) {
+      if (rows.isNotEmpty) rows.add(const SizedBox(height: 8));
+      rows.add(
+        _SummaryRow(
+          label: 'payments_refund_amount'.tr(),
+          value: money(refund.amount),
+        ),
+      );
+      rows.add(const SizedBox(height: 8));
+      rows.add(
+        _SummaryRow(
+          label: 'payments_refund_status'.tr(),
+          value: refund.isCard
+              ? 'payments_refund_to_card'.tr(
+                  namedArgs: {
+                    'card':
+                        '${CardBrand.fromDb(refund.cardBrand).label} •••• ${refund.cardLast4 ?? ''}',
+                  },
+                )
+              : 'payments_refund_to_wallet'.tr(),
+        ),
+      );
+    }
+    final cancelNote = detail.cancellationNote;
+    if (detail.status == OrderStatus.cancelled &&
+        cancelNote != null &&
+        cancelNote.trim().isNotEmpty) {
+      if (rows.isNotEmpty) rows.add(const SizedBox(height: 8));
+      rows.add(
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            '${'payments_cancel_reason'.tr()}: ${cancelNote.trim()}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
         ),
       );
     }
