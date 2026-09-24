@@ -87,5 +87,21 @@
   "payments_payment_method": "கட்டணம்",
   "payments_commission": "தளக் கமிஷன்",
   "payments_net_payout": "நிகர கொடுப்பனவு",
-  "payments_driver_payout": "டெலிவரி கொடுப்பனவு"
+  "payments_driver_payout": "டெலிவரி கொடுப்பனவு",
+  "payments_cancel_title": "இந்த ஆர்டரை ரத்து செய்யவா?",
+  "payments_cancel_body": "ஆர்டர் {order} ரத்து செய்யப்பட்டு, பொருட்கள் விவசாயியின் இருப்பில் மீண்டும் சேர்க்கப்படும். இதைத் திரும்பப் பெற முடியாது.",
+  "payments_cancel_reason_label": "காரணம் (விருப்பம்)",
+  "payments_cancel_reason_hint": "எ.கா. தவறுதலாக ஆர்டர் செய்தேன்",
+  "payments_cancel_keep": "ஆர்டரை வைத்திரு",
+  "payments_cancel_confirm": "ஆர்டரை ரத்து செய்",
+  "payments_cancel_refund_wallet": "{amount} உங்கள் வாலட்டுக்குத் திருப்பி அளிக்கப்படும்.",
+  "payments_cancel_refund_card": "{amount} {last4} இல் முடியும் உங்கள் கார்டுக்குத் திருப்பி அளிக்கப்படும்.",
+  "payments_cancel_refund_none": "இந்த ஆர்டருக்குப் பணத் திருப்பம் இல்லை.",
+  "payments_cancel_refund_unknown": "பணத் திருப்பம் குறித்த விவரங்களை ஏற்ற முடியவில்லை. நீங்கள் பணம் செலுத்தியிருந்தால் அது தானாகவே திருப்பி அளிக்கப்படும்.",
+  "payments_cancel_done": "ஆர்டர் ரத்து செய்யப்பட்டது.",
+  "payments_cancel_reason": "ரத்து செய்த காரணம்",
+  "payments_refund_amount": "திருப்பிய தொகை",
+  "payments_refund_status": "பணத் திருப்பம்",
+  "payments_refund_to_wallet": "வாலட்டுக்குத் திருப்பி அளிக்கப்பட்டது",
+  "payments_refund_to_card": "{card} க்குத் திருப்பி அளிக்கப்பட்டது"
 }
