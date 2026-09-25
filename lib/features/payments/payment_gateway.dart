@@ -61,6 +61,10 @@ class PaymentException implements Exception {
     'request_id_conflict',
     'card_required',
     'insufficient_wallet_balance',
+    'withdrawal_amount_too_low',
+    'withdrawal_daily_limit_exceeded',
+    'withdrawal_insufficient_balance',
+    'payout_failed',
     'network',
   };
 
