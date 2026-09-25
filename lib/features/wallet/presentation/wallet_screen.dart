@@ -6,6 +6,8 @@ import '../../../models/wallet.dart';
 import '../../payments/presentation/payment_methods_screen.dart';
 import '../wallet_service.dart';
 import 'top_up_screen.dart';
+import 'withdraw_screen.dart';
+import 'withdrawal_history_screen.dart';
 
 /// Shared wallet screen for any role — shows the live balance, a
 /// "Top Up" action (card-funded, see [TopUpScreen]), and a scrollable
@@ -25,6 +27,14 @@ class _WalletScreenState extends State<WalletScreen> {
   void _openTopUp() {
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => const TopUpScreen()));
+  }
+
+  void _openWithdraw() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => WithdrawScreen(profileId: widget.profileId),
+      ),
+    );
   }
 
   @override
@@ -74,10 +84,24 @@ class _WalletScreenState extends State<WalletScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          ElevatedButton.icon(
-                            onPressed: _openTopUp,
-                            icon: const Icon(Icons.add),
-                            label: Text('top_up'.tr()),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _openTopUp,
+                                  icon: const Icon(Icons.add),
+                                  label: Text('top_up'.tr()),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _openWithdraw,
+                                  icon: const Icon(Icons.arrow_upward),
+                                  label: Text('payments_withdraw_button'.tr()),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -91,6 +115,16 @@ class _WalletScreenState extends State<WalletScreen> {
                       ),
                       icon: const Icon(Icons.credit_card_outlined),
                       label: Text('payments_methods_title'.tr()),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const WithdrawalHistoryScreen(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.history),
+                      label: Text('payments_withdraw_history'.tr()),
                     ),
                     const SizedBox(height: 24),
                     Text(

@@ -4,6 +4,7 @@ import '../../core/local_db/powersync.dart'; // exposes `db`
 import '../../core/supabase/client.dart';
 import '../../models/wallet.dart';
 import '../payments/payment_gateway.dart';
+import 'withdrawal_models.dart';
 
 /// Outcome of `topup_wallet_with_card`. A gateway decline is a normal result
 /// (`succeeded == false` plus a [failureCode]), not an exception.
@@ -44,6 +45,11 @@ class WalletService {
   static const minTopUp = 100.0;
   static const maxTopUp = 100000.0;
   static const topUpPresets = [500.0, 1000.0, 2500.0, 5000.0];
+
+  /// Mirror the server-side limits in `request_withdrawal`.
+  static const minWithdrawal = 500.0;
+  static const maxWithdrawalPerDay = 100000.0;
+  static const withdrawalFee = 0.0;
 
   /// Null when the wallet row doesn't exist yet (no transactions ever
   /// posted) — treat as a balance of 0.
@@ -97,6 +103,51 @@ class WalletService {
         },
       );
       return TopUpResult.fromMap(Map<String, dynamic>.from(data as Map));
+    } on PostgrestException catch (error) {
+      throw PaymentException.fromServerMessage(error.message);
+    } on Exception {
+      throw const PaymentException('network');
+    }
+  }
+
+  /// Withdraws [amount] from the wallet to [cardId] via `request_withdrawal`.
+  ///
+  /// [requestId] is the idempotency key: reuse it only when retrying the SAME
+  /// attempt after a network failure. A failed payout is a normal result
+  /// (`succeeded == false`); the money has already been returned.
+  ///
+  /// Throws [PaymentException] for validation problems and `network` when the
+  /// outcome is unknown.
+  Future<WithdrawalResult> withdraw({
+    required String cardId,
+    required double amount,
+    required String requestId,
+  }) async {
+    try {
+      final data = await supabase.rpc(
+        'request_withdrawal',
+        params: {
+          'p_card_id': cardId,
+          'p_amount': amount,
+          'p_request_id': requestId,
+        },
+      );
+      return WithdrawalResult.fromMap(Map<String, dynamic>.from(data as Map));
+    } on PostgrestException catch (error) {
+      throw PaymentException.fromServerMessage(error.message);
+    } on Exception {
+      throw const PaymentException('network');
+    }
+  }
+
+  Future<List<Withdrawal>> listWithdrawals() async {
+    try {
+      final rows = await supabase.rpc('list_withdrawals');
+      return (rows as List)
+          .map(
+            (row) => Withdrawal.fromMap(Map<String, dynamic>.from(row as Map)),
+          )
+          .toList();
     } on PostgrestException catch (error) {
       throw PaymentException.fromServerMessage(error.message);
     } on Exception {
