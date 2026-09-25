@@ -5,7 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../wallet/presentation/widgets/wallet_summary_card.dart';
 
 import '../../../../core/auth/auth_providers.dart';
-import '../../../../core/auth/sign_out.dart';
+import '../../../../core/widgets/account_actions.dart';
+import '../../../../core/widgets/app_secondary_header.dart';
 import '../../../../core/widgets/generic_profile_info_section.dart';
 import '../../../../models/buyer_profile.dart';
 import '../../../../models/profile.dart';
@@ -41,7 +42,7 @@ class _BuyerProfileViewScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('buyer_profile_title'.tr())),
+      appBar: AppSecondaryHeader(title: 'buyer_profile_title'.tr()),
       body: StreamBuilder<Profile?>(
         stream: _profileStream,
         initialData: widget.initialProfile,
@@ -55,7 +56,7 @@ class _BuyerProfileViewScreenState
 
           final profile = profileSnapshot.data;
           if (profile == null) {
-            return const Center(child: Text('Profile not found'));
+            return Center(child: Text('profile_not_found'.tr()));
           }
 
           return StreamBuilder<BuyerProfile?>(
@@ -70,13 +71,13 @@ class _BuyerProfileViewScreenState
 
               final buyerProfile = buyerSnapshot.data;
               if (buyerProfile == null) {
-                return const Center(child: Text('Buyer profile not found'));
+                return Center(child: Text('profile_not_found'.tr()));
               }
 
               return SafeArea(
                 child: Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
+                    constraints: const BoxConstraints(maxWidth: 480),
                     child: ListView(
                       padding: const EdgeInsets.all(24),
                       children: [
@@ -104,10 +105,8 @@ class _BuyerProfileViewScreenState
                         if (buyerProfile.buyerType == 'organization')
                           ListTile(
                             leading: const Icon(Icons.repeat),
-                            title: const Text('Recurring Orders'),
-                            subtitle: const Text(
-                              'Manage your scheduled orders',
-                            ),
+                            title: Text('recurring_orders'.tr()),
+                            subtitle: Text('recurring_orders_subtitle'.tr()),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () {
                               Navigator.of(context).push(
@@ -135,21 +134,8 @@ class _BuyerProfileViewScreenState
                           },
                           child: Text('edit_profile'.tr()),
                         ),
-                        const SizedBox(height: 12),
-                        OutlinedButton.icon(
-                          onPressed: () => signOutAndReset(context, ref),
-                          icon: const Icon(Icons.logout),
-                          label: Text('logout'.tr()),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Theme.of(context)
-                                .colorScheme
-                                .error,
-                            side: BorderSide(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                        ),
+                        const SizedBox(height: 24),
+                        const AccountActions(),
                       ],
                     ),
                   ),

@@ -1,4 +1,6 @@
 {
+  "recurring_orders": "Recurring Orders",
+  "recurring_orders_subtitle": "Manage your scheduled orders",
   "buyer_profile_title": "Buyer Profile",
   "buyer_type": "Buyer type",
   "buyer_type_individual": "Individual",

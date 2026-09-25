@@ -7,8 +7,10 @@ import '../../../wallet/presentation/widgets/wallet_summary_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/auth/auth_providers.dart';
-import '../../../../core/auth/sign_out.dart';
+import '../../../../core/localization/app_language.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/widgets/account_actions.dart';
+import '../../../../core/widgets/app_secondary_header.dart';
 import '../../../../core/widgets/avatar_image.dart';
 import '../../../../features/navigation/presentation/app_nav_shell.dart';
 import '../../../../models/driver_profile.dart';
@@ -81,7 +83,10 @@ class _DriverProfileViewScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _ProfileAppBar(),
+      appBar: AppSecondaryHeader(
+        title: 'profile_title'.tr(),
+        helpText: 'profile_help_body'.tr(),
+      ),
       body: StreamBuilder<Profile?>(
         stream: _profileStream,
         initialData: widget.initialProfile,
@@ -135,48 +140,6 @@ class _DriverProfileViewScreenState
         },
       ),
       bottomNavigationBar: const _DriverBottomNav(),
-    );
-  }
-}
-
-/// Back arrow + centered "Profile" title + help icon, matching the
-/// plain-AppBar convention this app already uses for screens with a
-/// dedicated title (see `AppHeader` doc comment) — restyled to match
-/// the Figma header exactly.
-class _ProfileAppBar extends StatelessWidget implements PreferredSizeWidget {
-  @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
-
-  @override
-  Widget build(BuildContext context) {
-    return AppBar(
-      centerTitle: true,
-      leading: BackButton(onPressed: () => Navigator.of(context).maybePop()),
-      title: Text(
-        'profile_title'.tr(),
-        style: Theme.of(context).textTheme.titleLarge,
-      ),
-      actions: [
-        IconButton(
-          tooltip: 'help'.tr(),
-          icon: const Icon(Icons.help_outline),
-          onPressed: () {
-            showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: Text('help'.tr()),
-                content: Text('profile_help_body'.tr()),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text('ok'.tr()),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ],
     );
   }
 }
@@ -235,80 +198,10 @@ class _ProfileBody extends ConsumerWidget {
                 onPushNotificationsChanged: onPushNotificationsChanged,
               ),
               const SizedBox(height: 24),
-              Center(
-                child: TextButton(
-                  onPressed: () => _confirmLogOut(context, ref),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  child: Text('logout'.tr()),
-                ),
-              ),
-              Center(
-                child: TextButton(
-                  onPressed: () => _confirmDeleteAccount(context),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
-                  ),
-                  child: Text('delete_account'.tr()),
-                ),
-              ),
+              const AccountActions(),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _confirmLogOut(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('logout'.tr()),
-        content: Text('logout_confirm_body'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text('cancel'.tr()),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              signOutAndReset(context, ref);
-            },
-            child: Text('logout'.tr()),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _confirmDeleteAccount(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('delete_account'.tr()),
-        content: Text('delete_account_confirm_body'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text('cancel'.tr()),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(dialogContext).colorScheme.error,
-            ),
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              // TODO: wire up once account deletion exists server-side
-              // (no `delete_own_account` RPC / endpoint yet).
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('delete_account_not_available'.tr())),
-              );
-            },
-            child: Text('delete'.tr()),
-          ),
-        ],
       ),
     );
   }
@@ -1021,8 +914,8 @@ class _SettingsSection extends ConsumerWidget {
               _SettingsRow(
                 icon: Icons.language,
                 label: 'language'.tr(),
-                value: context.locale.languageCode.toUpperCase(),
-                onTap: () => _showLanguageSheet(context),
+                value: AppLanguage.current(context).nativeName,
+                onTap: () => LanguagePickerSheet.show(context, ref),
               ),
               Divider(height: 1, color: theme.colorScheme.outline),
               _SettingsRow(
@@ -1070,50 +963,6 @@ class _SettingsSection extends ConsumerWidget {
     ThemeMode.light => 'theme_light'.tr(),
     ThemeMode.dark => 'theme_dark'.tr(),
     ThemeMode.system => 'theme_system'.tr(),
-  };
-
-  void _showLanguageSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'language'.tr(),
-                    style: Theme.of(sheetContext).textTheme.titleMedium,
-                  ),
-                ),
-              ),
-              for (final locale in sheetContext.supportedLocales)
-                RadioListTile<Locale>(
-                  value: locale,
-                  groupValue: sheetContext.locale,
-                  title: Text(_languageLabel(locale.languageCode)),
-                  onChanged: (value) {
-                    if (value != null) sheetContext.setLocale(value);
-                    Navigator.of(sheetContext).pop();
-                  },
-                ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  String _languageLabel(String code) => switch (code) {
-    'en' => 'English',
-    'si' => 'සිංහල',
-    'ta' => 'தமிழ்',
-    _ => code.toUpperCase(),
   };
 
   void _showThemeSheet(BuildContext context, WidgetRef ref, ThemeMode current) {
@@ -1284,10 +1133,10 @@ class _DriverBottomNav extends ConsumerWidget {
   const _DriverBottomNav();
 
   static const _tabs = [
-    (icon: Icons.home_outlined, label: 'Home'),
-    (icon: Icons.calendar_today_outlined, label: 'Calendar'),
-    (icon: Icons.local_shipping_outlined, label: 'Deliveries'),
-    (icon: Icons.chat_bubble_outline, label: 'Chat'),
+    (icon: Icons.home_outlined, label: 'nav_home'),
+    (icon: Icons.calendar_today_outlined, label: 'nav_calendar'),
+    (icon: Icons.local_shipping_outlined, label: 'nav_deliveries'),
+    (icon: Icons.chat_bubble_outline, label: 'nav_chat'),
   ];
 
   @override
@@ -1296,7 +1145,7 @@ class _DriverBottomNav extends ConsumerWidget {
       selectedIndex: 0,
       destinations: [
         for (final tab in _tabs)
-          NavigationDestination(icon: Icon(tab.icon), label: tab.label),
+          NavigationDestination(icon: Icon(tab.icon), label: tab.label.tr()),
       ],
       onDestinationSelected: (index) {
         ref.read(navShellIndexProvider.notifier).select(index);
