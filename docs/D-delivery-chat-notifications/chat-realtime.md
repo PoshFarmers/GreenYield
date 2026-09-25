@@ -90,3 +90,28 @@ History of the three RPCs: `20260906092841_chat_system` (no-arg versions) → `2
 | `message` | select: participant. insert: `sender_id = auth.uid()` and participant. No update/delete. |
 | `is_conversation_participant(uuid)` | SECURITY DEFINER SQL helper (`20260827091748_messaging`). |
 | Storage `message-attachments` | insert and select for participants of the folder's conversation; no update/delete. |
+
+## 7. Offline vs online
+
+| Piece | Offline | Online |
+|---|---|---|
+| Thread list, messages, unread count, send, upload, mark read | Fail (Realtime and RPC) | Work |
+| Cached signed URLs | May still be in memory | Refresh after 1 hour |
+
+The three chat tables are also in the PowerSync publication and `powersync_schema.dart` (the schema comment says this is so `new_message` notifications and offline browsing work). The sync streams omit `conversation_participant.role/display_name/avatar_url`, `conversation.updated_at` and `message.attachment_type`, so names cannot actually be rendered offline from the mirror, and the app does not read chat from the mirror anyway.
+
+> ⚠ Unverified: the schema comment promises offline browsing of chat, but the stream columns make that impossible for names/avatars/roles. Decide whether to drop the comment or extend the streams.
+
+## 8. Edge cases and failure modes
+
+> ⚠ Unverified: `touch_conversation_on_message` is not SECURITY DEFINER and `conversation` has no UPDATE policy, so under RLS the `updated_at` update by the sender is likely matched to zero rows. Consequences: `conversation.updated_at` may stay at its creation time; the `conversation` Realtime stream may not fire on new messages; a recipient's thread list might not refresh live for incoming messages (only the caller's own `last_read_at` changes fire the participant stream). The later migration orders by latest message time "even if updated_at is briefly stale", which suggests this was seen. Confirm on a live device.
+
+- **Send failure after upload:** the image is uploaded before the row insert; a failed insert leaves an orphan object (no delete policy).
+- **Content type:** upload uses `contentType: 'image/$ext'`, so `.jpg` becomes the non-standard `image/jpg`.
+- **Image-only last message:** the final `get_chat_threads` selects only `body`, so `last_message_text` is null for an image-only message (the UI fallback is not in the dump).
+- **Legacy participants with null `role`:** the backfill only fills profiles with exactly one role; `ChatThread.fromMap` casts `other_role` to a non-null string and `ChatRole.fromString` throws on unknown values.
+- **Same pair, different roles:** produces a separate thread by design.
+- **Order/journey conversations:** permitted by RLS but no creator and no UI path.
+- **Pagination:** only the latest 100 messages are streamed; older messages are not loadable.
+- **`new_message` notifications:** inserted for every message, hidden by the client, still synced (see notification doc).
+- **Unread cursor race:** `markMessagesAsRead` uses the client clock; skew can leave a message unread or hide a new one.
