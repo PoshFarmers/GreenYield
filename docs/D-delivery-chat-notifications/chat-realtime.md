@@ -115,3 +115,17 @@ The three chat tables are also in the PowerSync publication and `powersync_schem
 - **Pagination:** only the latest 100 messages are streamed; older messages are not loadable.
 - **`new_message` notifications:** inserted for every message, hidden by the client, still synced (see notification doc).
 - **Unread cursor race:** `markMessagesAsRead` uses the client clock; skew can leave a message unread or hide a new one.
+
+
+## 9. How to modify safely
+
+1. Change RPC bodies with `create or replace` in a new migration; keep the role parameters, or every entry point in Dart must change (`ChatService`, `chat_nav_badge_icon`, `role_nav_shell_registry`).
+2. If you fix the touch trigger, make `touch_conversation_on_message` SECURITY DEFINER with `set search_path = public` (do not add a broad UPDATE policy on `conversation`).
+3. To add a table to Realtime use `alter publication supabase_realtime add table ...` inside an idempotent `do $$` guard (never drop that publication).
+4. If you add `attachment_type` values, update `ChatMessage.isImage`, the storage `contentType` and the thread preview.
+5. To support order/journey chats, decide the role-snapshot rules first; `get_or_create_conversation` only matches `general` threads.
+6. To send a notification differently, edit `notify_new_message` (see notification doc); keep the client's `type != 'new_message'` filters in sync.
+
+## Source files
+
+`lib/features/chat/chat_service.dart`, `lib/features/chat/application/chat_providers.dart`, `lib/models/chat_models.dart`, `lib/core/roles/role_nav_shell_registry.dart` (Chat tab wiring), `lib/core/local_db/powersync_schema.dart`, sync-config (path unconfirmed) streams `own_conversations`, `own_conversation_participants`, `own_messages`. Migrations: `20260827091748_messaging.sql`, `20260827094812_cross_component_foreign_keys.sql`, `20260829050340_notification_events.sql`, `20260830104327_message_attachment_storage.sql`, `20260830121221_conversation_participant_display_fields.sql`, `20260906092841_chat_system.sql`, `20260906135739_chat_thread_unread_count.sql`, `20260907074658_fix_chat_realtime_publication.sql`, `20260907112905_chat_performance_and_role_fix.sql`, `20260907120353_chat_order_and_unread_refresh.sql`.
