@@ -107,7 +107,14 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: textPrimary,
           minimumSize: const Size.fromHeight(52),
-          side: BorderSide(color: border),
+          // Not `border`: that's the card-outline colour and is nearly
+          // invisible against the background, which made every outlined
+          // button look like plain text. A button outline must read as
+          // a button.
+          side: BorderSide(
+            color: textSecondary.withValues(alpha: 0.55),
+            width: 1.2,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
           ),
@@ -125,7 +132,9 @@ class AppTheme {
           side: BorderSide(color: border),
         ),
       ),
-      dialogTheme: DialogThemeData(backgroundColor: surface),
+      // M3 tints a dialog's `icon` with colorScheme.secondary, which here
+      // is the pale primaryTint — the icon all but vanished. Use accent.
+      dialogTheme: DialogThemeData(backgroundColor: surface, iconColor: accent),
       appBarTheme: AppBarTheme(
         backgroundColor: background,
         foregroundColor: textPrimary,
