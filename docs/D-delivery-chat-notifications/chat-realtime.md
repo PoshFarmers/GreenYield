@@ -60,3 +60,33 @@ sequenceDiagram
 6. **Show an image.** `resolveAttachmentUrl` creates a 1-hour signed URL, cached in a static in-memory map.
 
 Provider wiring is in `chat_providers.dart` (`chatThreadsProvider`, `unreadConversationCountProvider`, `chatMessagesProvider`, `peerLastReadAtProvider`; role-keyed families).
+
+## 5. RPCs and triggers
+
+All three RPCs are SECURITY DEFINER, `search_path = public`, granted to `authenticated`.
+
+| RPC | Final definition | Parameters | Behaviour |
+|---|---|---|---|
+| `get_or_create_conversation(p_caller_role text, p_other_user_id uuid, p_other_role text) returns uuid` | `20260907120353_chat_order_and_unread_refresh` (same body as `20260907112905`) | roles as text | Requires an authenticated caller; both roles in (buyer, farmer, driver) and different; other user is not the caller; both users actually hold their role in `profile_role`. Takes `pg_advisory_xact_lock` on the sorted user pair. Reuses an existing 2-participant general thread that matches **both user ids and both roles**; otherwise inserts the conversation and both participant rows with name/avatar/role snapshots (`trim(concat_ws(' ', first_name, last_name))`). |
+| `get_chat_threads(p_active_role text)` | same migration | | One row per direct thread where the caller's snapshot role equals `p_active_role`. Returns `conversation_id, other_user_id, other_role, other_name` (`'Unknown'` if blank), `other_avatar_url, last_message_text, last_message_at, is_last_from_me, has_unread, unread_count, updated_at`. Last message via lateral join; unread from the caller's `last_read_at` (null = epoch). Ordered by `coalesce(latest message time, updated_at) desc, updated_at desc`. |
+| `unread_conversation_count(p_active_role text) returns integer` | same migration | | Number of the caller's participant rows for that role with at least one message from someone else after `last_read_at`. Counts threads, not messages. |
+
+Triggers:
+
+| Trigger | Event | Function | Effect |
+|---|---|---|---|
+| `trg_touch_conversation_on_message` | AFTER INSERT on `message` | `touch_conversation_on_message` (`20260906092841`) | `update conversation set updated_at = now()`. Not SECURITY DEFINER. |
+| `trg_notify_new_message` | AFTER INSERT on `message` | `notify_new_message` (`20260829050340`) | One `new_message` notification per other participant, see [notification-events.md](notification-events.md). |
+| `trg_conversation_powersync_mirrors` | | `set_conversation_powersync_mirrors` | `context_type_text` |
+
+History of the three RPCs: `20260906092841_chat_system` (no-arg versions) → `20260906135739_chat_thread_unread_count` (adds `unread_count`) → `20260907112905_chat_performance_and_role_fix` (role-aware) → **`20260907120353_chat_order_and_unread_refresh`** (final; only change is the thread ordering). Note the last migration's header comment is a copy of the previous one.
+
+## 6. RLS / permissions
+
+| Object | Policy |
+|---|---|
+| `conversation` | select: `is_conversation_participant(id)`. insert: `conversation_insert_participant_context` (general always; order/journey only for the order's buyer/farmer or the journey's driver; from `20260827094812`). **No update or delete policy.** |
+| `conversation_participant` | select: `is_conversation_participant(conversation_id)` (so both participants see both rows). insert: self, or already a participant. update: own row only (`profile_id = auth.uid()`). |
+| `message` | select: participant. insert: `sender_id = auth.uid()` and participant. No update/delete. |
+| `is_conversation_participant(uuid)` | SECURITY DEFINER SQL helper (`20260827091748_messaging`). |
+| Storage `message-attachments` | insert and select for participants of the folder's conversation; no update/delete. |
