@@ -27,3 +27,36 @@ Direct one-to-one messaging between buyer, farmer and driver, with role-aware th
 | Storage bucket `message-attachments` | private; object path `<conversation_id>/<uuid>.<ext>` | `20260830104327_message_attachment_storage` |
 
 Indexes added for unread/thread queries: `idx_message_unread_lookup`, `idx_conversation_participant_profile_role_conversation`, `idx_message_conversation_created_sender`.
+
+## 4. Flow
+
+```mermaid
+sequenceDiagram
+    participant A as Sender app
+    participant S as Storage message-attachments
+    participant DB as Postgres
+    participant RT as Realtime
+    participant B as Recipient app
+    A->>DB: rpc get_or_create_conversation
+    DB-->>A: conversation id
+    opt image attached
+        A->>S: upload conversation_id/uuid.ext
+    end
+    A->>DB: INSERT message
+    DB->>DB: trigger touch_conversation_on_message
+    DB->>DB: trigger notify_new_message
+    DB-->>RT: change on message
+    RT-->>B: streamMessages emits
+    B->>DB: UPDATE own last_read_at
+    DB-->>RT: change on conversation_participant
+    RT-->>A: streamPeerLastReadAt emits
+```
+
+1. **Open/start a thread.** Entry points (e.g. "Message Farmer") call `get_or_create_conversation(callerRole, otherUserId, otherRole)`.
+2. **List threads.** `watchChatThreads(activeRole)` calls RPC `get_chat_threads(p_active_role)` and re-runs it when the `conversation` stream or the caller's own `conversation_participant` stream fires (200 ms debounce, request-version guard so an older slow response never overwrites a newer one).
+3. **Open a room.** `streamMessages(conversationId)` streams the latest 100 messages (`order created_at desc`, `limit 100`), so the list is newest first. `streamPeerLastReadAt` streams the participant rows of the conversation and returns the other participant's `last_read_at`; the UI derives "seen" by comparing message time to it.
+4. **Send.** `sendMessage` optionally uploads the image, then inserts a `message` row (body or attachment required; empty sends return without writing).
+5. **Mark read.** `markMessagesAsRead` updates the caller's own `last_read_at` to now (UTC).
+6. **Show an image.** `resolveAttachmentUrl` creates a 1-hour signed URL, cached in a static in-memory map.
+
+Provider wiring is in `chat_providers.dart` (`chatThreadsProvider`, `unreadConversationCountProvider`, `chatMessagesProvider`, `peerLastReadAtProvider`; role-keyed families).
