@@ -5,7 +5,8 @@ const Map<String, ({double min, double max})> cropPriceBounds = {
   'Tomato': (min: 150, max: 250),
   'Carrot': (min: 120, max: 200),
   'Cabbage': (min: 80, max: 150),
-  'Brinjal': (min: 100, max: 180),
+  'Eggplant': (min: 100, max: 180),
+  'Brinjal': (min: 100, max: 180), // legacy alias
   'Okra': (min: 150, max: 220),
   'Pumpkin': (min: 60, max: 120),
   'Cucumber': (min: 80, max: 150),
@@ -13,7 +14,8 @@ const Map<String, ({double min, double max})> cropPriceBounds = {
   'Potato': (min: 180, max: 280),
   'Onion': (min: 200, max: 320),
   'Beetroot': (min: 150, max: 220),
-  'Capsicum': (min: 250, max: 400),
+  'Red bell pepper': (min: 250, max: 400),
+  'Capsicum': (min: 250, max: 400), // legacy alias
   'Banana': (min: 100, max: 180),
   'Mango': (min: 150, max: 350),
   'Papaya': (min: 80, max: 150),
