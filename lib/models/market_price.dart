@@ -1,7 +1,7 @@
-/// Mirrors the `market_price` table — one row per crop, the latest
-/// computed average/min/max price from completed orders (see
-/// `refresh_market_price_analytics()` server-side). Synced read-only
-/// via the `market_prices` PowerSync stream; clients never write here.
+/// Mirrors the `market_price` table: one row per crop, a rolling 14-day
+/// quantity-weighted average from delivered/completed orders
+/// (`refresh_market_price_analytics()`), or the seed baseline when there are
+/// too few orders. Synced read-only via the `market_prices` stream.
 class MarketPrice {
   final String cropId;
   final double? avgPricePerKg;
@@ -10,6 +10,12 @@ class MarketPrice {
   final DateTime? asOfDate;
   final DateTime updatedAt;
 
+  /// Distinct delivered orders behind the figure (0 for seed rows).
+  final int sampleSize;
+
+  /// 'orders' | 'seed'
+  final String source;
+
   const MarketPrice({
     required this.cropId,
     this.avgPricePerKg,
@@ -17,7 +23,11 @@ class MarketPrice {
     this.maxPricePerKg,
     this.asOfDate,
     required this.updatedAt,
+    this.sampleSize = 0,
+    this.source = 'seed',
   });
+
+  bool get isEstimated => source != 'orders';
 
   factory MarketPrice.fromMap(Map<String, dynamic> map) {
     final asOfDate = map['as_of_date'] as String?;
@@ -30,6 +40,8 @@ class MarketPrice {
       updatedAt:
           DateTime.tryParse(map['updated_at'] as String? ?? '') ??
           DateTime.now(),
+      sampleSize: (map['sample_size'] as num?)?.toInt() ?? 0,
+      source: (map['source'] as String?) ?? 'seed',
     );
   }
 }
