@@ -34,7 +34,11 @@ alter table farmer_profile
 
 create or replace function refresh_farmer_rating_aggregate(p_farmer_profile_id uuid)
 returns void as $$
-begin
+  perform 1
+  from farmer_profile
+  where profile_id = p_farmer_profile_id
+  for update;
+
   update farmer_profile fp
   set avg_rating = coalesce(
         (select round(avg(rating)::numeric, 2) from farmer_review where farmer_profile_id = p_farmer_profile_id), 0),
