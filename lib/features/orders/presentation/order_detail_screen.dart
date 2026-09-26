@@ -4,9 +4,13 @@ import 'package:intl/intl.dart';
 
 import '../../../core/supabase/client.dart';
 import '../../../core/widgets/app_secondary_header.dart';
+import '../../../models/farmer_review.dart';
 import '../../chat/chat_service.dart';
 import '../../chat/presentation/chat_screen.dart';
 import '../../navigation/presentation/app_nav_shell.dart';
+import '../../reviews/farmer_review_service.dart';
+import '../../reviews/presentation/widgets/review_dialog.dart';
+import '../../reviews/presentation/widgets/star_rating.dart';
 import '../order_providers.dart';
 import '../order_service.dart';
 import '../order_detail_models.dart';
@@ -31,7 +35,36 @@ class OrderDetailScreen extends ConsumerStatefulWidget {
 
 class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
   final _service = const OrderService();
+  final _reviewService = const FarmerReviewService();
   bool _isLoadingAction = false;
+  bool _reviewPromptChecked = false;
+
+  /// Auto-shows the "rate your experience" popup once per screen visit,
+  /// the first time a buyer opens a delivered order that hasn't been
+  /// reviewed yet. Skippable — the same review entry point stays
+  /// available inline (see [_buildReviewSection]) if they dismiss it.
+  Future<void> _maybeShowReviewPrompt(OrderDetail detail) async {
+    if (_reviewPromptChecked ||
+        widget.viewerRole != 'buyer' ||
+        !detail.status.isReviewable) {
+      return;
+    }
+    _reviewPromptChecked = true;
+
+    final existing = await _reviewService.getReviewForOrder(detail.id);
+    if (!mounted || existing != null) return;
+
+    final result = await ReviewDialog.show(
+      context,
+      orderId: detail.id,
+      farmerName: detail.farmerName,
+    );
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Thanks for your review!')));
+    }
+  }
 
   Future<void> _openChat({
     required String targetUserId,
@@ -103,6 +136,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           if (detail == null) {
             return const Center(child: Text('Order not found.'));
           }
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _maybeShowReviewPrompt(detail),
+          );
           return _buildContent(context, detail);
         },
       ),
@@ -242,7 +278,85 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             subtitle: 'We are locating the nearest driver for your order.',
           ),
         ],
+        if (widget.viewerRole == 'buyer' && detail.status.isReviewable) ...[
+          const SizedBox(height: 20),
+          _buildReviewSection(detail),
+        ],
       ],
+    );
+  }
+
+  Widget _buildReviewSection(OrderDetail detail) {
+    return StreamBuilder<FarmerReview?>(
+      stream: _reviewService.watchReviewForOrder(detail.id),
+      builder: (context, snapshot) {
+        final theme = Theme.of(context);
+        final existing = snapshot.data;
+        final isEditing = existing != null;
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isEditing ? 'Your review' : 'Rate your experience',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (isEditing) ...[
+                StarRatingDisplay(rating: existing.rating.toDouble(), size: 18),
+                if (existing.comment != null &&
+                    existing.comment!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(existing.comment!, style: theme.textTheme.bodyMedium),
+                ],
+                const SizedBox(height: 12),
+              ] else ...[
+                Text(
+                  'How was your experience with ${detail.farmerName}?',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final result = await ReviewDialog.show(
+                      context,
+                      orderId: detail.id,
+                      farmerName: detail.farmerName,
+                      existingReview: existing,
+                    );
+                    if (result == true && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Thanks for your review!'),
+                        ),
+                      );
+                    }
+                  },
+                  icon: Icon(
+                    isEditing ? Icons.edit_outlined : Icons.star_outline,
+                  ),
+                  label: Text(isEditing ? 'Edit your review' : 'Rate & review'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

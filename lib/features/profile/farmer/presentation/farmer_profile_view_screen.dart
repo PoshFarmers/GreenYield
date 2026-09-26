@@ -10,9 +10,12 @@ import '../../../../core/widgets/app_secondary_header.dart';
 import '../../../../core/widgets/avatar_image.dart';
 import '../../../../core/widgets/media_image.dart';
 import '../../../../models/farmer_profile.dart';
+import '../../../../models/farmer_review.dart';
 import '../../../../models/profile.dart';
 import '../../../../models/wallet.dart';
 import '../../../wallet/wallet_service.dart';
+import '../../../reviews/farmer_review_service.dart';
+import '../../../reviews/presentation/widgets/star_rating.dart';
 import '../farmer_profile_service.dart';
 import 'add_crop_screen.dart';
 import 'crop_details_sheet.dart';
@@ -273,6 +276,8 @@ class _HeaderCard extends StatelessWidget {
 
   const _HeaderCard({required this.profile, required this.onEdit});
 
+  static const _reviewService = FarmerReviewService();
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -320,6 +325,31 @@ class _HeaderCard extends StatelessWidget {
               ],
             ),
           ],
+          const SizedBox(height: 6),
+          StreamBuilder<FarmerRatingSummary?>(
+            stream: _reviewService.watchRatingSummary(profile.id),
+            builder: (context, snapshot) {
+              final summary = snapshot.data;
+              if (summary == null || summary.reviewCount == 0) {
+                return Text(
+                  'no_reviews_yet'.tr(),
+                  style: theme.textTheme.bodySmall,
+                );
+              }
+              return Row(
+                children: [
+                  StarRatingDisplay(rating: summary.avgRating, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${summary.avgRating.toStringAsFixed(1)} (${summary.reviewCount})',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
           if (createdAt != null) ...[
             const SizedBox(height: 12),
             Chip(

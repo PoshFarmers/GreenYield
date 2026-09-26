@@ -15,7 +15,11 @@ const schema = Schema([
     Column.text('created_at'),
   ]),
   Table('profile_role', [Column.text('profile_id'), Column.text('role')]),
-  Table('farmer_profile', [Column.text('profile_id')]),
+  Table('farmer_profile', [
+    Column.text('profile_id'),
+    Column.real('avg_rating'),
+    Column.integer('review_count'),
+  ]),
   Table('farmer_crop', [
     Column.text('farmer_profile_id'),
     Column.text('crop_id'),
@@ -235,6 +239,20 @@ const schema = Schema([
     Column.text('reference_table'),
     Column.text('reference_id'),
     Column.text('created_at'),
+  ]),
+  // --- Farmer rating & reviews (see .../20260916120000_farmer_review.sql) ---
+  // Writes go through the submit_farmer_review() RPC, not a local
+  // insert-then-upload — there is no client insert/update RLS policy on
+  // this table. It's still registered so PowerSync replicates the
+  // result back down for offline reads.
+  Table('farmer_review', [
+    Column.text('order_id'),
+    Column.text('buyer_profile_id'),
+    Column.text('farmer_profile_id'),
+    Column.integer('rating'),
+    Column.text('comment'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
   ]),
   // no client insert/update RLS policy exists for this table.
   Table('pricing_rule', [
