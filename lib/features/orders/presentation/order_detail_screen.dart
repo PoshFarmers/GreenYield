@@ -278,7 +278,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             subtitle: 'We are locating the nearest driver for your order.',
           ),
         ],
-        if (detail.status.isReviewable) ...[
+        if (widget.viewerRole == 'buyer' && detail.status.isReviewable) ...[
           const SizedBox(height: 20),
           _buildReviewSection(detail),
         ],
