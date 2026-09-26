@@ -126,3 +126,7 @@ Because the sync stream `own_deliveries_*` does not select `farmer_display_name`
 3. If you add a delivery-status transition table, keep the order sync call last so an invalid order move aborts the delivery update.
 4. Any change to payout must keep using `apply_wallet_transaction` and stay inside the same transaction; add farmer/platform legs in [../C-orders-payments/money-flow.md](../C-orders-payments/money-flow.md) terms.
 5. When editing delivery/orders/profile RLS, test for `42P17` recursion and use the helper functions.
+
+## Source files
+
+`lib/features/orders/order_service.dart`, `lib/features/orders/order_providers.dart`, `lib/features/orders/order_detail_models.dart`, `lib/features/orders/driver_home_service.dart`, `lib/core/local_db/powersync_schema.dart`. Sync-config (path unconfirmed): `own_deliveries_buyer_or_farmer`, `own_deliveries_driver_assigned`, `own_delivery_assignments`, `own_delivery_tracking_*`, `own_journeys`, `own_routes`, `own_route_stops`. Migrations: `20260827093851_schedule_journey_route.sql`, `20260827094000_delivery_and_assignment.sql`, `20260827094054_delivery_tracking.sql`, `20260827094859_powersync_compat_view.sql`, `20260913105709_notify_and_driver_order_access.sql`, `20260915000000_mark_order_packed.sql`, `20260915130000_fix_orders_rls_recursion.sql`, `20260916050308_wallet_payment_and_payout.sql`, `20260827094613_wallet.sql`.
