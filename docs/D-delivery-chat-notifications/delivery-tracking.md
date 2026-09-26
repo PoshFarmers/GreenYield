@@ -84,3 +84,45 @@ Payout details: paid only to the current assignment's driver, only when `deliver
 Helper functions `is_assigned_driver_for_order(uuid, uuid)` and `is_assigned_driver_for_delivery(uuid, uuid)` are SECURITY DEFINER SQL functions that break the RLS cycle `orders → delivery → orders`; the recursion fix and the policies that depend on them are in `20260915130000_fix_orders_rls_recursion`.
 
 Buyers and farmers cannot read `delivery_assignment`; they get driver and vehicle data through the `get_order_detail` RPC ([../cross-cutting.md](../cross-cutting.md)).
+
+## 7. Client data sources
+
+| Screen / class | Source | Requirement |
+|---|---|---|
+| `OrderService.watchDeliveriesForDriver` | PostgREST embedded select `delivery_assignment → delivery → order → order_item → crop`, filtered `driver_profile_id = me` and `is_current = true`; filters by delivery status in Dart; **yields once** | RLS read on `delivery_assignment`, `delivery`, `orders`, `order_item`, `crop` |
+| `OrderService.confirmPickup / markInTransit / markDelivered` | `transition_delivery_status` | |
+| `OrderService.markOrderPacked` | `mark_order_packed` (farmer) | |
+| `DriverHomeService` | see [driver-assignment.md](driver-assignment.md) | |
+| Buyer/farmer order screens | local `orders`/`delivery` mirror + `get_order_detail` | |
+
+Because the sync stream `own_deliveries_*` does not select `farmer_display_name`/`buyer_display_name`, the local `delivery` rows have those columns null; any local query that relies on them (e.g. `COALESCE(p_farmer.first_name ..., d.farmer_display_name)`) falls back to null offline.
+
+## 8. Offline vs online
+
+| Piece | Offline | Online |
+|---|---|---|
+| Local `delivery` status (buyer/farmer/driver) | Readable from the mirror (last synced) | Live via sync |
+| Driver status changes | Fail (RPC only) | Work |
+| Driver deliveries/calendar lists | Fail | Work |
+| GPS tracking | not implemented | not implemented |
+
+## 9. Edge cases and failure modes
+
+- **No live tracking:** no code pings `delivery_tracking`; `estimate_delivery_eta` always returns null in practice.
+- **Streams for absent tables:** sync-config has `own_journeys`, `own_routes`, `own_route_stops`, `own_delivery_tracking_*`, but these tables are not in `powersync_schema.dart`.
+- **No reassignment or unassignment code:** `unassigned_at` is never set; if a driver drops out, nothing re-dispatches.
+- **Delivery status is not validated on its own:** any status may be set by the assigned driver; only the order machine rejects invalid moves, and `unassigned` (or a repeat) is not order-guarded.
+- **Cancellation:** `cancel_order` leaves the delivery and assignment untouched.
+- **`delivery_fee_amount = 0`** (missing buyer/farmer location at checkout): no payout row is written.
+- **Order deleted:** `delivery.order_id` is `ON DELETE RESTRICT`.
+
+> ⚠ Unverified: `estimate_delivery_eta` has no explicit `grant`/`revoke`; confirm who can execute it on the live DB.
+> ⚠ Unverified: Edge Functions that would create journeys/routes and insert tracking pings are not in the dump; confirm whether any exist in the Supabase project.
+
+## 10. How to modify safely
+
+1. To add live tracking: add the tables to `powersync_schema.dart` (or write pings via PostgREST), write pings only as the current assigned driver (policy already exists), and start/complete journeys from a single trusted place. Update the "schema only" banner here.
+2. Change status mapping only inside `transition_delivery_status`, and re-check it against `transition_order_status` (a mismatch makes the whole RPC roll back).
+3. If you add a delivery-status transition table, keep the order sync call last so an invalid order move aborts the delivery update.
+4. Any change to payout must keep using `apply_wallet_transaction` and stay inside the same transaction; add farmer/platform legs in [../C-orders-payments/money-flow.md](../C-orders-payments/money-flow.md) terms.
+5. When editing delivery/orders/profile RLS, test for `42P17` recursion and use the helper functions.
