@@ -144,3 +144,11 @@ Common filters: `da.is_current`, `orders.status <> 'cancelled'`, `coalesce(o.ord
 - **Concurrency:** many orders to one region all go to the same nearest driver (no load balancing).
 
 > ⚠ Unverified: `driver_route_preference.direction` is an enum (`route_direction`) with no `*_text` mirror trigger (every other enum synced to the client has one) and is streamed with `SELECT *`. Confirm it replicates correctly.
+
+## 10. How to modify safely
+
+1. Change ranking or eligibility only inside `assign_nearest_driver` (new migration, `create or replace`, re-run the `revoke`/`grant`). Keep the `confirmed → assigned` transitions and the `driver_schedule` upsert.
+2. If you start honouring `driver_route_preference`, `active_days` (bit0 = Monday, but Postgres `extract(isodow)` is 1–7 and `extract(dow)` is 0 = Sunday: convert carefully), or `is_available`, document the new rule here and in [../cross-cutting.md](../cross-cutting.md).
+3. If `place_checkout` is redefined again, re-check that it still calls `assign_nearest_driver` (this call was silently lost once).
+4. If you add reassignment, set the old row's `is_current = false` and `unassigned_at`, insert a new row (this fires the notification trigger again), and update `orders.delivery_id` only if the delivery row changes.
+5. Rename the legacy `max_load_kg` columns only together with the Dart `Vehicle` model, `powersync_schema.dart`, the `vehicles` stream and `driver_schedule.max_capacity_kg`.
