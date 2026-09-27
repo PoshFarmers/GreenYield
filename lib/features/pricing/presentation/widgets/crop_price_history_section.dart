@@ -27,6 +27,7 @@ class CropPriceHistorySection extends StatefulWidget {
 
 class _CropPriceHistorySectionState extends State<CropPriceHistorySection> {
   String? _selectedCropId;
+  PriceRange _range = PriceRange.d30;
 
   @override
   void initState() {
@@ -117,6 +118,8 @@ class _CropPriceHistorySectionState extends State<CropPriceHistorySection> {
           key: ValueKey(selected.cropId),
           farmerProfileId: widget.farmerProfileId,
           crop: selected,
+          range: _range,
+          onRangeChanged: (r) => _range = r,
         ),
       ],
     );
@@ -128,11 +131,15 @@ class _CropPriceHistorySectionState extends State<CropPriceHistorySection> {
 class _ChartWithOverlay extends StatefulWidget {
   final String farmerProfileId;
   final FarmerCrop crop;
+  final PriceRange range;
+  final ValueChanged<PriceRange> onRangeChanged;
 
   const _ChartWithOverlay({
     super.key,
     required this.farmerProfileId,
     required this.crop,
+    required this.range,
+    required this.onRangeChanged,
   });
 
   @override
@@ -165,7 +172,9 @@ class _ChartWithOverlayState extends State<_ChartWithOverlay> {
         return PriceHistoryChart(
           cropId: widget.crop.cropId,
           ownPricePerKg: own,
-          defaultPricePerKg: widget.crop.defaultPricePerKg,
+
+          initialRange: widget.range,
+          onRangeChanged: widget.onRangeChanged,
         );
       },
     );

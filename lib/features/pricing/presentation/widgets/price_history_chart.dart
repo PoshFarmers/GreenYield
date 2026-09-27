@@ -35,17 +35,18 @@ class PriceHistoryChart extends StatefulWidget {
   /// Farmer's own current listing price (dashed overlay), if any.
   final double? ownPricePerKg;
 
-  /// Farmer's default price for the crop (dashed overlay), if any.
-  final double? defaultPricePerKg;
-
   final PriceRange initialRange;
+
+  /// Called when the user picks a different range.
+  final ValueChanged<PriceRange>? onRangeChanged;
 
   const PriceHistoryChart({
     super.key,
     required this.cropId,
     this.ownPricePerKg,
-    this.defaultPricePerKg,
+
     this.initialRange = PriceRange.d30,
+    this.onRangeChanged,
   });
 
   @override
@@ -115,14 +116,16 @@ class _PriceHistoryChartState extends State<PriceHistoryChart> {
               ],
               selected: {_range},
               showSelectedIcon: false,
-              onSelectionChanged: (s) => setState(() {
-                _range = s.first;
-                _bindHistory();
-              }),
+              onSelectionChanged: (s) {
+                setState(() {
+                  _range = s.first;
+                  _bindHistory();
+                });
+                widget.onRangeChanged?.call(s.first);
+              },
             ),
             const SizedBox(height: 12),
             SizedBox(height: 220, child: _body(theme, snapshot, rows)),
-            ..._notes(theme, rows),
           ],
         );
       },
@@ -334,7 +337,7 @@ class _PriceHistoryChartState extends State<PriceHistoryChart> {
 
     var lo = rows.map((r) => r.minPricePerKg).reduce(math.min);
     var hi = rows.map((r) => r.maxPricePerKg).reduce(math.max);
-    for (final v in [widget.ownPricePerKg, widget.defaultPricePerKg]) {
+    for (final v in [widget.ownPricePerKg]) {
       if (v != null) {
         lo = math.min(lo, v);
         hi = math.max(hi, v);
@@ -383,19 +386,23 @@ class _PriceHistoryChartState extends State<PriceHistoryChart> {
           dotData: const FlDotData(show: false),
         );
 
-    HorizontalLine overlay(double y, Color color, String labelKey) =>
-        HorizontalLine(
-          y: y,
-          color: color,
-          strokeWidth: 1.5,
-          dashArray: [6, 4],
-          label: HorizontalLineLabel(
-            show: true,
-            alignment: Alignment.topRight,
-            style: theme.textTheme.labelSmall?.copyWith(color: color),
-            labelResolver: (_) => labelKey.tr(),
-          ),
-        );
+    HorizontalLine overlay(
+      double y,
+      Color color,
+      String labelKey,
+      Alignment alignment,
+    ) => HorizontalLine(
+      y: y,
+      color: color,
+      strokeWidth: 1.5,
+      dashArray: [6, 4],
+      label: HorizontalLineLabel(
+        show: true,
+        alignment: alignment,
+        style: theme.textTheme.labelSmall?.copyWith(color: color),
+        labelResolver: (_) => labelKey.tr(),
+      ),
+    );
 
     return LineChart(
       LineChartData(
@@ -466,12 +473,7 @@ class _PriceHistoryChartState extends State<PriceHistoryChart> {
                 widget.ownPricePerKg!,
                 scheme.tertiary,
                 'price_your_listing_price',
-              ),
-            if (widget.defaultPricePerKg != null)
-              overlay(
-                widget.defaultPricePerKg!,
-                scheme.outline,
-                'price_default_price',
+                Alignment.topRight,
               ),
           ],
         ),
@@ -525,40 +527,5 @@ class _PriceHistoryChartState extends State<PriceHistoryChart> {
         ),
       ),
     );
-  }
-
-  List<Widget> _notes(ThemeData theme, List<PriceHistory> rows) {
-    if (rows.isEmpty) return const [];
-    final real = rows.where((r) => !r.isSynthetic).length;
-    final hasSynthetic = rows.any((r) => r.isSynthetic);
-
-    Widget note(String text) => Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.info_outline,
-            size: 14,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              text,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    return [
-      if (real > 0 && real < 3)
-        note('price_chart_sparse'.tr(namedArgs: {'count': '$real'})),
-      if (hasSynthetic) note('price_chart_synthetic_note'.tr()),
-    ];
   }
 }
