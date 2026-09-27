@@ -132,6 +132,8 @@ const schema = Schema([
     Column.real('min_price_per_kg'),
     Column.real('max_price_per_kg'),
     Column.text('as_of_date'),
+    Column.integer('sample_size'),
+    Column.text('source'),
     Column.text('updated_at'),
   ]),
   Table('price_trend', [
@@ -148,6 +150,8 @@ const schema = Schema([
     Column.real('min_price_per_kg'),
     Column.real('max_price_per_kg'),
     Column.integer('order_count'),
+    Column.real('total_quantity_kg'),
+    Column.integer('is_synthetic'),
     Column.text('created_at'),
   ]),
   // --- Sprint 2 / Task 3.2 — Order Creation & Checkout Flow ---
