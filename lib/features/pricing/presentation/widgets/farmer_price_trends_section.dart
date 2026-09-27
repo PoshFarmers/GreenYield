@@ -61,7 +61,7 @@ class _FarmerPriceTrendsSectionState extends State<FarmerPriceTrendsSection> {
                     ),
                     const SizedBox(height: 12),
                     SizedBox(
-                      height: 96,
+                      height: 116,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: crops.length,
@@ -132,6 +132,17 @@ class _CropPriceTile extends StatelessWidget {
                   : theme.colorScheme.primary,
             ),
           ),
+          if (price != null && avg != null)
+            Text(
+              price!.source == 'orders'
+                  ? 'market_based_on_orders_short'.tr(
+                      namedArgs: {'count': '${price!.sampleSize}'},
+                    )
+                  : 'market_estimated_short'.tr(),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           const SizedBox(height: 2),
           if (avg == null)
             Text(

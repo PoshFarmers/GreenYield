@@ -138,6 +138,16 @@ class _MarketPriceComparisonCardState extends State<MarketPriceComparisonCard> {
                       ),
                     ],
                   ),
+                  Text(
+                    market.source == 'orders'
+                        ? 'market_based_on_orders'.tr(
+                            namedArgs: {'count': '${market.sampleSize}'},
+                          )
+                        : 'market_estimated'.tr(),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSecondaryContainer,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     isAbove
