@@ -2,7 +2,10 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/auth/auth_error_message.dart';
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/localization/app_language.dart';
+import '../../../core/widgets/app_logo.dart';
 import '../../../core/widgets/google_glyph.dart';
 import 'register_screen.dart';
 
@@ -45,7 +48,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       // Navigation happens automatically — AuthGate watches
       // authStateChangesProvider and swaps screens on its own.
     } catch (e) {
-      setState(() => _errorMessage = e.toString());
+      // Wrong password, offline, rate-limited… as a sentence a user can
+      // act on, not the raw AuthApiException.
+      setState(() => _errorMessage = authErrorMessage(e));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -59,10 +64,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       await ref.read(authServiceProvider).signInWithGoogle();
     } catch (e) {
-      setState(() => _errorMessage = e.toString());
+      setState(() => _errorMessage = authErrorMessage(e));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  /// The error refers to the last attempt — drop it as soon as the user
+  /// starts correcting the fields.
+  void _clearError() {
+    if (_errorMessage != null) setState(() => _errorMessage = null);
   }
 
   void _forgotPassword() {
@@ -86,8 +97,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 24),
-                    _AppLogo(color: colors.primary),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () => LanguagePickerSheet.show(context, ref),
+                        icon: const Icon(Icons.language, size: 18),
+                        label: Text(AppLanguage.current(context).nativeName),
+                      ),
+                    ),
+                    const Center(child: AppLogo(size: 96)),
                     const SizedBox(height: 16),
                     Text(
                       'app_name'.tr(),
@@ -109,6 +127,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
+                      onChanged: (_) => _clearError(),
                       decoration: InputDecoration(
                         hintText: 'email_or_phone_hint'.tr(),
                         prefixIcon: const Icon(Icons.person_outline),
@@ -142,6 +161,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
+                      onChanged: (_) => _clearError(),
                       decoration: InputDecoration(
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
@@ -160,10 +180,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           : null,
                     ),
                     if (_errorMessage != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        _errorMessage!,
-                        style: TextStyle(color: colors.error),
+                      const SizedBox(height: 16),
+                      Semantics(
+                        liveRegion: true,
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: colors.error.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: colors.error.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                size: 20,
+                                color: colors.error,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: colors.error,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                     const SizedBox(height: 28),
@@ -261,30 +309,6 @@ class _FieldLabel extends StatelessWidget {
       text.toUpperCase(),
       style: Theme.of(context).textTheme.labelSmall
           ?.copyWith(letterSpacing: 0.5, fontWeight: FontWeight.w600),
-    );
-  }
-}
-
-/// Placeholder app mark shown above the app name on the login screen.
-/// Swap the icon (or replace with `Image.asset('assets/icons/logo.png')`)
-/// once real branding is ready.
-class _AppLogo extends StatelessWidget {
-  const _AppLogo({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 72,
-        height: 72,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: const Icon(Icons.agriculture, color: Colors.white, size: 36),
-      ),
     );
   }
 }

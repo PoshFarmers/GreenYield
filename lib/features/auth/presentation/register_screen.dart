@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/auth/auth_error_message.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/widgets/app_secondary_header.dart';
 import '../../../core/widgets/app_text_field.dart';
@@ -50,7 +51,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       // screen once the auth state stream confirms a session exists,
       // revealing whatever AuthGate has already swapped to underneath.
     } catch (e) {
-      setState(() => _errorMessage = e.toString());
+      setState(() => _errorMessage = authErrorMessage(e));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -66,7 +67,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       // Same as above: this only *launches* the OAuth flow. Completion
       // comes back later via deep link and is caught by ref.listen.
     } catch (e) {
-      setState(() => _errorMessage = e.toString());
+      setState(() => _errorMessage = authErrorMessage(e));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
