@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../../delivery_fee_service.dart';
+import '../../pricing_constants.dart';
 
 /// buyer-facing price breakdown: farm-gate
 /// subtotal (price/kg × quantity) plus an estimated delivery fee.
@@ -57,7 +58,8 @@ class _PriceBreakdownCardState extends State<PriceBreakdownCard> {
     final subtotal = widget.pricePerKg * widget.quantityKg;
     final currency = 'currency_prefix'.tr();
     final fee = _fee;
-    final total = fee == null ? subtotal : subtotal + fee;
+    final tax = double.parse((subtotal * kOrderTaxRate).toStringAsFixed(2));
+    final total = subtotal + tax + (fee ?? 0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -67,6 +69,8 @@ class _PriceBreakdownCardState extends State<PriceBreakdownCard> {
           'farm_gate_subtotal'.tr(),
           '$currency ${subtotal.toStringAsFixed(2)}',
         ),
+        const SizedBox(height: 6),
+        _row(theme, 'tax'.tr(), '$currency ${tax.toStringAsFixed(2)}'),
         const SizedBox(height: 6),
         _isLoading
             ? Row(
