@@ -2,15 +2,14 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../wallet/presentation/widgets/wallet_summary_card.dart';
+
 import '../../../../core/auth/auth_providers.dart';
 import '../../../../core/widgets/generic_profile_info_section.dart';
 import '../../../../models/buyer_profile.dart';
 import '../../../../models/profile.dart';
-import '../../../../models/wallet.dart';
 import '../buyer_profile_service.dart';
-import '../../../wallet/wallet_service.dart';
 import 'buyer_profile_edit_screen.dart';
-import '../../../wallet/presentation/wallet_screen.dart';
 import '../../../orders/presentation/recurring/recurring_orders_screen.dart';
 
 class BuyerProfileViewScreen extends ConsumerStatefulWidget {
@@ -82,7 +81,7 @@ class _BuyerProfileViewScreenState
                       children: [
                         GenericProfileInfoSection(profile: profile),
 
-                        _BuyerWalletCard(profileId: profile.id),
+                        WalletSummaryCard(profileId: profile.id),
                         const SizedBox(height: 8),
 
                         ListTile(
@@ -159,66 +158,6 @@ class _BuyerProfileViewScreenState
             },
           );
         },
-      ),
-    );
-  }
-}
-
-class _BuyerWalletCard extends StatelessWidget {
-  final String profileId;
-
-  const _BuyerWalletCard({required this.profileId});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.account_balance_wallet_outlined,
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('wallet_balance'.tr(), style: theme.textTheme.bodySmall),
-                const SizedBox(height: 2),
-                StreamBuilder<Wallet?>(
-                  stream: const WalletService().watchBalance(profileId),
-                  builder: (context, snapshot) {
-                    final wallet = snapshot.data;
-                    final text = wallet == null
-                        ? 'LKR 0.00'
-                        : '${wallet.currency} ${wallet.balance.toStringAsFixed(2)}';
-                    return Text(
-                      text,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => WalletScreen(profileId: profileId),
-              ),
-            ),
-            child: Text('view'.tr()),
-          ),
-        ],
       ),
     );
   }
