@@ -1,4 +1,5 @@
 import '../../core/local_db/powersync.dart'; // exposes `db`
+import '../../core/supabase/client.dart';
 import '../../models/produce_listing.dart';
 
 class ProduceListingService {
@@ -43,6 +44,56 @@ class ProduceListingService {
     );
   }
 
+  /// Edits the parts of a published batch that are safe to change
+  /// offline: price, the per-batch description/photo overrides, and the
+  /// harvest date. Goes through the local mirror like any PowerSync
+  /// write. Price needs no special care server-side — the
+  /// clamp_listing_price_to_bounds trigger already keeps it in range.
+  ///
+  /// [description] / [imageUrl] null means "no override" (fall back to
+  /// the farmer_crop values) — never copy the crop's value in here.
+  ///
+  /// Deliberately excludes stock and status: see [adjustStock].
+  Future<void> updateListingDetails({
+    required String listingId,
+    required double pricePerKg,
+    required String? description,
+    required String? imageUrl,
+    required DateTime? harvestedOn,
+  }) async {
+    await db.execute(
+      '''
+      UPDATE produce_listing
+      SET price_per_kg = ?, description = ?, image_url = ?, harvested_on = ?
+      WHERE id = ?
+      ''',
+      [
+        pricePerKg,
+        description,
+        imageUrl,
+        harvestedOn?.toIso8601String().split('T').first,
+        listingId,
+      ],
+    );
+  }
+
+  /// Adds (positive) or removes (negative) stock atomically on the server
+  /// and returns the new available quantity. Also flips sold_out ⇄ active
+  /// as stock leaves/returns to zero. Online-only by design: an absolute
+  /// stock value written offline could overwrite a sale that happened in
+  /// the meantime (see the adjust_own_listing_stock migration). The local
+  /// mirror catches up via sync.
+  Future<double> adjustStock({
+    required String listingId,
+    required double deltaKg,
+  }) async {
+    final result = await supabase.rpc(
+      'adjust_own_listing_stock',
+      params: {'p_listing_id': listingId, 'p_delta_kg': deltaKg},
+    );
+    return (result as num).toDouble();
+  }
+
   /// Every listing this farmer has posted, newest first, with the
   /// description fallback chain (listing -> farmer_crop) already
   /// applied — the same coalesce the marketplace_listing_read view does
@@ -62,10 +113,13 @@ class ProduceListingService {
         pl.available_quantity_kg,
         pl.status_text,
         COALESCE(pl.description, fc.description) AS description,
+        pl.description                         AS listing_description,
+        fc.description                         AS crop_description,
         pl.image_url                           AS listing_image_url,
         fc.image_url                           AS farmer_crop_image_url,
         c.fallback_image_url                   AS crop_fallback_image_url,
-        pl.harvested_on
+        pl.harvested_on,
+        pl.published_at
       FROM produce_listing pl
       JOIN crop c ON c.id = pl.crop_id
       LEFT JOIN farmer_crop fc

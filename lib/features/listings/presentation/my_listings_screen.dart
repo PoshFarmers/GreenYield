@@ -9,6 +9,8 @@ import '../../../models/profile.dart';
 import '../../pricing/presentation/widgets/market_price_comparison_card.dart';
 import '../produce_listing_service.dart';
 import 'add_harvest_screen.dart';
+import 'edit_listing_screen.dart';
+import 'widgets/listing_status_badge.dart';
 
 /// Farmer's "Harvest" tab — their own produce listings, with summary
 /// stats and a status filter. Posting a new listing (the FAB) is the
@@ -138,7 +140,17 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
                       )
                     else
                       for (final listing in visible) ...[
-                        _ListingCard(listing: listing),
+                        _ListingCard(
+                          listing: listing,
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => EditListingScreen(
+                                listing: listing,
+                                farmerProfileId: widget.profile.id,
+                              ),
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 12),
                       ],
                   ],
@@ -325,8 +337,9 @@ class _StatusFilterBar extends StatelessWidget {
 
 class _ListingCard extends StatelessWidget {
   final ProduceListing listing;
+  final VoidCallback onTap;
 
-  const _ListingCard({required this.listing});
+  const _ListingCard({required this.listing, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -364,7 +377,24 @@ class _ListingCard extends StatelessWidget {
                     Positioned(
                       top: 10,
                       left: 10,
-                      child: _StatusBadge(status: listing.status),
+                      child: ListingStatusBadge(status: listing.status),
+                    ),
+                    // Signals the card opens an editor, not just a view.
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.edit_outlined,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -452,39 +482,15 @@ class _ListingCard extends StatelessWidget {
             ),
           ),
         ),
-      ],
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  final String status;
-
-  const _StatusBadge({required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final (color, labelKey) = switch (status) {
-      'active' => (theme.colorScheme.primary, 'status_active'),
-      'sold_out' => (theme.colorScheme.error, 'status_sold_out'),
-      'expired' => (theme.colorScheme.outline, 'status_expired'),
-      _ => (theme.colorScheme.tertiary, 'status_flagged'),
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        labelKey.tr(),
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: theme.colorScheme.onPrimary,
-          fontWeight: FontWeight.w600,
+        // Topmost, so the ripple shows over the image and the whole card
+        // is the tap target.
+        Positioned.fill(
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(borderRadius: borderRadius, onTap: onTap),
+          ),
         ),
-      ),
+      ],
     );
   }
 }

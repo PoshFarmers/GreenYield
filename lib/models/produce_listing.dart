@@ -16,6 +16,13 @@ class ProduceListing {
   /// Already coalesced: listing's own value, else the farmer_crop one.
   final String? description;
 
+  /// The un-coalesced parts of [description]: this batch's own override
+  /// (null = inheriting) and the farmer_crop default it falls back to.
+  /// The edit screen needs them apart, so clearing the override restores
+  /// the fallback instead of copying the crop text into the listing.
+  final String? listingDescription;
+  final String? cropDescription;
+
   /// The three tiers of the image fallback chain, kept separate (rather
   /// than pre-coalesced into one path) because each tier lives in a
   /// different bucket -- see [displayImage].
@@ -24,6 +31,11 @@ class ProduceListing {
   final String? cropFallbackImageUrl;
 
   final DateTime? harvestedOn;
+  final DateTime? publishedAt;
+
+  /// Only active / sold-out batches can have their stock changed; expired
+  /// and flagged ones are read-only (mirrors adjust_own_listing_stock).
+  bool get isStockEditable => status == 'active' || status == 'sold_out';
 
   const ProduceListing({
     required this.id,
@@ -34,10 +46,13 @@ class ProduceListing {
     required this.availableQuantityKg,
     required this.status,
     this.description,
+    this.listingDescription,
+    this.cropDescription,
     this.listingImageUrl,
     this.farmerCropImageUrl,
     this.cropFallbackImageUrl,
     this.harvestedOn,
+    this.publishedAt,
   });
 
   double get totalValue => pricePerKg * availableQuantityKg;
@@ -76,10 +91,13 @@ class ProduceListing {
           (map['available_quantity_kg'] as num?)?.toDouble() ?? 0,
       status: map['status_text'] as String? ?? 'active',
       description: map['description'] as String?,
+      listingDescription: map['listing_description'] as String?,
+      cropDescription: map['crop_description'] as String?,
       listingImageUrl: map['listing_image_url'] as String?,
       farmerCropImageUrl: map['farmer_crop_image_url'] as String?,
       cropFallbackImageUrl: map['crop_fallback_image_url'] as String?,
       harvestedOn: harvestedOn == null ? null : DateTime.tryParse(harvestedOn),
+      publishedAt: DateTime.tryParse(map['published_at'] as String? ?? ''),
     );
   }
 }

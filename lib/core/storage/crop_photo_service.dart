@@ -23,14 +23,21 @@ class CropPhotoService {
   /// Per-listing photo override (produce_listing.image_url). Keyed by
   /// listing id rather than crop id so publishing a listing never
   /// overwrites the farmer's standing farmer_crop photo.
+  ///
+  /// Pass [version] when *replacing* a listing's photo: it makes a new
+  /// path, so every MediaImage showing the old one (which reloads on a
+  /// path change) picks up the new photo instead of a stale cached copy.
   Future<String> uploadListingPhoto({
     required String userId,
     required String listingId,
     required Uint8List bytes,
     required String fileName,
+    String? version,
   }) => _uploadAt(
     userId: userId,
-    name: 'listing_$listingId',
+    name: version == null
+        ? 'listing_$listingId'
+        : 'listing_${listingId}_$version',
     bytes: bytes,
     fileName: fileName,
   );
