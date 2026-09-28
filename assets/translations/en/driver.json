@@ -151,5 +151,10 @@
   "status_pending_pickup": "Pending Pickup",
   "status_pending_dropoff": "Pending Drop-off",
   "status_pending_pickup_nearest": "Nearest • Pending Pickup",
-  "status_pending_dropoff_nearest": "Nearest • Pending Drop-off"
+  "status_pending_dropoff_nearest": "Nearest • Pending Drop-off",
+  "awaiting_packing": "Waiting for farmer",
+  "awaiting_pickup_first": "Pick up first",
+  "error_stop_not_ready": "This stop isn't ready for that step yet. The list has been refreshed.",
+  "error_no_connection": "Can't connect right now. Check your internet connection and try again.",
+  "error_action_failed": "That didn't work. Please try again."
 }

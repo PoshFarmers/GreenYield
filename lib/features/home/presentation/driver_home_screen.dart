@@ -182,15 +182,30 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('route_started_notified'.tr())));
     } catch (e) {
+      developer.log('start route failed: $e', name: 'GreenYield.DriverHome');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('error_starting_route'.tr(namedArgs: {'error': '$e'})),
-        ),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(_friendlyError(e))));
     } finally {
       if (mounted) setState(() => _startingRoute = false);
     }
+  }
+
+  /// A sentence the driver can act on, instead of the raw
+  /// PostgrestException (e.g. "Invalid transition from assigned to
+  /// picked_up for order …"). The raw error is still logged above.
+  String _friendlyError(Object e) {
+    final raw = e.toString();
+    if (raw.contains('Invalid transition') || raw.contains('cannot be')) {
+      return 'error_stop_not_ready'.tr();
+    }
+    if (e is TimeoutException ||
+        raw.contains('SocketException') ||
+        raw.contains('Failed host lookup') ||
+        raw.contains('ClientException')) {
+      return 'error_no_connection'.tr();
+    }
+    return 'error_action_failed'.tr();
   }
 
   Future<void> _handleStopAction(DriverStop stop) async {
@@ -214,12 +229,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
         ),
       );
     } catch (e) {
+      developer.log('stop action failed: $e', name: 'GreenYield.DriverHome');
+      // The local view was out of date (e.g. the farmer hadn't packed
+      // yet, or the step already happened) — resync it.
+      ref.invalidate(driverTodayStopsProvider(widget.profile.id));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('error_updating_status'.tr(namedArgs: {'error': '$e'})),
-        ),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(_friendlyError(e))));
     } finally {
       if (mounted) {
         setState(() => _pendingDeliveryIds.remove(stop.deliveryId));
@@ -1282,22 +1298,29 @@ class _StopCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                _StatusChip(
-                  label: stop.isDone
-                      ? (isPickup
-                            ? 'status_picked_up'.tr()
-                            : 'status_delivered'.tr())
-                      : isNearest
-                      ? (isPickup
-                            ? 'status_pending_pickup_nearest'.tr()
-                            : 'status_pending_dropoff_nearest'.tr())
-                      : (isPickup
-                            ? 'status_pending_pickup'.tr()
-                            : 'status_pending_dropoff'.tr()),
-                  color: accent,
-                  done: stop.isDone,
+                // Flexible: the "Nearest • Pending Drop-off" label (longer
+                // still in si/ta) overflowed this row on narrow phones.
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _StatusChip(
+                      label: stop.isDone
+                          ? (isPickup
+                                ? 'status_picked_up'.tr()
+                                : 'status_delivered'.tr())
+                          : isNearest
+                          ? (isPickup
+                                ? 'status_pending_pickup_nearest'.tr()
+                                : 'status_pending_dropoff_nearest'.tr())
+                          : (isPickup
+                                ? 'status_pending_pickup'.tr()
+                                : 'status_pending_dropoff'.tr()),
+                      color: accent,
+                      done: stop.isDone,
+                    ),
+                  ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 Text(
                   stop.displayOrderId,
                   style: theme.textTheme.labelMedium?.copyWith(
@@ -1369,9 +1392,19 @@ class _StopCard extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: stop.hasCoordinates ? onNavigate : null,
                     icon: const Icon(Icons.navigation_outlined, size: 18),
-                    label: Text('navigate'.tr()),
+                    // Ellipsis + tight padding: the si/ta labels overflowed
+                    // half-width buttons on narrow phones.
+                    label: Text(
+                      'navigate'.tr(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      minimumSize: const Size(0, 44),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 12,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -1382,7 +1415,12 @@ class _StopCard extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: isPending ? null : onAction,
+                      // Held until the stop is actually ready (order
+                      // packed / parcel picked up) — the server would
+                      // otherwise reject it as an invalid transition.
+                      onPressed: isPending || !stop.isReadyForAction
+                          ? null
+                          : onAction,
                       icon: isPending
                           ? const SizedBox(
                               width: 14,
@@ -1392,13 +1430,30 @@ class _StopCard extends StatelessWidget {
                                 color: Colors.white,
                               ),
                             )
-                          : const Icon(Icons.check_circle_outline, size: 18),
+                          : Icon(
+                              stop.isReadyForAction
+                                  ? Icons.check_circle_outline
+                                  : Icons.hourglass_top,
+                              size: 18,
+                            ),
                       label: Text(
-                        isPickup ? 'picked_up'.tr() : 'delivered'.tr(),
+                        !stop.isReadyForAction
+                            ? (isPickup
+                                  ? 'awaiting_packing'.tr()
+                                  : 'awaiting_pickup_first'.tr())
+                            : isPickup
+                            ? 'picked_up'.tr()
+                            : 'delivered'.tr(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       style: FilledButton.styleFrom(
                         backgroundColor: accent,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        minimumSize: const Size(0, 44),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 12,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -1444,11 +1499,15 @@ class _StatusChip extends StatelessWidget {
             color: color,
           ),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

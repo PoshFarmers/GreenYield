@@ -151,5 +151,10 @@
   "status_pending_pickup": "சேகரிப்பு நிலுவையில்",
   "status_pending_dropoff": "விநியோகம் நிலுவையில்",
   "status_pending_pickup_nearest": "அருகில் • சேகரிப்பு நிலுவையில்",
-  "status_pending_dropoff_nearest": "அருகில் • விநியோகம் நிலுவையில்"
+  "status_pending_dropoff_nearest": "அருகில் • விநியோகம் நிலுவையில்",
+  "awaiting_packing": "விவசாயிக்காகக் காத்திருக்கிறது",
+  "awaiting_pickup_first": "முதலில் சேகரிக்கவும்",
+  "error_stop_not_ready": "இந்த நிறுத்தம் அந்தப் படிக்கு இன்னும் தயாராக இல்லை. பட்டியல் புதுப்பிக்கப்பட்டது.",
+  "error_no_connection": "இப்போது இணைக்க முடியவில்லை. உங்கள் இணைய இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
+  "error_action_failed": "அது வேலை செய்யவில்லை. மீண்டும் முயற்சிக்கவும்."
 }

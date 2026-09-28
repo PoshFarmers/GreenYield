@@ -54,6 +54,17 @@ class DriverStop {
       ? deliveryStatus != 'assigned'
       : deliveryStatus == 'delivered';
 
+  /// The order lifecycle only allows `packed → picked_up` (and a drop-off
+  /// only after pickup) — see transition_order_status. Offering the
+  /// action earlier just gets an "Invalid transition" error back, so the
+  /// UI holds it until the stop is actually ready.
+  bool get isReadyForAction {
+    if (isDone) return false;
+    return type == DriverStopType.pickup
+        ? orderStatus == 'packed'
+        : deliveryStatus == 'picked_up' || deliveryStatus == 'in_transit';
+  }
+
   /// Short human-readable order id: GY-XXXXXX — matches
   /// `OrderSummary.displayId` / `OrderDetail.displayId` elsewhere in
   /// the app.

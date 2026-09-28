@@ -151,5 +151,10 @@
   "status_pending_pickup": "රැගෙන යාමට ඉතිරිය",
   "status_pending_dropoff": "බෙදාහැරීමට ඉතිරිය",
   "status_pending_pickup_nearest": "ළඟම • රැගෙන යාමට ඉතිරිය",
-  "status_pending_dropoff_nearest": "ළඟම • බෙදාහැරීමට ඉතිරිය"
+  "status_pending_dropoff_nearest": "ළඟම • බෙදාහැරීමට ඉතිරිය",
+  "awaiting_packing": "ගොවියා එනතුරු",
+  "awaiting_pickup_first": "පළමුව රැගෙන යන්න",
+  "error_stop_not_ready": "මෙම නැවතුම තවමත් එම පියවරට සූදානම් නැත. ලැයිස්තුව යාවත්කාලීන කර ඇත.",
+  "error_no_connection": "දැන් සම්බන්ධ විය නොහැක. ඔබේ අන්තර්ජාල සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "error_action_failed": "එය සාර්ථක නොවීය. කරුණාකර නැවත උත්සාහ කරන්න."
 }
