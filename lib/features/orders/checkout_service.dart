@@ -9,6 +9,7 @@ import '../../models/cart_item.dart';
 import '../../models/profile.dart';
 import '../payments/payment_gateway.dart';
 import '../pricing/delivery_fee_service.dart';
+import '../pricing/pricing_constants.dart';
 import 'order_models.dart';
 
 /// Order Creation & Checkout Flow.
@@ -16,7 +17,7 @@ class CheckoutService {
   static const _uuid = Uuid();
 
   /// Flat tax rate applied to each farmer's subtotal.
-  static const double taxRate = 0.02;
+  static const double taxRate = kOrderTaxRate;
 
   const CheckoutService();
 
