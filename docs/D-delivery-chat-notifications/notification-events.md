@@ -23,3 +23,17 @@ Backend-generated in-app notifications: which events create rows, what they cont
 `notification`: `id`, `profile_id` (FK profile, cascade), `type text`, `title text NOT NULL`, `body`, `payload jsonb NOT NULL default '{}'`, `source_table text`, `source_id uuid`, `read_at`, `created_at`. Indexes `(profile_id, created_at desc)` and a partial unread index. Enum `notification_channel`: `in_app`, `push`, `sms`, `email` (used only by `notification_preference`, with mirror `channel_text`).
 
 Locally, `payload` is stored as text; `NotificationItem.fromMap` decodes it, and the upload path decodes it back (`jsonbColumns: {'payload'}` in `tableRegistry`).
+
+
+## 4. Flow
+
+```mermaid
+flowchart LR
+    E[Trigger or RPC] --> P{Uses send_notification?}
+    P -- yes --> N[INSERT notification]
+    P -- no --> N
+    N --> W[PowerSync own_notifications stream]
+    W --> L[Local SQLite notification]
+    L --> C[NotificationService and providers]
+    C --> U[Bell badge and list]
+```
