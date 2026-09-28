@@ -13,6 +13,7 @@ import '../../profile/buyer/buyer_profile_service.dart';
 import '../../orders/presentation/recurring/recurring_orders_screen.dart';
 import '../marketplace_service.dart';
 import '../marketplace_cache.dart';
+import '../../pricing/presentation/market_prices_screen.dart';
 import 'listing_detail_screen.dart';
 import 'produce_card.dart';
 
@@ -438,12 +439,19 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
         : _visibleListings;
 
     return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       controller: _scrollController,
       slivers: [
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           sliver: SliverList.list(
             children: [
+              _MarketPricesEntry(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const MarketPricesScreen()),
+                ),
+              ),
+              const SizedBox(height: 12),
               if (_isShowingCachedData) ...[
                 const _OfflineCachedBanner(),
                 const SizedBox(height: 12),
@@ -563,15 +571,20 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
       ];
     }
 
+    final screenW = MediaQuery.sizeOf(context).width;
+    final gridW = (screenW < 480 ? screenW : 480.0) - 32;
+    final tileW = (gridW - 20) / 3;
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+
     return [
       SliverPadding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         sliver: SliverGrid.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
             crossAxisSpacing: 10,
             mainAxisSpacing: 10,
-            childAspectRatio: 0.66,
+            mainAxisExtent: tileW + 52 * textScale,
           ),
           itemCount: visible.length,
           itemBuilder: (context, index) {
@@ -608,6 +621,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
         : _visibleFarmers;
 
     return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -1247,6 +1261,62 @@ class _BuyerRecurringOrdersBanner extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Entry tile to the buyer Market Prices screen (top of the produce tab).
+class _MarketPricesEntry extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _MarketPricesEntry({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.query_stats,
+              color: theme.colorScheme.onSecondaryContainer,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'buyer_market_title'.tr(),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSecondaryContainer,
+                    ),
+                  ),
+                  Text(
+                    'buyer_market_entry_subtitle'.tr(),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSecondaryContainer,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: theme.colorScheme.onSecondaryContainer,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

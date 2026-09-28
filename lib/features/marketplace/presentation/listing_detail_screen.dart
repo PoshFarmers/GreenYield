@@ -14,6 +14,7 @@ import '../../cart/cart_service.dart';
 import '../../chat/chat_service.dart';
 import '../../chat/presentation/chat_screen.dart';
 import '../../navigation/presentation/app_nav_shell.dart';
+import '../../pricing/presentation/widgets/market_position_chip.dart';
 import '../../pricing/presentation/widgets/price_breakdown_card.dart';
 import '../../reviews/presentation/farmer_public_profile_screen.dart';
 import '../marketplace_service.dart';
@@ -343,6 +344,12 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                   ),
                 ),
                 Text('per_kg'.tr(), style: theme.textTheme.bodySmall),
+                const SizedBox(height: 6),
+                MarketPositionChip(
+                  cropId: listing.cropId,
+                  pricePerKg: listing.pricePerKg,
+                  detailed: true,
+                ),
               ],
             ),
           ],
