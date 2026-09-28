@@ -14,6 +14,12 @@ import 'withdrawal_history_screen.dart';
 /// Shared wallet screen for any role: live balance, Top up / Withdraw / Cards,
 /// this-month summary and a filterable, date-grouped, infinitely scrolling
 /// transaction list (all from the local mirror, so it works offline).
+///
+/// NOTE: the body is a SingleChildScrollView (not a lazy ListView) on
+/// purpose. The balance/month StreamBuilders hold single-subscription
+/// PowerSync streams; a lazy list disposes and re-creates them while
+/// scrolling, which re-listens to a consumed stream and renders the red
+/// error boxes.
 class WalletScreen extends StatefulWidget {
   final String profileId;
 
@@ -38,18 +44,20 @@ class _WalletScreenState extends State<WalletScreen> {
   int _limit = _pageSize;
   int _loaded = 0;
   List<WalletTransaction>? _last;
+  bool _loadingMore = false;
 
   @override
   void initState() {
     super.initState();
-    _balance = _service.watchBalance(widget.profileId);
-    _month = _history.watchMonthSummary(widget.profileId);
+    _balance = _service.watchBalance(widget.profileId).asBroadcastStream();
+    _month = _history.watchMonthSummary(widget.profileId).asBroadcastStream();
     _bind();
     _scroll.addListener(_onScroll);
   }
 
   @override
   void dispose() {
+    _scroll.removeListener(_onScroll);
     _scroll.dispose();
     super.dispose();
   }
@@ -63,13 +71,19 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   void _onScroll() {
-    if (!_scroll.hasClients) return;
+    if (!_scroll.hasClients || _loadingMore) return;
     final p = _scroll.position;
     // `_loaded >= _limit` means the last page was full, so there may be more.
     if (p.pixels >= p.maxScrollExtent - 300 && _loaded >= _limit) {
-      setState(() {
-        _limit += _pageSize;
-        _bind();
+      _loadingMore = true;
+      // Defer: scroll notifications can fire during layout.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _limit += _pageSize;
+          _bind();
+        });
+        _loadingMore = false;
       });
     }
   }
@@ -110,57 +124,60 @@ class _WalletScreenState extends State<WalletScreen> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
-            child: ListView(
+            child: SingleChildScrollView(
               controller: _scroll,
               padding: const EdgeInsets.all(20),
-              children: [
-                _balanceCard(theme),
-                const SizedBox(height: 12),
-                _monthSummary(theme),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: () => _push(const WithdrawalHistoryScreen()),
-                    icon: const Icon(Icons.history, size: 18),
-                    label: Text('payments_withdraw_history'.tr()),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _balanceCard(theme),
+                  const SizedBox(height: 12),
+                  _monthSummary(theme),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => _push(const WithdrawalHistoryScreen()),
+                      icon: const Icon(Icons.history, size: 18),
+                      label: Text('payments_withdraw_history'.tr()),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'recent_transactions'.tr(),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  const SizedBox(height: 8),
+                  Text(
+                    'recent_transactions'.tr(),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      for (final f in WalletFilter.values) ...[
-                        ChoiceChip(
-                          label: Text(f.labelKey.tr()),
-                          selected: _filter == f,
-                          onSelected: (_) => _setFilter(f),
-                        ),
-                        const SizedBox(width: 8),
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final f in WalletFilter.values) ...[
+                          ChoiceChip(
+                            label: Text(f.labelKey.tr()),
+                            selected: _filter == f,
+                            onSelected: (_) => _setFilter(f),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                StreamBuilder<List<WalletTransaction>>(
-                  stream: _txns,
-                  builder: (context, snapshot) {
-                    final txns = snapshot.data ?? _last;
-                    if (snapshot.data != null) {
-                      _last = snapshot.data;
-                      _loaded = snapshot.data!.length;
-                    }
-                    return _list(theme, txns);
-                  },
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  StreamBuilder<List<WalletTransaction>>(
+                    stream: _txns,
+                    builder: (context, snapshot) {
+                      final txns = snapshot.data ?? _last;
+                      if (snapshot.data != null) {
+                        _last = snapshot.data;
+                        _loaded = snapshot.data!.length;
+                      }
+                      return _list(theme, txns);
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),
