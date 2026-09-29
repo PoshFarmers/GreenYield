@@ -64,5 +64,15 @@
   "market_based_on_orders": "ඇණවුම් {count} ක් මත පදනම්ව",
   "market_estimated": "යොමු මිල ගණන් වලින් ඇස්තමේන්තු කර ඇත",
   "market_based_on_orders_short": "ඇණවුම් {count}",
-  "market_estimated_short": "ඇස්තමේන්තුගත"
+  "market_estimated_short": "ඇස්තමේන්තුගත",
+  "reviews_title": "සමාලෝචන",
+  "my_reviews": "මගේ සමාලෝචන",
+  "see_all": "සියල්ල බලන්න",
+  "see_all_reviews": "සමාලෝචන {count} ම බලන්න",
+  "n_reviews": {"zero": "සමාලෝචන නැත", "one": "සමාලෝචන 1", "other": "සමාලෝචන {}"},
+  "no_reviews_yet_farmer_hint": "ඇණවුමක් බෙදා හැරීමෙන් පසු ගැනුම්කරුවන්ට ඔබව ශ්‍රේණිගත කළ හැක. ඔවුන්ගේ සමාලෝචන මෙහි දිස් වේ.",
+  "no_reviews_with_rating": "මෙම ශ්‍රේණිගත කිරීම සහිත සමාලෝචන නැත.",
+  "review_buyer_fallback": "ගැනුම්කරු",
+  "reviews_offline_notice": "ඔබ නොබැඳි බැවින් ගැනුම්කරුවන්ගේ නම් සහ නවතම සමාලෝචන නොපෙන්විය හැක.",
+  "reviews_load_failed": "ඔබේ සමාලෝචන පූරණය කළ නොහැකි විය."
 }

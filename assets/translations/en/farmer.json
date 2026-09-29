@@ -64,5 +64,15 @@
   "market_based_on_orders": "Based on {count} orders",
   "market_estimated": "Estimated from reference prices",
   "market_based_on_orders_short": "{count} orders",
-  "market_estimated_short": "Estimated"
+  "market_estimated_short": "Estimated",
+  "reviews_title": "Reviews",
+  "my_reviews": "My reviews",
+  "see_all": "See all",
+  "see_all_reviews": "See all {count} reviews",
+  "n_reviews": {"zero": "No reviews", "one": "1 review", "other": "{} reviews"},
+  "no_reviews_yet_farmer_hint": "Buyers can rate you after an order is delivered. Their reviews will appear here.",
+  "no_reviews_with_rating": "No reviews with this rating.",
+  "review_buyer_fallback": "Buyer",
+  "reviews_offline_notice": "You're offline, so buyer names and the newest reviews may be missing.",
+  "reviews_load_failed": "Couldn't load your reviews."
 }

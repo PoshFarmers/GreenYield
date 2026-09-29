@@ -2,7 +2,9 @@ import 'dart:developer' as developer;
 
 import '../../core/local_db/powersync.dart'; // exposes `db`
 import '../../core/supabase/client.dart';
+import '../../models/farmer_public_profile.dart';
 import '../../models/farmer_review.dart';
+import 'farmer_public_profile_service.dart';
 
 /// Farmer rating & reviews. Reads watch the local PowerSync mirror
 /// (read-only). The one write this class exposes, [submitReview], goes
@@ -22,6 +24,54 @@ class FarmerReviewService {
           parameters: [farmerProfileId],
         )
         .map((rows) => rows.map(FarmerReview.fromMap).toList());
+  }
+
+  /// Every review a farmer has received, newest first — for the farmer's
+  /// own profile. Prefers the get_farmer_public_profile RPC: it's
+  /// authoritative and carries buyer names, which the local mirror can't
+  /// (other users' `profile` rows don't sync). Offline, falls back to the
+  /// local `farmer_review` rows with names left null (the UI shows a
+  /// generic "Buyer"); [OwnReviews.fromCache] tells the UI which it got.
+  Future<OwnReviews> fetchOwnReviews(String farmerProfileId) async {
+    try {
+      final profile = await const FarmerPublicProfileService().fetchProfile(
+        farmerProfileId,
+      );
+      return OwnReviews(
+        reviews: [
+          for (final r in profile?.reviews ?? const <FarmerPublicReview>[])
+            (
+              rating: r.rating,
+              comment: r.comment,
+              createdAt: r.createdAt,
+              buyerName: r.buyerName,
+            ),
+        ],
+        fromCache: false,
+      );
+    } catch (e) {
+      developer.log(
+        'fetchOwnReviews: RPC failed, using local mirror: $e',
+        name: 'GreenYield.Reviews',
+      );
+      final rows = await db.getAll(
+        'SELECT * FROM farmer_review WHERE farmer_profile_id = ? '
+        'ORDER BY created_at DESC',
+        [farmerProfileId],
+      );
+      return OwnReviews(
+        reviews: [
+          for (final r in rows.map(FarmerReview.fromMap))
+            (
+              rating: r.rating,
+              comment: r.comment,
+              createdAt: r.createdAt,
+              buyerName: null,
+            ),
+        ],
+        fromCache: true,
+      );
+    }
   }
 
   /// The signed-in buyer's own review of [orderId], if any — null means
@@ -108,4 +158,36 @@ class FarmerReviewService {
       params: {'p_order_id': orderId, 'p_rating': rating, 'p_comment': comment},
     );
   }
+}
+
+typedef OwnReview = ({
+  int rating,
+  String? comment,
+  DateTime createdAt,
+
+  /// Null when loaded offline (names aren't in the local mirror).
+  String? buyerName,
+});
+
+/// Result of [FarmerReviewService.fetchOwnReviews].
+class OwnReviews {
+  final List<OwnReview> reviews;
+
+  /// True when this came from the local mirror because the server was
+  /// unreachable — may be incomplete and has no buyer names.
+  final bool fromCache;
+
+  const OwnReviews({required this.reviews, required this.fromCache});
+
+  int get count => reviews.length;
+
+  double get average => reviews.isEmpty
+      ? 0
+      : reviews.fold<int>(0, (sum, r) => sum + r.rating) / reviews.length;
+
+  /// How many reviews gave each star rating, 1..5.
+  Map<int, int> get distribution => {
+    for (var star = 1; star <= 5; star++)
+      star: reviews.where((r) => r.rating == star).length,
+  };
 }

@@ -8,8 +8,8 @@ import '../../../wallet/presentation/widgets/wallet_summary_card.dart';
 import 'package:latlong2/latlong.dart' as ll;
 
 import '../../../../core/auth/auth_providers.dart';
-import '../../../../core/auth/sign_out.dart';
 import '../../../../core/storage/crop_photo_service.dart';
+import '../../../../core/widgets/account_actions.dart';
 import '../../../../core/widgets/app_secondary_header.dart';
 import '../../../../core/widgets/avatar_image.dart';
 import '../../../../core/widgets/media_image.dart';
@@ -17,6 +17,8 @@ import '../../../../models/farmer_profile.dart';
 import '../../../../models/farmer_review.dart';
 import '../../../../models/profile.dart';
 import '../../../reviews/farmer_review_service.dart';
+import '../../../reviews/presentation/farmer_reviews_screen.dart';
+import '../../../reviews/presentation/widgets/review_tile.dart';
 import '../../../reviews/presentation/widgets/star_rating.dart';
 import '../farmer_profile_service.dart';
 import 'add_crop_screen.dart';
@@ -127,7 +129,7 @@ class _FarmerProfileViewScreenState
 
           final profile = profileSnapshot.data;
           if (profile == null) {
-            return const Center(child: Text('Profile not found'));
+            return Center(child: Text('profile_not_found'.tr()));
           }
 
           return StreamBuilder<FarmerProfile?>(
@@ -142,7 +144,7 @@ class _FarmerProfileViewScreenState
 
               final farmerProfile = farmerSnapshot.data;
               if (farmerProfile == null) {
-                return const Center(child: Text('Farmer profile not found'));
+                return Center(child: Text('profile_not_found'.tr()));
               }
 
               return SafeArea(
@@ -169,6 +171,8 @@ class _FarmerProfileViewScreenState
                         const SizedBox(height: 12),
                         const _PerformanceCard(),
                         const SizedBox(height: 12),
+                        _ReviewsCard(farmerProfileId: _userId),
+                        const SizedBox(height: 12),
                         _CropsGrownCard(
                           // Farmer crop photos are stored at a deterministic
                           // path (keyed by crop id), so re-uploading one
@@ -187,20 +191,7 @@ class _FarmerProfileViewScreenState
                           onAddCrop: () => _addCrop(farmerProfile.crops),
                         ),
                         const SizedBox(height: 24),
-                        OutlinedButton.icon(
-                          onPressed: () => signOutAndReset(context, ref),
-                          icon: const Icon(Icons.logout),
-                          label: Text('logout'.tr()),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Theme.of(context)
-                                .colorScheme
-                                .error,
-                            side: BorderSide(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                        ),
+                        const AccountActions(),
                         const SizedBox(height: 16),
                       ],
                     ),
@@ -327,17 +318,38 @@ class _HeaderCard extends StatelessWidget {
                   style: theme.textTheme.bodySmall,
                 );
               }
-              return Row(
-                children: [
-                  StarRatingDisplay(rating: summary.avgRating, size: 16),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${summary.avgRating.toStringAsFixed(1)} (${summary.reviewCount})',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+              // Tappable: the rating is where a farmer looks first to
+              // find out what buyers said.
+              return InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        FarmerReviewsScreen(farmerProfileId: profile.id),
                   ),
-                ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      StarRatingDisplay(rating: summary.avgRating, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${summary.avgRating.toStringAsFixed(1)} · ${'n_reviews'.plural(summary.reviewCount)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right,
+                        size: 18,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ],
+                  ),
+                ),
               );
             },
           ),
@@ -437,6 +449,113 @@ class _PerformanceCard extends StatelessWidget {
           const SizedBox(height: 8),
           _StatRow(label: 'active_listings'.tr()),
         ],
+      ),
+    );
+  }
+}
+
+/// What buyers actually wrote, not just the average: rating summary with
+/// star breakdown, the two most recent reviews (shown exactly as buyers
+/// see them), and a way into the full list.
+class _ReviewsCard extends StatefulWidget {
+  final String farmerProfileId;
+
+  const _ReviewsCard({required this.farmerProfileId});
+
+  @override
+  State<_ReviewsCard> createState() => _ReviewsCardState();
+}
+
+class _ReviewsCardState extends State<_ReviewsCard> {
+  static const _previewCount = 2;
+  final _service = const FarmerReviewService();
+  late Future<OwnReviews> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _service.fetchOwnReviews(widget.farmerProfileId);
+  }
+
+  Future<void> _openAll(OwnReviews? loaded) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FarmerReviewsScreen(
+          farmerProfileId: widget.farmerProfileId,
+          initial: loaded,
+        ),
+      ),
+    );
+    // A review may have arrived meanwhile; cheap to re-check.
+    if (mounted) {
+      setState(
+        () => _future = _service.fetchOwnReviews(widget.farmerProfileId),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _Card(
+      child: FutureBuilder<OwnReviews>(
+        future: _future,
+        builder: (context, snapshot) {
+          final data = snapshot.data;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  _SectionTitle(
+                    icon: Icons.rate_review_outlined,
+                    label: 'reviews_title'.tr(),
+                  ),
+                  const Spacer(),
+                  if (data != null && data.count > 0)
+                    TextButton(
+                      onPressed: () => _openAll(data),
+                      child: Text('see_all'.tr()),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (data == null)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (data.count == 0) ...[
+                if (data.fromCache) const OfflineReviewsNotice(),
+                const NoReviewsYet(),
+              ] else ...[
+                if (data.fromCache) ...[
+                  const OfflineReviewsNotice(),
+                  const SizedBox(height: 12),
+                ],
+                ReviewsSummary(reviews: data),
+                const SizedBox(height: 16),
+                for (final review in data.reviews.take(_previewCount)) ...[
+                  ReviewTile(
+                    buyerName: review.buyerName ?? 'review_buyer_fallback'.tr(),
+                    rating: review.rating,
+                    comment: review.comment,
+                    createdAt: review.createdAt,
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                if (data.count > _previewCount)
+                  OutlinedButton(
+                    onPressed: () => _openAll(data),
+                    child: Text(
+                      'see_all_reviews'.tr(
+                        namedArgs: {'count': '${data.count}'},
+                      ),
+                    ),
+                  ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
