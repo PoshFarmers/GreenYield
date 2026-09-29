@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 
 import '../../core/local_db/powersync.dart';
 import '../../core/supabase/client.dart';
+import 'live_tracking_models.dart';
 import 'order_detail_models.dart';
 
 /// Sprint 3 — Task: Multi-Role Order Management.
@@ -276,7 +277,34 @@ class OrderService {
     yield await fetchDeliveries();
   }
 
+  /// Watch live tracking details for an order.
+  Stream<LiveOrderTracking?> watchLiveOrderTracking(String orderId) {
+    return db
+        .watch(
+          'SELECT id, status FROM orders WHERE id = ? UNION SELECT order_id AS id, status FROM delivery WHERE order_id = ? LIMIT 1',
+          parameters: [orderId, orderId],
+        )
+        .asyncMap((_) async {
+          try {
+            final data = await supabase.rpc(
+              'get_live_order_tracking',
+              params: {'p_order_id': orderId},
+            );
+            if (data != null) {
+              return LiveOrderTracking.fromMap(data as Map<String, dynamic>);
+            }
+          } catch (e) {
+            developer.log(
+              'get_live_order_tracking RPC failed: $e',
+              name: 'GreenYield.OrderService',
+            );
+          }
+          return null;
+        });
+  }
+
   /// Watch the full detail of a single order.
+
   ///
   /// The local PowerSync SQLite only replicates the *current user's* profile
   /// row (RLS: `profile.id = auth.uid()`), so JOINing p_farmer / p_buyer /
