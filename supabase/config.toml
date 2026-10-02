@@ -423,3 +423,11 @@ entrypoint = "./functions/process-recurring-orders/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/process-recurring-orders/*.html" ]
+
+# Snap-to-List AI assistant. Needs the caller's JWT (the function also
+# checks it itself) and the GEMINI_API_KEY secret.
+[functions.suggest-listing]
+enabled = true
+verify_jwt = true
+import_map = "./functions/suggest-listing/deno.json"
+entrypoint = "./functions/suggest-listing/index.ts"
