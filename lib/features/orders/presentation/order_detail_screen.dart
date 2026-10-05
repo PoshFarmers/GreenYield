@@ -166,10 +166,11 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final asyncDetail = ref.watch(orderDetailProvider(widget.orderId));
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: const AppSecondaryHeader(
         title: 'Order Details',
         showBackButton: true,

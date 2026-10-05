@@ -50,7 +50,10 @@ class _DriverDeliveriesScreenState extends ConsumerState<DriverDeliveriesScreen>
               height: 44,
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F0EA),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.5)
+                    : const Color(0xFFE8F0EA),
                 borderRadius: BorderRadius.circular(24),
               ),
               child: TabBar(
@@ -72,7 +75,10 @@ class _DriverDeliveriesScreenState extends ConsumerState<DriverDeliveriesScreen>
                   fontWeight: FontWeight.w500,
                 ),
                 indicator: BoxDecoration(
-                  color: const Color(0xFFD3E8D7),
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Theme.of(context).colorScheme.primary
+                            .withValues(alpha: 0.25)
+                      : const Color(0xFFD3E8D7),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 indicatorSize: TabBarIndicatorSize.tab,
@@ -296,7 +302,11 @@ class _DeliveryTile extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF5F7F6),
+                    color: theme.brightness == Brightness.dark
+                        ? theme.colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.35,
+                          )
+                        : const Color(0xFFF5F7F6),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -382,7 +392,9 @@ class _RouteFlow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F7F6),
+        color: theme.brightness == Brightness.dark
+            ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
+            : const Color(0xFFF5F7F6),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
