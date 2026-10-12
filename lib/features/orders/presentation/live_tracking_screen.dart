@@ -34,11 +34,10 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
 
   // Real road route caching
   List<ll.LatLng> _activeRoutePoints = [];
-  List<ll.LatLng> _secondaryRoutePoints = [];
   double? _activeRouteDistanceKm;
   int? _activeRouteDurationMin;
 
-  ll.LatLng? _lastRoutedDriverPos;
+  ll.LatLng? _lastRoutedStartPos;
   ll.LatLng? _lastRoutedTargetPos;
   bool? _lastPickupState;
   bool _isFetchingRoute = false;
@@ -51,8 +50,7 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
     _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       ref.invalidate(liveOrderTrackingProvider(widget.orderId));
     });
-    // ref.listen only fires on *changes* — trigger on first load too.
-    // Use whenData to safely unwrap the initial async state.
+    // Trigger on first load safely
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(liveOrderTrackingProvider(widget.orderId)).whenData((tracking) {
@@ -92,21 +90,12 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
       final response = await http
           .get(uri, headers: {'User-Agent': 'GreenYieldApp/1.0 (lk)'})
           .timeout(const Duration(seconds: 10));
-      developer.log(
-        'OSRM response: ${response.statusCode} (${response.body.length} bytes)',
-        name: 'GreenYield.LiveTracking',
-      );
       if (response.statusCode != 200) return null;
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final code = data['code'] as String?;
-      if (code != 'Ok') {
-        developer.log(
-          'OSRM routing failed — code: $code',
-          name: 'GreenYield.LiveTracking',
-        );
-        return null;
-      }
+      if (code != 'Ok') return null;
+
       final routes = data['routes'] as List?;
       if (routes == null || routes.isEmpty) return null;
 
@@ -132,61 +121,57 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
       final durationMin = (((first['duration'] as num?)?.toDouble() ?? 0) / 60)
           .round();
 
-      developer.log(
-        'OSRM route: ${points.length} pts, ${distanceKm.toStringAsFixed(1)} km, $durationMin min',
-        name: 'GreenYield.LiveTracking',
-      );
-
       return {
         'points': points,
         'distanceKm': distanceKm,
         'durationMin': durationMin,
       };
-    } catch (e, st) {
-      developer.log(
-        'OSRM fetch error: $e',
-        name: 'GreenYield.LiveTracking',
-        error: e,
-        stackTrace: st,
-      );
+    } catch (e) {
+      developer.log('OSRM fetch error: $e', name: 'GreenYield.LiveTracking');
       return null;
     }
   }
 
-  /// Calculates real road routes when driver location or destination changes significantly.
+  /// Calculates real road routes:
+  /// Before pickup: farmer location -> buyer location
+  /// After pickup: driver real-time GPS location -> buyer location
   void _updateRoadRoutes(LiveOrderTracking tracking) {
     final driver = tracking.driver;
     final farmer = tracking.farmer;
     final buyer = tracking.buyer;
     final isPickedUp = tracking.isPickedUp;
 
-    if (driver == null || !driver.hasCoordinates) {
-      return;
+    ll.LatLng? startPos;
+    ll.LatLng? destPos;
+
+    if (buyer != null && buyer.hasCoordinates) {
+      destPos = ll.LatLng(buyer.latitude!, buyer.longitude!);
     }
 
-    final currentDriverPos = ll.LatLng(driver.latitude!, driver.longitude!);
-    final activeTargetPos = isPickedUp
-        ? (buyer != null && buyer.hasCoordinates
-              ? ll.LatLng(buyer.latitude!, buyer.longitude!)
-              : null)
-        : (farmer != null && farmer.hasCoordinates
-              ? ll.LatLng(farmer.latitude!, farmer.longitude!)
-              : null);
+    if (isPickedUp) {
+      // Package picked up: route is from driver's real-time GPS to buyer
+      if (driver != null && driver.hasCoordinates) {
+        startPos = ll.LatLng(driver.latitude!, driver.longitude!);
+      } else if (farmer != null && farmer.hasCoordinates) {
+        startPos = ll.LatLng(farmer.latitude!, farmer.longitude!);
+      }
+    } else {
+      // Till package picked up: route represents Farmer -> Buyer delivery journey
+      if (farmer != null && farmer.hasCoordinates) {
+        startPos = ll.LatLng(farmer.latitude!, farmer.longitude!);
+      }
+    }
 
-    if (activeTargetPos == null) return;
+    if (startPos == null || destPos == null) return;
 
-    // Check if we need to recalculate:
-    // 1. Pickup status changed
-    // 2. Target changed
-    // 3. Driver moved more than ~40 meters
     bool shouldRecalculate = false;
     if (_lastPickupState != isPickedUp) {
       shouldRecalculate = true;
-    } else if (_lastRoutedTargetPos == null ||
-        _distanceBetween(_lastRoutedTargetPos!, activeTargetPos) > 0.05) {
+    } else if (_lastRoutedStartPos == null ||
+        _distanceBetween(_lastRoutedStartPos!, startPos) > 0.04) {
       shouldRecalculate = true;
-    } else if (_lastRoutedDriverPos == null ||
-        _distanceBetween(_lastRoutedDriverPos!, currentDriverPos) > 0.04) {
+    } else if (_lastRoutedTargetPos == null ||
+        _distanceBetween(_lastRoutedTargetPos!, destPos) > 0.05) {
       shouldRecalculate = true;
     }
 
@@ -194,47 +179,22 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
 
     _isFetchingRoute = true;
     _lastPickupState = isPickedUp;
-    _lastRoutedDriverPos = currentDriverPos;
-    _lastRoutedTargetPos = activeTargetPos;
+    _lastRoutedStartPos = startPos;
+    _lastRoutedTargetPos = destPos;
 
     Future.microtask(() async {
-      final activeRouteData = await _fetchRoadRoute(
-        currentDriverPos,
-        activeTargetPos,
-      );
-
-      List<ll.LatLng>? secondaryPoints;
-      // If not yet picked up, also route farmer -> buyer to show full trip context
-      if (!isPickedUp &&
-          farmer != null &&
-          farmer.hasCoordinates &&
-          buyer != null &&
-          buyer.hasCoordinates) {
-        final farmerPos = ll.LatLng(farmer.latitude!, farmer.longitude!);
-        final buyerPos = ll.LatLng(buyer.latitude!, buyer.longitude!);
-        final secRoute = await _fetchRoadRoute(farmerPos, buyerPos);
-        if (secRoute != null) {
-          secondaryPoints = secRoute['points'] as List<ll.LatLng>?;
-        }
-      }
+      final routeData = await _fetchRoadRoute(startPos!, destPos!);
 
       if (mounted) {
         setState(() {
           _isFetchingRoute = false;
-          if (activeRouteData != null) {
-            _activeRoutePoints =
-                activeRouteData['points'] as List<ll.LatLng>? ?? [];
-            _activeRouteDistanceKm = activeRouteData['distanceKm'] as double?;
-            _activeRouteDurationMin = activeRouteData['durationMin'] as int?;
+          if (routeData != null) {
+            _activeRoutePoints = routeData['points'] as List<ll.LatLng>? ?? [];
+            _activeRouteDistanceKm = routeData['distanceKm'] as double?;
+            _activeRouteDurationMin = routeData['durationMin'] as int?;
           } else {
-            // Fallback straight line if OSRM unavailable
-            _activeRoutePoints = [currentDriverPos, activeTargetPos];
-          }
-
-          if (secondaryPoints != null) {
-            _secondaryRoutePoints = secondaryPoints;
-          } else if (isPickedUp) {
-            _secondaryRoutePoints = [];
+            // Fallback straight line only if OSRM service is temporarily down
+            _activeRoutePoints = [startPos!, destPos!];
           }
         });
       } else {
@@ -243,7 +203,7 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
     });
   }
 
-  /// Approximate Euclidean distance in km for threshold comparison
+  /// Approximate distance in km for threshold comparison
   double _distanceBetween(ll.LatLng a, ll.LatLng b) {
     const ll.Distance distance = ll.Distance();
     return distance.as(ll.LengthUnit.Kilometer, a, b);
@@ -251,9 +211,6 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Use ref.listen to react to tracking data changes and trigger road
-    // route calculation — this is the correct Riverpod pattern for side
-    // effects (avoids calling async work from inside build).
     ref.listen<AsyncValue<LiveOrderTracking?>>(
       liveOrderTrackingProvider(widget.orderId),
       (_, next) {
@@ -297,12 +254,20 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
           final isPickedUp = tracking.isPickedUp;
 
           final mapPoints = <ll.LatLng>[];
-          if (driver != null && driver.hasCoordinates) {
-            mapPoints.add(ll.LatLng(driver.latitude!, driver.longitude!));
+          // Before pickup: show Farmer and Buyer (till package picked up, view farmer location)
+          // After pickup: show Driver real-time location and Buyer
+          if (!isPickedUp) {
+            if (farmer != null && farmer.hasCoordinates) {
+              mapPoints.add(ll.LatLng(farmer.latitude!, farmer.longitude!));
+            }
+          } else {
+            if (driver != null && driver.hasCoordinates) {
+              mapPoints.add(ll.LatLng(driver.latitude!, driver.longitude!));
+            } else if (farmer != null && farmer.hasCoordinates) {
+              mapPoints.add(ll.LatLng(farmer.latitude!, farmer.longitude!));
+            }
           }
-          if (farmer != null && farmer.hasCoordinates) {
-            mapPoints.add(ll.LatLng(farmer.latitude!, farmer.longitude!));
-          }
+
           if (buyer != null && buyer.hasCoordinates) {
             mapPoints.add(ll.LatLng(buyer.latitude!, buyer.longitude!));
           }
@@ -344,84 +309,122 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                   // Real road route polyline layer
                   PolylineLayer(
                     polylines: [
-                      // Secondary route (Farmer -> Buyer when still heading to pickup)
-                      if (!isPickedUp && _secondaryRoutePoints.isNotEmpty)
-                        Polyline(
-                          points: _secondaryRoutePoints,
-                          strokeWidth: 4,
-                          color: theme.colorScheme.outline.withValues(
-                            alpha: 0.5,
-                          ),
-                          pattern: const StrokePattern.dotted(),
-                        ),
-
-                      // Active driving route (Driver -> Target)
-                      if (_activeRoutePoints.isNotEmpty)
+                      if (_activeRoutePoints.isNotEmpty) ...[
+                        // Outer subtle glow/halo for road visibility
                         Polyline(
                           points: _activeRoutePoints,
-                          strokeWidth: 5,
-                          color: isPickedUp
-                              ? Colors.orange.shade700
-                              : theme.colorScheme.primary,
-                        )
-                      else if (mapPoints.length > 1)
-                        // Fallback straight line before route loads
-                        Polyline(
-                          points: mapPoints,
-                          strokeWidth: 3,
-                          color: theme.colorScheme.primary.withValues(
-                            alpha: 0.4,
-                          ),
-                          pattern: StrokePattern.dashed(
-                            segments: const [10, 8],
-                          ),
+                          strokeWidth: 9,
+                          color:
+                              (isPickedUp
+                                      ? const Color(0xFF1976D2)
+                                      : const Color(0xFF2E7D32))
+                                  .withValues(alpha: 0.25),
                         ),
+                        // Real road route line
+                        Polyline(
+                          points: _activeRoutePoints,
+                          strokeWidth: 5.5,
+                          color: isPickedUp
+                              ? const Color(0xFF1976D2) // Blue during transit
+                              : const Color(0xFF2E7D32), // Green pre-pickup
+                        ),
+                      ],
                     ],
                   ),
 
                   MarkerLayer(
                     markers: [
-                      // Farmer Marker
-                      if (farmer != null && farmer.hasCoordinates)
+                      // Farmer Marker: visible before pickup
+                      if (!isPickedUp &&
+                          farmer != null &&
+                          farmer.hasCoordinates)
                         Marker(
                           point: ll.LatLng(farmer.latitude!, farmer.longitude!),
-                          width: 44,
-                          height: 44,
+                          width: 48,
+                          height: 48,
                           child: _buildLocationMarker(
                             icon: Icons.storefront,
-                            color: Colors.green.shade700,
+                            color: const Color(0xFF2E7D32),
                             label: 'Farmer',
                           ),
                         ),
 
-                      // Buyer Marker
-                      if (buyer != null && buyer.hasCoordinates)
+                      // Driver Marker: visible after package picked up (with truck icon)
+                      if (isPickedUp && driver != null && driver.hasCoordinates)
                         Marker(
-                          point: ll.LatLng(buyer.latitude!, buyer.longitude!),
-                          width: 44,
-                          height: 44,
-                          child: _buildLocationMarker(
-                            icon: Icons.person_pin_circle,
-                            color: Colors.blue.shade700,
-                            label: 'Buyer',
+                          point: ll.LatLng(driver.latitude!, driver.longitude!),
+                          width: 52,
+                          height: 52,
+                          child: _buildDriverMarker(
+                            color: const Color(0xFF1976D2),
                           ),
                         ),
 
-                      // Driver Marker (Changes between Vehicle and Package icon after pickup)
-                      if (driver != null && driver.hasCoordinates)
+                      // Destination Buyer Marker
+                      if (buyer != null && buyer.hasCoordinates)
                         Marker(
-                          point: ll.LatLng(driver.latitude!, driver.longitude!),
+                          point: ll.LatLng(buyer.latitude!, buyer.longitude!),
                           width: 48,
                           height: 48,
-                          child: _buildDriverMarker(
-                            isPickedUp: isPickedUp,
-                            color: theme.colorScheme.primary,
+                          child: _buildLocationMarker(
+                            icon: Icons.person_pin_circle,
+                            color: const Color(0xFFE65100),
+                            label: 'Buyer',
                           ),
                         ),
                     ],
                   ),
                 ],
               ),
+
+              // Route Loading Banner Overlay
+              if (_isFetchingRoute)
+                Positioned(
+                  top: 16,
+                  left: 20,
+                  right: 20,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 8,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'Loading real road route data...',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
 
               // Bottom Info Card Overlay
               Positioned(
@@ -449,39 +452,39 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                               ),
                               decoration: BoxDecoration(
                                 color: isPickedUp
-                                    ? Colors.orange.shade100
-                                    : Colors.green.shade100,
+                                    ? const Color(0xFFE3F2FD)
+                                    : const Color(0xFFE8F5E9),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
                                 children: [
                                   Icon(
                                     isPickedUp
-                                        ? Icons.inventory_2_outlined
-                                        : Icons.local_shipping_outlined,
+                                        ? Icons.local_shipping
+                                        : Icons.storefront,
                                     size: 16,
                                     color: isPickedUp
-                                        ? Colors.orange.shade900
-                                        : Colors.green.shade900,
+                                        ? const Color(0xFF1976D2)
+                                        : const Color(0xFF2E7D32),
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
                                     isPickedUp
                                         ? 'Package In Transit'
-                                        : 'Heading to Pickup',
+                                        : 'Awaiting Pickup from Farmer',
                                     style: GoogleFonts.inter(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
                                       color: isPickedUp
-                                          ? Colors.orange.shade900
-                                          : Colors.green.shade900,
+                                          ? const Color(0xFF1976D2)
+                                          : const Color(0xFF2E7D32),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
                             const Spacer(),
-                            if (driver?.recordedAt != null)
+                            if (isPickedUp && driver?.recordedAt != null)
                               Text(
                                 'Updated ${_timeAgo(driver!.recordedAt!)}',
                                 style: GoogleFonts.inter(
@@ -491,29 +494,33 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                               ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 14),
+
+                        // Route Distance & Time calculation
                         if (_activeRouteDistanceKm != null &&
                             _activeRouteDurationMin != null) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
-                              vertical: 6,
+                              vertical: 8,
                             ),
                             decoration: BoxDecoration(
                               color: theme.colorScheme.surfaceContainerHighest
                                   .withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Row(
                               children: [
                                 Icon(
                                   Icons.alt_route,
                                   size: 16,
-                                  color: theme.colorScheme.primary,
+                                  color: isPickedUp
+                                      ? const Color(0xFF1976D2)
+                                      : const Color(0xFF2E7D32),
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  '${_activeRouteDistanceKm!.toStringAsFixed(1)} km road distance',
+                                  '${_activeRouteDistanceKm!.toStringAsFixed(1)} km street route',
                                   style: GoogleFonts.inter(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
@@ -524,136 +531,171 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                                 Icon(
                                   Icons.timer_outlined,
                                   size: 15,
-                                  color: theme.colorScheme.primary,
+                                  color: isPickedUp
+                                      ? const Color(0xFF1976D2)
+                                      : const Color(0xFF2E7D32),
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  '~$_activeRouteDurationMin mins away',
+                                  '~$_activeRouteDurationMin mins',
                                   style: GoogleFonts.inter(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.primary,
+                                    color: isPickedUp
+                                        ? const Color(0xFF1976D2)
+                                        : const Color(0xFF2E7D32),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 14),
                         ],
 
-                        // Driver Details Row
-                        if (driver != null) ...[
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                backgroundColor:
-                                    theme.colorScheme.primaryContainer,
-                                child: Icon(
-                                  Icons.person,
-                                  color: theme.colorScheme.onPrimaryContainer,
+                        // Current tracked party details
+                        if (isPickedUp) ...[
+                          // Driver In-Transit details
+                          if (driver != null)
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: const Color(0xFF1976D2)
+                                      .withValues(alpha: 0.15),
+                                  child: const Icon(
+                                    Icons.local_shipping,
+                                    color: Color(0xFF1976D2),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      driver.name,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        driver.name,
+                                        style: GoogleFonts.inter(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
-                                    ),
-                                    Text(
-                                      'Your Delivery Driver',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 13,
-                                        color:
-                                            theme.colorScheme.onSurfaceVariant,
+                                      Text(
+                                        'Delivery Driver (Real-time GPS)',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          color: theme
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
+                                if (driver.phone != null &&
+                                    driver.phone!.isNotEmpty)
+                                  IconButton.filledTonal(
+                                    onPressed: () => _makeCall(driver.phone),
+                                    icon: const Icon(Icons.call),
+                                  ),
+                              ],
+                            )
+                          else
+                            Text(
+                              'Waiting for driver GPS signal...',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontStyle: FontStyle.italic,
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
-                              if (driver.phone != null &&
-                                  driver.phone!.isNotEmpty)
-                                IconButton.filledTonal(
-                                  onPressed: () => _makeCall(driver.phone),
-                                  icon: const Icon(Icons.call),
-                                ),
-                            ],
-                          ),
-                        ] else
-                          Text(
-                            'Waiting for driver position...',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontStyle: FontStyle.italic,
-                              color: theme.colorScheme.onSurfaceVariant,
                             ),
-                          ),
+                        ] else ...[
+                          // Farmer pickup details
+                          if (farmer != null)
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: const Color(0xFF2E7D32)
+                                      .withValues(alpha: 0.15),
+                                  child: const Icon(
+                                    Icons.storefront,
+                                    color: Color(0xFF2E7D32),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        farmer.name,
+                                        style: GoogleFonts.inter(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Farmer / Pickup Location',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          color: theme
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (farmer.phone != null &&
+                                    farmer.phone!.isNotEmpty)
+                                  IconButton.filledTonal(
+                                    onPressed: () => _makeCall(farmer.phone),
+                                    icon: const Icon(Icons.call),
+                                  ),
+                              ],
+                            )
+                          else
+                            Text(
+                              'Awaiting farmer pickup information...',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontStyle: FontStyle.italic,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
 
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12),
                           child: Divider(height: 1),
                         ),
 
-                        // Locations summary
-                        Row(
-                          children: [
-                            if (farmer != null)
+                        // Destination summary
+                        if (buyer != null)
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on,
+                                size: 16,
+                                color: Color(0xFFE65100),
+                              ),
+                              const SizedBox(width: 6),
                               Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Farmer',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        color: theme.colorScheme.outline,
-                                      ),
-                                    ),
-                                    Text(
-                                      farmer.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
+                                child: Text(
+                                  buyer.address != null &&
+                                          buyer.address!.isNotEmpty
+                                      ? buyer.address!
+                                      : 'Deliver to ${buyer.name}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
                               ),
-                            if (farmer != null && buyer != null)
-                              const SizedBox(width: 12),
-                            if (buyer != null)
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Buyer Destination',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        color: theme.colorScheme.outline,
-                                      ),
-                                    ),
-                                    Text(
-                                      buyer.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
+                            ],
+                          ),
                       ],
                     ),
                   ),
@@ -675,34 +717,35 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 6),
-        ],
-      ),
-      child: Center(child: Icon(icon, color: color, size: 26)),
-    );
-  }
-
-  Widget _buildDriverMarker({required bool isPickedUp, required Color color}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isPickedUp ? Colors.orange.shade700 : color,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 3),
+        border: Border.all(color: color, width: 2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 8,
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Center(
-        child: Icon(
-          isPickedUp ? Icons.inventory_2 : Icons.directions_car,
-          color: Colors.white,
-          size: 24,
-        ),
+      child: Center(child: Icon(icon, color: color, size: 24)),
+    );
+  }
+
+  Widget _buildDriverMarker({required Color color}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2.5),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: const Center(
+        child: Icon(Icons.local_shipping, color: Colors.white, size: 24),
       ),
     );
   }
