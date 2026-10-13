@@ -79,6 +79,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
       setState(
         () => _myPosition = ll.LatLng(position.latitude, position.longitude),
       );
+      _syncDriverPosition(
+        position.latitude,
+        position.longitude,
+        speedKmh: position.speed >= 0 ? position.speed * 3.6 : null,
+        heading: position.heading >= 0 ? position.heading : null,
+      );
 
       _positionSub =
           Geolocator.getPositionStream(
@@ -91,10 +97,41 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             setState(
               () => _myPosition = ll.LatLng(pos.latitude, pos.longitude),
             );
+            _syncDriverPosition(
+              pos.latitude,
+              pos.longitude,
+              speedKmh: pos.speed >= 0 ? pos.speed * 3.6 : null,
+              heading: pos.heading >= 0 ? pos.heading : null,
+            );
           });
     } catch (_) {
       // No GPS fix available — the map/list still work, just without
       // "nearest first" sorting or a driver marker.
+    }
+  }
+
+  void _syncDriverPosition(
+    double lat,
+    double lng, {
+    double? speedKmh,
+    double? heading,
+  }) {
+    final stops = ref
+        .read(driverTodayStopsProvider(widget.profile.id))
+        .when(data: (d) => d, error: (_, e) => null, loading: () => null);
+    if (stops != null && stops.isNotEmpty) {
+      final activeDeliveryIds = stops
+          .where((s) => !s.isDone)
+          .map((s) => s.deliveryId)
+          .toSet()
+          .toList();
+      _service.recordDriverLocation(
+        activeDeliveryIds: activeDeliveryIds,
+        latitude: lat,
+        longitude: lng,
+        speedKmh: speedKmh,
+        heading: heading,
+      );
     }
   }
 
@@ -162,7 +199,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
       if (stop.type == DriverStopType.pickup) {
         await _service.confirmPickup(stop.deliveryId);
       } else {
-        await _service.confirmDropoff(stop.deliveryId);
+        await _service.confirmDelivery(stop.deliveryId);
       }
       ref.invalidate(driverTodayStopsProvider(widget.profile.id));
       if (!mounted) return;
@@ -192,6 +229,14 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(driverTodayStopsProvider(widget.profile.id), (_, next) {
+      next.whenData((stops) {
+        if (_myPosition != null) {
+          _syncDriverPosition(_myPosition!.latitude, _myPosition!.longitude);
+        }
+      });
+    });
+
     final stopsAsync = ref.watch(driverTodayStopsProvider(widget.profile.id));
     final shiftStarted = ref.watch(driverShiftStartedProvider);
 
@@ -985,7 +1030,7 @@ class _StopsMapState extends State<_StopsMap>
                     ),
                   ),
 
-                // Stop markers (highlighting active navigation target)
+                // Stop markers — always show original pickup/dropoff icon
                 for (final stop in widget.stops)
                   if (stop.hasCoordinates)
                     Marker(
@@ -995,86 +1040,55 @@ class _StopsMapState extends State<_StopsMap>
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Builder(
-                            builder: (context) {
-                              final isNavTarget =
-                                  widget.navigatingStop != null &&
-                                  widget.navigatingStop!.deliveryId ==
-                                      stop.deliveryId &&
-                                  widget.navigatingStop!.type == stop.type;
-                              return Container(
-                                width: isNavTarget ? 42 : 36,
-                                height: isNavTarget ? 42 : 36,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: stop.isDone
-                                      ? theme
-                                            .colorScheme
-                                            .surfaceContainerHighest
-                                      : isNavTarget
-                                      ? const Color(0xFF1976D2)
-                                      : stop.type == DriverStopType.pickup
-                                      ? const Color(0xFF2E7D32)
-                                      : const Color(0xFFE65100),
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: isNavTarget ? 3 : 2,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.28,
-                                      ),
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: stop.isDone
+                                  ? theme.colorScheme.surfaceContainerHighest
+                                  : stop.type == DriverStopType.pickup
+                                  ? const Color(0xFF2E7D32)
+                                  : const Color(0xFFE65100),
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.28),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
                                 ),
-                                child: Icon(
-                                  stop.isDone
-                                      ? Icons.check
-                                      : isNavTarget
-                                      ? Icons.navigation
-                                      : stop.type == DriverStopType.pickup
-                                      ? Icons.storefront
-                                      : Icons.home_work,
-                                  size: isNavTarget ? 22 : 18,
-                                  color: Colors.white,
-                                ),
-                              );
-                            },
+                              ],
+                            ),
+                            child: Icon(
+                              stop.isDone
+                                  ? Icons.check
+                                  : stop.type == DriverStopType.pickup
+                                  ? Icons.storefront
+                                  : Icons.home_work,
+                              size: 18,
+                              color: Colors.white,
+                            ),
                           ),
                           const SizedBox(height: 2),
-                          Builder(
-                            builder: (context) {
-                              final isNavTarget =
-                                  widget.navigatingStop != null &&
-                                  widget.navigatingStop!.deliveryId ==
-                                      stop.deliveryId &&
-                                  widget.navigatingStop!.type == stop.type;
-                              return Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 5,
-                                  vertical: 1.5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isNavTarget
-                                      ? const Color(0xFF1976D2)
-                                      : Colors.black.withValues(alpha: 0.65),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  stop.type == DriverStopType.pickup
-                                      ? 'Pickup'
-                                      : 'Drop',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              );
-                            },
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              stop.type == DriverStopType.pickup
+                                  ? 'Pickup'
+                                  : 'Drop',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ],
                       ),

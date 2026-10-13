@@ -28,7 +28,8 @@ class LiveTrackingScreen extends ConsumerStatefulWidget {
   ConsumerState<LiveTrackingScreen> createState() => _LiveTrackingScreenState();
 }
 
-class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
+class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen>
+    with SingleTickerProviderStateMixin {
   final MapController _mapController = MapController();
   Timer? _pollingTimer;
 
@@ -43,9 +44,21 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
   bool _isFetchingRoute = false;
   bool _hasInitialCameraFitted = false;
 
+  late final AnimationController _pulseCtrl;
+  late final Animation<double> _pulseAnim;
+
   @override
   void initState() {
     super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(
+      begin: 1.0,
+      end: 1.4,
+    ).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+
     // Poll every 5 seconds for live GPS updates
     _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       ref.invalidate(liveOrderTrackingProvider(widget.orderId));
@@ -61,6 +74,7 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
 
   @override
   void dispose() {
+    _pulseCtrl.dispose();
     _pollingTimer?.cancel();
     _mapController.dispose();
     super.dispose();
@@ -349,15 +363,13 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                           ),
                         ),
 
-                      // Driver Marker: visible after package picked up (with truck icon)
+                      // Driver Marker: visible after package picked up (with animated pulsing truck icon)
                       if (isPickedUp && driver != null && driver.hasCoordinates)
                         Marker(
                           point: ll.LatLng(driver.latitude!, driver.longitude!),
-                          width: 52,
-                          height: 52,
-                          child: _buildDriverMarker(
-                            color: const Color(0xFF1976D2),
-                          ),
+                          width: 60,
+                          height: 60,
+                          child: _buildDriverMarker(),
                         ),
 
                       // Destination Buyer Marker
@@ -730,22 +742,49 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
     );
   }
 
-  Widget _buildDriverMarker({required Color color}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2.5),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.4),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+  Widget _buildDriverMarker() {
+    return AnimatedBuilder(
+      animation: _pulseAnim,
+      builder: (_, _) => Stack(
+        alignment: Alignment.center,
+        children: [
+          // Outer pulse ring
+          Container(
+            width: 52 * _pulseAnim.value,
+            height: 52 * _pulseAnim.value,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF1976D2)
+                  .withValues(alpha: 0.28 / _pulseAnim.value),
+            ),
+          ),
+          // Truck badge
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1976D2), Color(0xFF0D47A1)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              border: Border.all(color: Colors.white, width: 2.5),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 8,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.local_shipping,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
         ],
-      ),
-      child: const Center(
-        child: Icon(Icons.local_shipping, color: Colors.white, size: 24),
       ),
     );
   }
