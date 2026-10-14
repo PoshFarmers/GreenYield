@@ -252,7 +252,12 @@ class _TransactionTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_labelKey.tr(), style: theme.textTheme.bodyMedium),
+                Text(
+                  transaction.description?.trim().isNotEmpty == true
+                      ? transaction.description!
+                      : _labelKey.tr(),
+                  style: theme.textTheme.bodyMedium,
+                ),
                 Text(
                   '${transaction.createdAt.year}-${transaction.createdAt.month.toString().padLeft(2, '0')}-${transaction.createdAt.day.toString().padLeft(2, '0')}',
                   style: theme.textTheme.bodySmall?.copyWith(

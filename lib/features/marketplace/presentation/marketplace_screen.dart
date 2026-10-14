@@ -8,6 +8,9 @@ import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/avatar_image.dart';
 import '../../../models/marketplace_listing.dart';
 import '../../../models/profile.dart';
+import '../../../models/buyer_profile.dart';
+import '../../profile/buyer/buyer_profile_service.dart';
+import '../../orders/presentation/recurring/recurring_orders_screen.dart';
 import '../marketplace_service.dart';
 import '../marketplace_cache.dart';
 import 'listing_detail_screen.dart';
@@ -406,6 +409,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
             constraints: const BoxConstraints(maxWidth: 480),
             child: Column(
               children: [
+                if (widget.profile.activeRole == 'buyer')
+                  _BuyerRecurringOrdersBanner(profileId: widget.profile.id),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: _MarketTabBar(selected: _tab, onSelected: _setTab),
@@ -1139,6 +1144,109 @@ class _ErrorState extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _BuyerRecurringOrdersBanner extends StatelessWidget {
+  final String profileId;
+
+  const _BuyerRecurringOrdersBanner({required this.profileId});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<BuyerProfile?>(
+      stream: BuyerProfileService().watchOwnProfile(profileId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+        final buyer = snapshot.data!;
+
+        if (buyer.buyerType != 'organization') {
+          return const SizedBox.shrink();
+        }
+
+        final theme = Theme.of(context);
+        return Card(
+          elevation: 0,
+          margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: theme.colorScheme.primary.withValues(alpha: 0.2),
+            ),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      RecurringOrdersScreen(buyerProfileId: profileId),
+                ),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 12.0,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.event_repeat,
+                    color: theme.colorScheme.primary,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Schedule your weekly orders',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                        Text(
+                          'Restock automatically',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onPrimaryContainer
+                                .withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              RecurringOrdersScreen(buyerProfileId: profileId),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 0,
+                      ),
+                      minimumSize: const Size(0, 36),
+                      elevation: 0,
+                    ),
+                    child: const Text('Set up'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

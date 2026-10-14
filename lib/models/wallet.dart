@@ -49,6 +49,7 @@ class WalletTransaction {
   final double balanceAfter;
   final String? referenceTable;
   final String? referenceId;
+  final String? description;
   final DateTime createdAt;
 
   const WalletTransaction({
@@ -58,6 +59,7 @@ class WalletTransaction {
     required this.balanceAfter,
     this.referenceTable,
     this.referenceId,
+    this.description,
     required this.createdAt,
   });
 
@@ -69,6 +71,7 @@ class WalletTransaction {
       balanceAfter: (map['balance_after'] as num?)?.toDouble() ?? 0,
       referenceTable: map['reference_table'] as String?,
       referenceId: map['reference_id'] as String?,
+      description: map['description'] as String?,
       createdAt:
           DateTime.tryParse(map['created_at'] as String? ?? '') ??
           DateTime.now(),

@@ -172,6 +172,7 @@ const schema = Schema([
     Column.text(
       'order_date',
     ), // buyer-selected delivery date (added in 20260914000000)
+    Column.text('source'), // 'manual' | 'recurring' (added in 20260927093817)
     Column.text('placed_at'),
     Column.text('created_at'),
     Column.text('updated_at'),
@@ -238,6 +239,7 @@ const schema = Schema([
     Column.real('balance_after'),
     Column.text('reference_table'),
     Column.text('reference_id'),
+    Column.text('description'),
     Column.text('created_at'),
   ]),
   // --- Farmer rating & reviews (see .../20260916120000_farmer_review.sql) ---
@@ -264,6 +266,36 @@ const schema = Schema([
     Column.text('effective_from'),
     Column.text('effective_to'),
     Column.integer('is_active'),
+    Column.text('created_at'),
+  ]),
+  Table('recurring_schedule', [
+    Column.text('buyer_profile_id'),
+    Column.text('label'),
+    Column.text('status'),
+    Column.text('end_date'),
+    Column.text('created_at'),
+  ]),
+  Table('recurring_order', [
+    Column.text('schedule_id'),
+    Column.text('frequency'),
+    Column.integer('day_of_week'),
+    Column.text('next_run_at'),
+    Column.text('delivery_address'),
+    Column.text('delivery_location'),
+    Column.text('status'),
+    Column.text('last_processed_date'),
+    Column.text('processing_status'),
+    Column.text('last_attempt_at'),
+    Column.text('last_error'),
+    Column.text('last_low_balance_notice_date'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  Table('recurring_order_item', [
+    Column.text('recurring_order_id'),
+    Column.text('crop_id'),
+    Column.real('quantity_kg'),
+    Column.text('preferred_farmer_id'),
     Column.text('created_at'),
   ]),
 ]);

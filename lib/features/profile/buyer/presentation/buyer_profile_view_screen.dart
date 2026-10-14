@@ -11,6 +11,7 @@ import '../buyer_profile_service.dart';
 import '../../../wallet/wallet_service.dart';
 import 'buyer_profile_edit_screen.dart';
 import '../../../wallet/presentation/wallet_screen.dart';
+import '../../../orders/presentation/recurring/recurring_orders_screen.dart';
 
 class BuyerProfileViewScreen extends ConsumerStatefulWidget {
   final Profile? initialProfile;
@@ -98,6 +99,25 @@ class _BuyerProfileViewScreenState
                             leading: const Icon(Icons.label),
                             title: Text('buyer_label'.tr()),
                             subtitle: Text(buyerProfile.buyerLabel!),
+                          ),
+
+                        if (buyerProfile.buyerType == 'organization')
+                          ListTile(
+                            leading: const Icon(Icons.repeat),
+                            title: const Text('Recurring Orders'),
+                            subtitle: const Text(
+                              'Manage your scheduled orders',
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => RecurringOrdersScreen(
+                                    buyerProfileId: profile.id,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
 
                         const SizedBox(height: 24),
