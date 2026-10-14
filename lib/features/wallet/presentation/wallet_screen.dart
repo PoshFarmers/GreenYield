@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/widgets/app_secondary_header.dart';
 import '../../../models/wallet.dart';
+import '../../payments/presentation/payment_methods_screen.dart';
 import '../wallet_service.dart';
 
 /// Shared wallet screen for any role — shows the live balance, a
@@ -162,6 +163,16 @@ class _WalletScreenState extends State<WalletScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const PaymentMethodsScreen(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.credit_card_outlined),
+                      label: Text('payments_methods_title'.tr()),
+                    ),
                     const SizedBox(height: 24),
                     Text(
                       'recent_transactions'.tr(),
@@ -252,12 +263,7 @@ class _TransactionTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  transaction.description?.trim().isNotEmpty == true
-                      ? transaction.description!
-                      : _labelKey.tr(),
-                  style: theme.textTheme.bodyMedium,
-                ),
+                Text(_labelKey.tr(), style: theme.textTheme.bodyMedium),
                 Text(
                   '${transaction.createdAt.year}-${transaction.createdAt.month.toString().padLeft(2, '0')}-${transaction.createdAt.day.toString().padLeft(2, '0')}',
                   style: theme.textTheme.bodySmall?.copyWith(
