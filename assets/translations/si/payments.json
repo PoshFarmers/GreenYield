@@ -74,5 +74,18 @@
   "payments_error_amount_too_high": "එක් ගනුදෙනුවකට උපරිම ටොප් අප් මුදල LKR 100,000කි.",
   "payments_error_invalid_amount": "වලංගු මුදලක් ඇතුළත් කරන්න.",
   "payments_error_invalid_request": "යමක් වැරදී ඇත. කරුණාකර නැවත උත්සාහ කරන්න.",
-  "payments_error_request_id_conflict": "යමක් වැරදී ඇත. කරුණාකර නැවත උත්සාහ කරන්න."
+  "payments_error_request_id_conflict": "යමක් වැරදී ඇත. කරුණාකර නැවත උත්සාහ කරන්න.",
+  "payments_error_card_required": "ගෙවීමට කාඩ්පතක් තෝරන්න.",
+  "payments_error_insufficient_wallet_balance": "ඔබගේ පසුම්බි ශේෂය ප්‍රමාණවත් නැත. මුදල් එක් කර නැවත උත්සාහ කරන්න.",
+  "payments_checkout_wallet_balance": "ශේෂය: {amount}",
+  "payments_checkout_wallet_low": "ඔබගේ පසුම්බි ශේෂය මෙම ඇණවුමේ මුළු මුදලට වඩා අඩුයි.",
+  "payments_checkout_top_up": "මුදල් එක් කරන්න",
+  "payments_checkout_add_card": "නව කාඩ්පතක් එක් කරන්න",
+  "payments_checkout_no_cards": "සුරකින ලද කාඩ්පත් නැත. කාඩ්පතකින් ගෙවීමට එකක් එක් කරන්න.",
+  "payments_paid_with_wallet": "පසුම්බියෙන් ගෙවා ඇත",
+  "payments_paid_with_card": "{card} මගින් ගෙවා ඇත",
+  "payments_payment_method": "ගෙවීම",
+  "payments_commission": "වේදිකා කොමිස්",
+  "payments_net_payout": "ශුද්ධ ගෙවීම",
+  "payments_driver_payout": "බෙදාහැරීමේ ගෙවීම"
 }

@@ -104,11 +104,12 @@ enum OrderStatus {
       this == OrderStatus.packed;
 
   /// Whether the buyer can rate/review the farmer for this order —
-  /// mirrors the `status = 'delivered'` check in the
+  /// mirrors the `status in ('delivered', 'completed')` check in the
   /// `submit_farmer_review` RPC. Doesn't account for a review already
   /// existing (edit vs. first-time add) — check
   /// `FarmerReviewService.watchReviewForOrder` for that.
-  bool get isReviewable => this == OrderStatus.delivered;
+  bool get isReviewable =>
+      this == OrderStatus.delivered || this == OrderStatus.completed;
 }
 
 enum DeliveryStatus {
@@ -357,6 +358,18 @@ class OrderDetail {
   final double subtotalAmount;
   final double deliveryFeeAmount;
   final double totalAmount;
+  final double taxAmount;
+
+  // Payment info (buyer view only)
+  final String? paymentMethod; // 'wallet' | 'card'
+  final String? paymentCardLast4;
+  final String? paymentCardBrand;
+
+  // Settlement (null until the order is settled at `delivered`).
+  // commission/net: farmer view only. driverPayout: driver view only.
+  final double? commissionAmount;
+  final double? netPayout;
+  final double? driverPayout;
 
   // Items
   final List<OrderItemDetail> items;
@@ -396,6 +409,13 @@ class OrderDetail {
     required this.deliveryFeeAmount,
     required this.totalAmount,
     required this.items,
+    this.taxAmount = 0,
+    this.paymentMethod,
+    this.paymentCardLast4,
+    this.paymentCardBrand,
+    this.commissionAmount,
+    this.netPayout,
+    this.driverPayout,
     required this.buyerProfileId,
     required this.buyerName,
     this.buyerPhone,
