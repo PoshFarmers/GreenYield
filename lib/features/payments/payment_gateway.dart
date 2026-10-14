@@ -50,6 +50,15 @@ class PaymentException implements Exception {
     'card_limit_reached',
     'card_already_added',
     'card_not_found',
+    'card_declined',
+    'insufficient_funds',
+    'expired_card',
+    'incorrect_cvc',
+    'amount_too_low',
+    'amount_too_high',
+    'invalid_amount',
+    'invalid_request',
+    'request_id_conflict',
     'network',
   };
 
