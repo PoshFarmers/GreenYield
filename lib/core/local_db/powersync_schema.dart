@@ -31,6 +31,8 @@ const schema = Schema([
     Column.text('name'),
     Column.text('category'),
     Column.text('fallback_image_url'),
+    Column.real('price_floor_per_kg'),
+    Column.real('price_ceiling_per_kg'),
   ]),
   Table('produce_listing', [
     Column.text('farmer_profile_id'),

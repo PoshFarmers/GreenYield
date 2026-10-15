@@ -1,19 +1,22 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/media_image.dart';
 import '../../../models/marketplace_listing.dart';
+import '../../pricing/presentation/widgets/market_position_chip.dart';
 
 /// One produce listing tile in the marketplace grid — image, crop name,
-/// and price/kg only (farmer/distance live on the detail screen).
-class ProduceCard extends StatelessWidget {
+/// price/kg, with a small "x% below / above market" indicator pinned to
+/// the image's top-right corner when market data exists.
+class ProduceCard extends ConsumerWidget {
   final MarketplaceListing listing;
   final VoidCallback onTap;
 
   const ProduceCard({super.key, required this.listing, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final borderRadius = BorderRadius.circular(14);
 
@@ -29,31 +32,40 @@ class ProduceCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Square regardless of card width — this is a visual
-                  // browse grid, not a data table, so crop name + price
-                  // is all the caption needs. The caption below takes
-                  // whatever height the grid's aspect ratio leaves over.
                   AspectRatio(
                     aspectRatio: 1,
-                    child: MediaImage(
-                      path: listing.displayImage.path,
-                      bucket: listing.displayImage.bucket,
-                      public: listing.displayImage.isFallback,
-                      placeholder: Container(
-                        color: theme.colorScheme.surfaceContainerHighest,
-                        child: Icon(
-                          Icons.image_outlined,
-                          size: 28,
-                          color: theme.colorScheme.outline,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        MediaImage(
+                          path: listing.displayImage.path,
+                          bucket: listing.displayImage.bucket,
+                          public: listing.displayImage.isFallback,
+                          placeholder: Container(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            child: Icon(
+                              Icons.image_outlined,
+                              size: 28,
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
                         ),
-                      ),
+                        Positioned(
+                          top: 6,
+                          right: 6,
+                          child: MarketPositionChip(
+                            cropId: listing.cropId,
+                            pricePerKg: listing.pricePerKg,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
-                        vertical: 6,
+                        vertical: 4,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,9 +100,6 @@ class ProduceCard extends StatelessWidget {
               ),
             ),
           ),
-          // Painted on top so the border is never covered at the rounded
-          // corners (the image otherwise sits flush against the top edge
-          // with nothing to buffer it).
           Positioned.fill(
             child: IgnorePointer(
               child: DecoratedBox(

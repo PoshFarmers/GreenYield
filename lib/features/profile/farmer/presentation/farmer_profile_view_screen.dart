@@ -2,6 +2,9 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../wallet/presentation/widgets/wallet_summary_card.dart';
+
 import 'package:latlong2/latlong.dart' as ll;
 
 import '../../../../core/auth/auth_providers.dart';
@@ -12,15 +15,12 @@ import '../../../../core/widgets/media_image.dart';
 import '../../../../models/farmer_profile.dart';
 import '../../../../models/farmer_review.dart';
 import '../../../../models/profile.dart';
-import '../../../../models/wallet.dart';
-import '../../../wallet/wallet_service.dart';
 import '../../../reviews/farmer_review_service.dart';
 import '../../../reviews/presentation/widgets/star_rating.dart';
 import '../farmer_profile_service.dart';
 import 'add_crop_screen.dart';
 import 'crop_details_sheet.dart';
 import 'farmer_profile_edit_screen.dart';
-import '../../../wallet/presentation/wallet_screen.dart';
 
 class FarmerProfileViewScreen extends ConsumerStatefulWidget {
   final Profile? initialProfile;
@@ -162,7 +162,7 @@ class _FarmerProfileViewScreenState
                           ),
                         ),
                         const SizedBox(height: 12),
-                        _WalletCard(profileId: _userId),
+                        WalletSummaryCard(profileId: _userId),
                         const SizedBox(height: 12),
                         _FarmLocationCard(profile: profile),
                         const SizedBox(height: 12),
@@ -361,62 +361,6 @@ class _HeaderCard extends StatelessWidget {
               side: BorderSide(color: theme.colorScheme.outlineVariant),
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-/// Wallet balance — the wallet feature itself isn't built yet, so this
-/// shows a placeholder rather than a real balance.
-class _WalletCard extends StatelessWidget {
-  final String profileId;
-
-  const _WalletCard({required this.profileId});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return _Card(
-      child: Row(
-        children: [
-          Icon(
-            Icons.account_balance_wallet_outlined,
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('wallet_balance'.tr(), style: theme.textTheme.bodySmall),
-                const SizedBox(height: 2),
-                StreamBuilder<Wallet?>(
-                  stream: const WalletService().watchBalance(profileId),
-                  builder: (context, snapshot) {
-                    final wallet = snapshot.data;
-                    final text = wallet == null
-                        ? 'LKR 0.00'
-                        : '${wallet.currency} ${wallet.balance.toStringAsFixed(2)}';
-                    return Text(
-                      text,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => WalletScreen(profileId: profileId),
-              ),
-            ),
-            child: Text('view'.tr()),
-          ),
         ],
       ),
     );

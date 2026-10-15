@@ -48,5 +48,14 @@
   "estimated_total": "ඇස්තමේන්තුගත මුළු එකතුව",
   "delivery_fee_unknown": "පිටවීමේදී ගණනය කෙරේ",
   "delivery_fee_unknown_hint": "බෙදාහැරීම් පිරිවැය ඇස්තමේන්තු කිරීමට ප්‍රමාණවත් ස්ථාන දත්ත අප සතුව නොමැත.",
-  "showing_saved_results_offline": "ඔබ නොබැඳිය — ඔබගේ අවසන් සුරකින ලද ප්‍රතිඵල පෙන්වයි"
+  "showing_saved_results_offline": "ඔබ නොබැඳිය — ඔබගේ අවසන් සුරකින ලද ප්‍රතිඵල පෙන්වයි",
+  "buyer_market_title": "වෙළඳපල මිල",
+  "buyer_market_entry_subtitle": "අද භෝග විකිණෙන මිල බලන්න",
+  "buyer_market_below": "වෙළඳපලට වඩා {percent}% අඩු",
+  "buyer_market_above": "වෙළඳපලට වඩා {percent}% වැඩි",
+  "buyer_market_at": "වෙළඳපල මිලට",
+  "buyer_market_average": "වෙළඳපල සාමාන්‍යය {amount}/කි.ග්‍රෑ.",
+  "buyer_market_range": "පරාසය {min} – {max}",
+  "buyer_market_empty": "පෙන්වීමට භෝග නැත",
+  "buyer_market_no_data": "තවම දත්ත නැත"
 }
