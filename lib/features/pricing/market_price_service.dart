@@ -84,6 +84,25 @@ class MarketPriceService {
         });
   }
 
+  /// Every history row for [cropId] on or after [from] (date-only), oldest
+  /// first. Dates are stored as 'yyyy-MM-dd' text, so string comparison works.
+  Stream<List<PriceHistory>> watchHistory(
+    String cropId, {
+    required DateTime from,
+  }) {
+    final f =
+        '${from.year.toString().padLeft(4, '0')}-'
+        '${from.month.toString().padLeft(2, '0')}-'
+        '${from.day.toString().padLeft(2, '0')}';
+    return db
+        .watch(
+          'SELECT * FROM price_history WHERE crop_id = ? AND price_date >= ? '
+          'ORDER BY price_date ASC',
+          parameters: [cropId, f],
+        )
+        .map((rows) => rows.map(PriceHistory.fromMap).toList());
+  }
+
   Future<List<PriceHistory>> getRecentHistory(
     String cropId, {
     int limit = 30,
