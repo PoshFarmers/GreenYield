@@ -181,7 +181,8 @@ class _ChatThreadsScreenState extends ConsumerState<ChatThreadsScreen>
           ),
           const SizedBox(height: 8),
           Expanded(
-            child: threadsAsync.when(skipLoadingOnReload: true,
+            child: threadsAsync.when(
+              skipLoadingOnReload: true,
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(
                 child: Padding(

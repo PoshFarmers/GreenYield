@@ -244,7 +244,8 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen>
         title: 'Track Order',
         showBackButton: true,
       ),
-      body: trackingAsync.when(skipLoadingOnReload: true,
+      body: trackingAsync.when(
+        skipLoadingOnReload: true,
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Padding(

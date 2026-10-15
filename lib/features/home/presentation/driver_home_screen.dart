@@ -243,7 +243,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     return Scaffold(
       appBar: _isFullscreen ? null : AppHeader(profile: widget.profile),
       body: SafeArea(
-        child: stopsAsync.when(skipLoadingOnReload: true,
+        child: stopsAsync.when(
+          skipLoadingOnReload: true,
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(
             child: Padding(
