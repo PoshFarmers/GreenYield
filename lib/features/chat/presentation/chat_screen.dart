@@ -78,10 +78,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   /// Newest incoming message we've already marked as read.
   DateTime? _lastMarked;
 
+  late final ProviderContainer _container;
+  late final ChatService _chatService;
+
   @override
   void initState() {
     super.initState();
+
+    // Capture these while the widget is mounted. The container can be used
+    // to invalidate providers after dispose, and the service can finish a
+    // pending mark-read write without accessing ref.
+    _container = ProviderScope.containerOf(context, listen: false);
+    _chatService = ref.read(chatServiceProvider);
+
     WidgetsBinding.instance.addObserver(this);
+
     // Messages may already be loaded (provider is kept alive), in which case
     // the listener in build() won't fire for them.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -95,7 +106,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _readDebounce?.cancel();
+
+    // Don't drop a pending mark-read if the user leaves quickly.
+    if (_readDebounce?.isActive ?? false) {
+      _readDebounce!.cancel();
+      _readDebounce = null;
+      _markReadNow();
+    }
+
     _textController.dispose();
     super.dispose();
   }
@@ -115,7 +133,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       source: ImageSource.gallery,
       imageQuality: 80,
     );
-    if (picked != null) {
+
+    if (picked != null && mounted) {
       setState(() => _attachedImage = File(picked.path));
     }
   }
@@ -143,6 +162,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _deliver(_PendingMessage pending) async {
     final service = ref.read(chatServiceProvider);
+
     try {
       await service.sendMessage(
         conversationId: widget.conversationId,
@@ -183,10 +203,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         newestFromOther = m.createdAt;
       }
     }
+
     if (newestFromOther == null) return;
 
     final last = _lastMarked;
     if (last != null && !newestFromOther.isAfter(last)) return;
+
     _lastMarked = newestFromOther;
     _scheduleMarkAsRead();
   }
@@ -194,15 +216,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   void _scheduleMarkAsRead() {
     _readDebounce?.cancel();
     _readDebounce = Timer(const Duration(milliseconds: 150), () {
-      if (!mounted) return;
-      ref
-          .read(chatServiceProvider)
-          .markMessagesAsRead(widget.conversationId)
-          .catchError((_) {
-            // Allow the next emission to retry.
-            _lastMarked = null;
-          });
+      _readDebounce = null;
+      _markReadNow();
     });
+  }
+
+  /// Marks messages as read and refreshes the thread list only after the
+  /// write succeeds. This keeps the unread badge independent of whether the
+  /// corresponding Realtime UPDATE arrives.
+  ///
+  /// Uses the captured service and container because this operation can
+  /// continue after this screen has been disposed.
+  Future<void> _markReadNow() async {
+    try {
+      await _chatService.markMessagesAsRead(widget.conversationId);
+
+      // Refresh the thread list and navigation badge deterministically.
+      _container.invalidate(chatThreadsProvider);
+    } catch (_) {
+      // Allow a later message emission to retry the mark-read operation.
+      _lastMarked = null;
+    }
   }
 
   @override
@@ -571,6 +605,7 @@ class _AttachmentImageState extends State<_AttachmentImage> {
         Icon(Icons.broken_image_outlined, color: theme.colorScheme.outline),
       );
     }
+
     if (url == null) {
       return placeholder(const CircularProgressIndicator());
     }

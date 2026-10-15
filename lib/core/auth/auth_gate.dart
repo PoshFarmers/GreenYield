@@ -21,7 +21,8 @@ import '../roles/role_nav_shell_registry.dart';
 ///
 /// Every `when` uses `skipLoadingOnReload` so a provider rebuild (token
 /// refresh, app resume, invalidate) keeps the current screen up instead of
-/// replacing the whole nav shell with a spinner.
+/// replacing the whole nav shell with a spinner. However, cached values
+/// from a previous authentication state or user are treated as loading.
 class AuthGate extends ConsumerStatefulWidget {
   const AuthGate({super.key});
 
@@ -78,16 +79,31 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       error: (error, _) => Scaffold(body: Center(child: Text('$error'))),
       data: (_) {
         final authService = ref.watch(authServiceProvider);
+
         if (!authService.isSignedIn) {
           _resetCompletion();
           return const LoginScreen();
         }
 
+        const spinner = Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        );
+
+        final authUserId = ref.watch(authUserIdProvider);
         final profileAsync = ref.watch(ownProfileProvider);
+
+        // A reload can retain the previous value, such as null while logged
+        // out or another user's profile. Don't trust it until the current
+        // user's profile has arrived.
+        final cachedProfile = profileAsync.asData?.value;
+        if (profileAsync.isLoading &&
+            (cachedProfile == null || cachedProfile.id != authUserId)) {
+          return spinner;
+        }
+
         return profileAsync.when(
           skipLoadingOnReload: true,
-          loading: () =>
-              const Scaffold(body: Center(child: CircularProgressIndicator())),
+          loading: () => spinner,
           error: (error, _) => Scaffold(body: Center(child: Text('$error'))),
           data: (profile) {
             if (profile == null) {
@@ -97,11 +113,18 @@ class _AuthGateState extends ConsumerState<AuthGate> {
             }
 
             final rolesAsync = ref.watch(ownRolesProvider);
+
+            // The same stale-value issue applies to roles: an empty list
+            // retained from the logged-out state must not trigger role
+            // selection while the current user's roles are still loading.
+            if (rolesAsync.isLoading &&
+                (rolesAsync.asData?.value ?? const <String>[]).isEmpty) {
+              return spinner;
+            }
+
             return rolesAsync.when(
               skipLoadingOnReload: true,
-              loading: () => const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              ),
+              loading: () => spinner,
               error: (error, _) =>
                   Scaffold(body: Center(child: Text('$error'))),
               data: (roles) {
@@ -111,10 +134,8 @@ class _AuthGateState extends ConsumerState<AuthGate> {
 
                 final activeRole = profile.activeRole ?? roles.first;
 
-                // Location lives on the common `profile` row, not a
-                // role table, so it's checked here — after a role
-                // exists (the prompt copy depends on it) but before
-                // any role-specific screens.
+                // Location lives on the common profile row, not a role
+                // table, so check it before any role-specific screens.
                 if (profile.locationText == null ||
                     profile.locationPoint == null) {
                   return LocationSetupScreen(profile: profile);
@@ -123,8 +144,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
                 final roleScreens = roleScreensRegistry[activeRole];
 
                 if (roleScreens == null) {
-                  // That role's ticket hasn't merged its registry
-                  // entry yet — expected during parallel development
+                  // That role's ticket hasn't merged its registry entry yet.
                   return Scaffold(
                     body: Center(
                       child: Text('$activeRole profile screens coming soon'),
@@ -136,13 +156,13 @@ class _AuthGateState extends ConsumerState<AuthGate> {
                   future: _completionFor(profile.id, activeRole, roleScreens),
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) {
-                      return const Scaffold(
-                        body: Center(child: CircularProgressIndicator()),
-                      );
+                      return spinner;
                     }
+
                     if (!snapshot.data!) {
                       return roleScreens.completeProfileBuilder(context);
                     }
+
                     return buildNavShellForRole(profile, activeRole);
                   },
                 );
