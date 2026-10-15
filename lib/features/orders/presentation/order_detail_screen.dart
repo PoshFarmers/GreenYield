@@ -1,6 +1,6 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/supabase/client.dart';
 import '../../../core/widgets/app_secondary_header.dart';
@@ -13,8 +13,11 @@ import '../../reviews/presentation/widgets/review_dialog.dart';
 import '../../reviews/presentation/widgets/star_rating.dart';
 import '../order_providers.dart';
 import '../order_service.dart';
+import '../../payments/models/linked_card.dart';
+import '../cancellation_models.dart';
 import '../order_detail_models.dart';
 import 'live_tracking_screen.dart';
+import 'widgets/cancel_order_dialog.dart';
 import 'widgets/info_card.dart';
 import 'widgets/order_item_card.dart';
 import 'widgets/order_status_chip.dart';
@@ -105,6 +108,46 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Failed to open chat: $e')));
       }
+    }
+  }
+
+  /// Buyer cancel flow: refund preview -> dialog (optional reason) -> cancel.
+  Future<void> _confirmCancel(OrderDetail detail) async {
+    setState(() => _isLoadingAction = true);
+    CancellationPreview? preview;
+    try {
+      preview = await _service.getCancellationPreview(detail.id);
+    } catch (_) {
+      // The preview is informational; the dialog works without it.
+    }
+    if (!mounted) return;
+    setState(() => _isLoadingAction = false);
+
+    final reason = await showCancelOrderDialog(
+      context,
+      orderDisplayId: detail.displayId,
+      preview: preview,
+    );
+    if (reason == null || !mounted) return;
+
+    setState(() => _isLoadingAction = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _service.cancelOrder(
+        detail.id,
+        note: reason.isEmpty ? null : reason,
+      );
+      ref.invalidate(orderDetailProvider(widget.orderId));
+      final refund = preview == null
+          ? ''
+          : ' ${cancellationRefundText(preview)}';
+      messenger.showSnackBar(
+        SnackBar(content: Text('${'payments_cancel_done'.tr()}$refund')),
+      );
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Action failed: $e')));
+    } finally {
+      if (mounted) setState(() => _isLoadingAction = false);
     }
   }
 
@@ -213,6 +256,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             _buildSectionHeader('Order Summary'),
             const SizedBox(height: 12),
             _buildSummaryCard(context, detail),
+            _buildPaymentInfo(context, detail),
           ],
         ),
 
@@ -544,6 +588,8 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
       secondaryButton = TextButton(
         onPressed: _isLoadingAction
             ? null
+            : widget.viewerRole == 'buyer'
+            ? () => _confirmCancel(detail)
             : () => _handleAction(() => _service.cancelOrder(detail.id)),
         style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
         child: const Text('Cancel Order'),
@@ -590,6 +636,108 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     );
   }
 
+  /// Buyer: how it was paid. Farmer: commission + net payout. Driver: payout.
+  /// Payout rows only appear once the order is settled (server returns null before).
+  Widget _buildPaymentInfo(BuildContext context, OrderDetail detail) {
+    final theme = Theme.of(context);
+    String money(double v) => 'LKR ${v.toStringAsFixed(2)}';
+    final rows = <Widget>[];
+
+    if (widget.viewerRole == 'buyer' && detail.paymentMethod != null) {
+      rows.add(
+        _SummaryRow(
+          label: 'payments_payment_method'.tr(),
+          value: detail.paymentMethod == 'card'
+              ? 'payments_paid_with_card'.tr(
+                  namedArgs: {
+                    'card':
+                        '${CardBrand.fromDb(detail.paymentCardBrand).label} •••• ${detail.paymentCardLast4 ?? ''}',
+                  },
+                )
+              : 'payments_paid_with_wallet'.tr(),
+        ),
+      );
+    }
+    final refund = detail.refund;
+    if (widget.viewerRole == 'buyer' && refund != null) {
+      if (rows.isNotEmpty) rows.add(const SizedBox(height: 8));
+      rows.add(
+        _SummaryRow(
+          label: 'payments_refund_amount'.tr(),
+          value: money(refund.amount),
+        ),
+      );
+      rows.add(const SizedBox(height: 8));
+      rows.add(
+        _SummaryRow(
+          label: 'payments_refund_status'.tr(),
+          value: refund.isCard
+              ? 'payments_refund_to_card'.tr(
+                  namedArgs: {
+                    'card':
+                        '${CardBrand.fromDb(refund.cardBrand).label} •••• ${refund.cardLast4 ?? ''}',
+                  },
+                )
+              : 'payments_refund_to_wallet'.tr(),
+        ),
+      );
+    }
+    final cancelNote = detail.cancellationNote;
+    if (detail.status == OrderStatus.cancelled &&
+        cancelNote != null &&
+        cancelNote.trim().isNotEmpty) {
+      if (rows.isNotEmpty) rows.add(const SizedBox(height: 8));
+      rows.add(
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            '${'payments_cancel_reason'.tr()}: ${cancelNote.trim()}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+    if (widget.viewerRole == 'farmer' && detail.netPayout != null) {
+      rows.add(
+        _SummaryRow(
+          label: 'payments_commission'.tr(),
+          value: '- ${money(detail.commissionAmount ?? 0)}',
+        ),
+      );
+      rows.add(const SizedBox(height: 8));
+      rows.add(
+        _SummaryRow(
+          label: 'payments_net_payout'.tr(),
+          value: money(detail.netPayout!),
+        ),
+      );
+    }
+    if (widget.viewerRole == 'driver' && detail.driverPayout != null) {
+      rows.add(
+        _SummaryRow(
+          label: 'payments_driver_payout'.tr(),
+          value: money(detail.driverPayout!),
+        ),
+      );
+    }
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+        ),
+        child: Column(children: rows),
+      ),
+    );
+  }
+
   Widget _buildSummaryCard(BuildContext context, OrderDetail detail) {
     final theme = Theme.of(context);
     return Container(
@@ -609,6 +757,11 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           _SummaryRow(
             label: 'Delivery Fee',
             value: 'LKR ${detail.deliveryFeeAmount.toStringAsFixed(2)}',
+          ),
+          const SizedBox(height: 8),
+          _SummaryRow(
+            label: 'tax'.tr(),
+            value: 'LKR ${detail.taxAmount.toStringAsFixed(2)}',
           ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),

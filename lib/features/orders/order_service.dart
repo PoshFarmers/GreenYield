@@ -4,6 +4,7 @@ import 'dart:developer' as developer;
 import '../../core/local_db/powersync.dart';
 import '../../core/supabase/client.dart';
 import 'live_tracking_models.dart';
+import 'cancellation_models.dart';
 import 'order_detail_models.dart';
 
 /// Sprint 3 — Task: Multi-Role Order Management.
@@ -72,6 +73,7 @@ class OrderService {
             o.checkout_group_id,
             o.status,
             o.total_amount,
+            o.source,
             o.placed_at,
             o.order_date,
             o.delivery_id,
@@ -123,6 +125,7 @@ class OrderService {
             o.checkout_group_id,
             o.status,
             o.total_amount,
+            o.source,
             o.placed_at,
             o.order_date,
             o.delivery_id,
@@ -368,6 +371,19 @@ class OrderService {
       subtotalAmount: _toDouble(row['subtotal_amount']),
       deliveryFeeAmount: _toDouble(row['delivery_fee_amount']),
       totalAmount: _toDouble(row['total_amount']),
+      taxAmount: _toDouble(row['tax_amount']),
+      paymentMethod: row['payment_method'] as String?,
+      paymentCardLast4: row['payment_card_last4'] as String?,
+      paymentCardBrand: row['payment_card_brand'] as String?,
+      commissionAmount: row['commission_amount'] == null
+          ? null
+          : _toDouble(row['commission_amount']),
+      netPayout: row['net_payout'] == null
+          ? null
+          : _toDouble(row['net_payout']),
+      driverPayout: row['driver_payout'] == null
+          ? null
+          : _toDouble(row['driver_payout']),
       items: items,
       buyerProfileId: row['buyer_profile_id'] as String,
       buyerName: buyerName.isNotEmpty ? buyerName : 'Buyer',
@@ -377,6 +393,8 @@ class OrderService {
       farmerName: farmerName.isNotEmpty ? farmerName : 'Farmer',
       farmerPhone: row['farmer_phone'] as String?,
       farmerAddress: null, // not included in RPC yet
+      refund: RefundInfo.fromDetailMap(row),
+      cancellationNote: row['cancellation_note'] as String?,
       deliveryId: row['delivery_id'] as String?,
       deliveryStatus: row['delivery_status'] != null
           ? DeliveryStatus.fromDb(row['delivery_status'] as String)
@@ -406,6 +424,7 @@ class OrderService {
         o.total_amount,
         o.placed_at,
         o.order_date,
+        o.tax_amount,
         o.delivery_address,
         d.id              AS delivery_id,
         d.status          AS delivery_status,
@@ -464,6 +483,7 @@ class OrderService {
       subtotalAmount: _toDouble(row['subtotal_amount']),
       deliveryFeeAmount: _toDouble(row['delivery_fee_amount']),
       totalAmount: _toDouble(row['total_amount']),
+      taxAmount: _toDouble(row['tax_amount']),
       items: items,
       buyerProfileId: row['buyer_profile_id'] as String,
       buyerName: buyerDisplayName ?? 'Buyer',
@@ -534,6 +554,15 @@ class OrderService {
       'transition_delivery_status',
       params: {'p_delivery_id': deliveryId, 'p_new_status': 'delivered'},
     );
+  }
+
+  /// What cancelling would refund (and where). Calls `get_cancellation_preview`.
+  Future<CancellationPreview> getCancellationPreview(String orderId) async {
+    final data = await supabase.rpc(
+      'get_cancellation_preview',
+      params: {'p_order_id': orderId},
+    );
+    return CancellationPreview.fromMap(Map<String, dynamic>.from(data as Map));
   }
 
   /// Buyer or driver cancels an order. Calls `cancel_order(p_order_id)`.

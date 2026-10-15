@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../models/notification_item.dart';
+import '../../../orders/presentation/recurring/recurring_schedule_detail_screen.dart';
 
 /// One notification row: type icon, title, description, relative
 /// timestamp, and an unread indicator (accent bar + dot). Tap to expand
@@ -132,15 +133,49 @@ class _NotificationCardState extends State<NotificationCard>
                         const SizedBox(height: 8),
                         Align(
                           alignment: Alignment.centerRight,
-                          child: Text(
-                            'Tap to collapse',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.freshLeafGreen.withValues(
-                                alpha: 0.7,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Tap to collapse',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.freshLeafGreen.withValues(
+                                    alpha: 0.7,
+                                  ),
+                                  fontStyle: FontStyle.italic,
+                                ),
                               ),
-                              fontStyle: FontStyle.italic,
-                            ),
+                              if (widget.notification.sourceTable ==
+                                      'recurring_schedule' &&
+                                  widget.notification.sourceId != null) ...[
+                                const SizedBox(width: 16),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            RecurringScheduleDetailScreen(
+                                              scheduleId:
+                                                  widget.notification.sourceId!,
+                                            ),
+                                      ),
+                                    );
+                                  },
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 4,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('View Schedule'),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ],

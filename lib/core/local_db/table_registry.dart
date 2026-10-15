@@ -59,6 +59,12 @@ final Map<String, TableConfig> tableRegistry = {
 
   // --- add new tables here as wallet lands ---
   // 'listing': TableConfig(tableName: 'listing', remotePkColumn: 'id'),
+  'recurring_schedule': const TableConfig(tableName: 'recurring_schedule'),
+  'recurring_order': const TableConfig(
+    tableName: 'recurring_order',
+    jsonbColumns: {'delivery_address'},
+  ),
+  'recurring_order_item': const TableConfig(tableName: 'recurring_order_item'),
 };
 
 TableConfig configFor(String table) {

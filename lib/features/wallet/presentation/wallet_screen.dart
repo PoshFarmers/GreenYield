@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 
 import '../../../core/widgets/app_secondary_header.dart';
 import '../../../models/wallet.dart';
+import '../../payments/presentation/payment_methods_screen.dart';
 import '../wallet_service.dart';
+import 'top_up_screen.dart';
+import 'withdraw_screen.dart';
+import 'withdrawal_history_screen.dart';
 
 /// Shared wallet screen for any role — shows the live balance, a
-/// "Top Up" action (self-service credit via the `topup_wallet` RPC),
-/// and a scrollable list of recent transactions.
+/// "Top Up" action (card-funded, see [TopUpScreen]), and a scrollable
+/// list of recent transactions.
 class WalletScreen extends StatefulWidget {
   final String profileId;
 
@@ -19,84 +23,18 @@ class WalletScreen extends StatefulWidget {
 
 class _WalletScreenState extends State<WalletScreen> {
   final _service = const WalletService();
-  bool _isToppingUp = false;
 
-  Future<void> _showTopUpSheet() async {
-    final controller = TextEditingController();
-    final formKey = GlobalKey<FormState>();
+  void _openTopUp() {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const TopUpScreen()));
+  }
 
-    final amount = await showModalBottomSheet<double>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
-          ),
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'top_up_wallet'.tr(),
-                  style: Theme.of(sheetContext).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: controller,
-                  autofocus: true,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'amount_lkr'.tr(),
-                    hintText: 'enter_amount_hint'.tr(),
-                  ),
-                  validator: (value) {
-                    final parsed = double.tryParse(value?.trim() ?? '');
-                    if (parsed == null || parsed <= 0) {
-                      return 'error_enter_valid_amount'.tr();
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () {
-                    if (formKey.currentState!.validate()) {
-                      Navigator.of(sheetContext)
-                          .pop(double.parse(controller.text.trim()));
-                    }
-                  },
-                  child: Text('top_up'.tr()),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+  void _openWithdraw() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => WithdrawScreen(profileId: widget.profileId),
+      ),
     );
-
-    if (amount == null) return;
-
-    setState(() => _isToppingUp = true);
-    try {
-      await _service.topUp(amount);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('top_up_success'.tr())));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('${'top_up_failed'.tr()}\n$e')));
-    } finally {
-      if (mounted) setState(() => _isToppingUp = false);
-    }
   }
 
   @override
@@ -146,21 +84,47 @@ class _WalletScreenState extends State<WalletScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          ElevatedButton.icon(
-                            onPressed: _isToppingUp ? null : _showTopUpSheet,
-                            icon: _isToppingUp
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.add),
-                            label: Text('top_up'.tr()),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _openTopUp,
+                                  icon: const Icon(Icons.add),
+                                  label: Text('top_up'.tr()),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _openWithdraw,
+                                  icon: const Icon(Icons.arrow_upward),
+                                  label: Text('payments_withdraw_button'.tr()),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const PaymentMethodsScreen(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.credit_card_outlined),
+                      label: Text('payments_methods_title'.tr()),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const WithdrawalHistoryScreen(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.history),
+                      label: Text('payments_withdraw_history'.tr()),
                     ),
                     const SizedBox(height: 24),
                     Text(

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/widgets/media_image.dart';
 import '../../../models/profile.dart';
 import '../../navigation/presentation/app_nav_shell.dart';
+import '../../payments/models/linked_card.dart';
 import '../order_models.dart';
 import 'live_tracking_screen.dart';
 import 'order_detail_screen.dart';
@@ -184,6 +185,8 @@ class _OrderConfirmationScreenState
                     ],
                   ),
                 ),
+                const SizedBox(height: 12),
+                _PaidWithTile(group: group),
                 const SizedBox(height: 28),
                 SizedBox(
                   width: double.infinity,
@@ -389,4 +392,52 @@ class _OrderSummaryCard extends StatelessWidget {
 String _shortOrderId(String orderId) {
   final compactId = orderId.replaceAll('-', '');
   return 'GY-${compactId.substring(0, 6).toUpperCase()}';
+}
+
+class _PaidWithTile extends StatelessWidget {
+  final PlacedOrderGroup group;
+
+  const _PaidWithTile({required this.group});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isCard = group.paymentMethod == 'card';
+    final label = isCard
+        ? 'payments_paid_with_card'.tr(
+            namedArgs: {
+              'card':
+                  '${CardBrand.fromDb(group.cardBrand).label} •••• ${group.cardLast4 ?? ''}',
+            },
+          )
+        : 'payments_paid_with_wallet'.tr();
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isCard
+                ? Icons.credit_card_outlined
+                : Icons.account_balance_wallet_outlined,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

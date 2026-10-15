@@ -91,6 +91,29 @@ class OrderSummaryCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (order.source == 'recurring')
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Text(
+                        'Recurring',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ),
+                  ),
                 OrderStatusChip(status: order.status),
               ],
             ),
