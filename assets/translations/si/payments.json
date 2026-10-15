@@ -87,5 +87,21 @@
   "payments_payment_method": "ගෙවීම",
   "payments_commission": "වේදිකා කොමිස්",
   "payments_net_payout": "ශුද්ධ ගෙවීම",
-  "payments_driver_payout": "බෙදාහැරීමේ ගෙවීම"
+  "payments_driver_payout": "බෙදාහැරීමේ ගෙවීම",
+  "payments_cancel_title": "මෙම ඇණවුම අවලංගු කරනවාද?",
+  "payments_cancel_body": "ඇණවුම {order} අවලංගු කර, භාණ්ඩ ගොවියාගේ තොගයට නැවත එක් කෙරේ. මෙය අහෝසි කළ නොහැක.",
+  "payments_cancel_reason_label": "හේතුව (විකල්ප)",
+  "payments_cancel_reason_hint": "උදා: අත්වැරැද්දකින් ඇණවුම් කළා",
+  "payments_cancel_keep": "ඇණවුම තබා ගන්න",
+  "payments_cancel_confirm": "ඇණවුම අවලංගු කරන්න",
+  "payments_cancel_refund_wallet": "{amount} ඔබගේ පසුම්බියට ආපසු ගෙවනු ලැබේ.",
+  "payments_cancel_refund_card": "{amount} {last4} න් අවසන් වන ඔබගේ කාඩ්පතට ආපසු ගෙවනු ලැබේ.",
+  "payments_cancel_refund_none": "මෙම ඇණවුම සඳහා ආපසු ගෙවීමක් සිදු නොකෙරේ.",
+  "payments_cancel_refund_unknown": "ආපසු ගෙවීමේ විස්තර පූරණය කළ නොහැකි විය. ඔබ ගෙවා ඇත්නම් එය ස්වයංක්‍රීයව ආපසු ගෙවනු ලැබේ.",
+  "payments_cancel_done": "ඇණවුම අවලංගු කරන ලදී.",
+  "payments_cancel_reason": "අවලංගු කිරීමේ හේතුව",
+  "payments_refund_amount": "ආපසු ගෙවූ මුදල",
+  "payments_refund_status": "ආපසු ගෙවීම",
+  "payments_refund_to_wallet": "පසුම්බියට ආපසු ගෙවන ලදී",
+  "payments_refund_to_card": "{card} වෙත ආපසු ගෙවන ලදී"
 }

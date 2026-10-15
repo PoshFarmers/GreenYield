@@ -87,5 +87,21 @@
   "payments_payment_method": "Payment",
   "payments_commission": "Platform commission",
   "payments_net_payout": "Net payout",
-  "payments_driver_payout": "Delivery payout"
+  "payments_driver_payout": "Delivery payout",
+  "payments_cancel_title": "Cancel this order?",
+  "payments_cancel_body": "Order {order} will be cancelled and the produce returned to the farmer's stock. This can't be undone.",
+  "payments_cancel_reason_label": "Reason (optional)",
+  "payments_cancel_reason_hint": "e.g. Ordered by mistake",
+  "payments_cancel_keep": "Keep order",
+  "payments_cancel_confirm": "Cancel order",
+  "payments_cancel_refund_wallet": "{amount} will be refunded to your wallet.",
+  "payments_cancel_refund_card": "{amount} will be refunded to your card ending {last4}.",
+  "payments_cancel_refund_none": "No refund will be issued for this order.",
+  "payments_cancel_refund_unknown": "We couldn't load your refund details. If you paid for this order, it will be refunded automatically.",
+  "payments_cancel_done": "Order cancelled.",
+  "payments_cancel_reason": "Cancellation reason",
+  "payments_refund_amount": "Refund amount",
+  "payments_refund_status": "Refund",
+  "payments_refund_to_wallet": "Refunded to wallet",
+  "payments_refund_to_card": "Refunded to {card}"
 }
