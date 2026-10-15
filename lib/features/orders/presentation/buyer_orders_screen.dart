@@ -23,19 +23,50 @@ class BuyerOrdersScreen extends ConsumerStatefulWidget {
   ConsumerState<BuyerOrdersScreen> createState() => _BuyerOrdersScreenState();
 }
 
-class _BuyerOrdersScreenState extends ConsumerState<BuyerOrdersScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabs;
-  bool? _isOrg; // null until we know buyer_type
-
-  final _buyerProfileService = BuyerProfileService();
+class _BuyerOrdersScreenState extends ConsumerState<BuyerOrdersScreen> {
+  // Created once — previously a new stream was made on every build.
+  late final Stream<BuyerProfile?> _buyerStream = BuyerProfileService()
+      .watchOwnProfile(widget.profile.id)
+      .asBroadcastStream();
 
   @override
-  void initState() {
-    super.initState();
-    // Start with 2 tabs; rebuild to 3 once buyer_type is known.
-    _tabs = TabController(length: 2, vsync: this);
+  Widget build(BuildContext context) {
+    return StreamBuilder<BuyerProfile?>(
+      stream: _buyerStream,
+      builder: (context, snap) {
+        final isOrg = snap.data?.buyerType == 'organization';
+        return _BuyerOrdersTabs(
+          // A new TabController is only created when the tab count changes,
+          // and never from inside a build (which caused setState-in-build).
+          key: ValueKey(isOrg),
+          profileId: widget.profile.id,
+          isOrg: isOrg,
+        );
+      },
+    );
   }
+}
+
+class _BuyerOrdersTabs extends ConsumerStatefulWidget {
+  final String profileId;
+  final bool isOrg;
+
+  const _BuyerOrdersTabs({
+    super.key,
+    required this.profileId,
+    required this.isOrg,
+  });
+
+  @override
+  ConsumerState<_BuyerOrdersTabs> createState() => _BuyerOrdersTabsState();
+}
+
+class _BuyerOrdersTabsState extends ConsumerState<_BuyerOrdersTabs>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs = TabController(
+    length: widget.isOrg ? 3 : 2,
+    vsync: this,
+  );
 
   @override
   void dispose() {
@@ -43,77 +74,51 @@ class _BuyerOrdersScreenState extends ConsumerState<BuyerOrdersScreen>
     super.dispose();
   }
 
-  void _updateTabCount(bool isOrg) {
-    if (_isOrg == isOrg) return;
-    setState(() {
-      _isOrg = isOrg;
-      final old = _tabs;
-      _tabs = TabController(length: isOrg ? 3 : 2, vsync: this);
-      old.dispose();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    final profileId = widget.profile.id;
+    final id = widget.profileId;
+    final isOrg = widget.isOrg;
 
-    return StreamBuilder<BuyerProfile?>(
-      stream: _buyerProfileService.watchOwnProfile(profileId),
-      builder: (context, snap) {
-        final isOrg = snap.data?.buyerType == 'organization';
-        _updateTabCount(isOrg);
-
-        final tabs = isOrg
-            ? const [
-                Tab(text: 'Active Orders'),
-                Tab(text: 'Scheduled'),
-                Tab(text: 'Order History'),
-              ]
-            : const [Tab(text: 'Active Orders'), Tab(text: 'Order History')];
-
-        return Scaffold(
-          appBar: AppSecondaryHeader(
-            title: 'Orders',
-            showBackButton: false,
-            bottom: TabBar(
-              controller: _tabs,
-              tabs: tabs,
-              isScrollable: isOrg, // scrollable only when 3 tabs
-              labelStyle: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-              unselectedLabelStyle: const TextStyle(fontSize: 13),
-              indicatorSize: TabBarIndicatorSize.tab,
-            ),
+    return Scaffold(
+      appBar: AppSecondaryHeader(
+        title: 'Orders',
+        showBackButton: false,
+        bottom: TabBar(
+          controller: _tabs,
+          isScrollable: isOrg,
+          tabs: [
+            const Tab(text: 'Active Orders'),
+            if (isOrg) const Tab(text: 'Scheduled'),
+            const Tab(text: 'Order History'),
+          ],
+          labelStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
           ),
-          body: TabBarView(
-            controller: _tabs,
-            children: [
-              // Always: Active Orders
-              _OrderList(
-                key: const ValueKey('buyer_active'),
-                provider: ref.watch(buyerActiveOrdersProvider(profileId)),
-                viewerRole: 'buyer',
-                emptyMessage: 'No active orders yet.\nShop in the Marketplace to get started.',
-                emptyIcon: Icons.shopping_bag_outlined,
-              ),
-
-              // Org-only: Scheduled Orders (inserted between Active and History)
-              if (isOrg) RecurringScheduleListWidget(buyerProfileId: profileId),
-
-              // Always: Order History
-              _OrderList(
-                key: const ValueKey('buyer_history'),
-                provider: ref.watch(buyerHistoryOrdersProvider(profileId)),
-                viewerRole: 'buyer',
-                emptyMessage: 'No order history yet.',
-                emptyIcon: Icons.history_outlined,
-              ),
-            ],
+          unselectedLabelStyle: const TextStyle(fontSize: 13),
+          indicatorSize: TabBarIndicatorSize.tab,
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabs,
+        children: [
+          _OrderList(
+            key: const ValueKey('buyer_active'),
+            provider: ref.watch(buyerActiveOrdersProvider(id)),
+            viewerRole: 'buyer',
+            emptyMessage: 'No active orders yet.\nShop in the Marketplace to get started.',
+            emptyIcon: Icons.shopping_bag_outlined,
           ),
-        );
-      },
+          if (isOrg) RecurringScheduleListWidget(buyerProfileId: id),
+          _OrderList(
+            key: const ValueKey('buyer_history'),
+            provider: ref.watch(buyerHistoryOrdersProvider(id)),
+            viewerRole: 'buyer',
+            emptyMessage: 'No order history yet.',
+            emptyIcon: Icons.history_outlined,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -139,6 +144,7 @@ class _OrderList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return provider.when(
+      skipLoadingOnReload: true,
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(
         child: Text('Error loading orders:\n$e', textAlign: TextAlign.center),

@@ -8,6 +8,7 @@ import '../../../wallet/presentation/widgets/wallet_summary_card.dart';
 import 'package:latlong2/latlong.dart' as ll;
 
 import '../../../../core/auth/auth_providers.dart';
+import '../../../../core/auth/sign_out.dart';
 import '../../../../core/storage/crop_photo_service.dart';
 import '../../../../core/widgets/app_secondary_header.dart';
 import '../../../../core/widgets/avatar_image.dart';
@@ -187,17 +188,7 @@ class _FarmerProfileViewScreenState
                         ),
                         const SizedBox(height: 24),
                         OutlinedButton.icon(
-                          onPressed: () async {
-                            await ref.read(authServiceProvider).signOut();
-                            // This screen was pushed on top of AuthGate's
-                            // root route — AuthGate swaps to LoginScreen
-                            // on its own, but only becomes visible once
-                            // every pushed route above it is popped.
-                            if (context.mounted) {
-                              Navigator.of(context)
-                                  .popUntil((route) => route.isFirst);
-                            }
-                          },
+                          onPressed: () => signOutAndReset(context, ref),
                           icon: const Icon(Icons.logout),
                           label: Text('logout'.tr()),
                           style: OutlinedButton.styleFrom(
