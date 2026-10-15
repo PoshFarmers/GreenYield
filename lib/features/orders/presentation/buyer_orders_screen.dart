@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/widgets/app_secondary_header.dart';
 import '../../../models/buyer_profile.dart';
@@ -83,20 +84,16 @@ class _BuyerOrdersTabsState extends ConsumerState<_BuyerOrdersTabs>
       appBar: AppSecondaryHeader(
         title: 'Orders',
         showBackButton: false,
-        bottom: TabBar(
-          controller: _tabs,
-          isScrollable: isOrg,
-          tabs: [
-            const Tab(text: 'Active Orders'),
-            if (isOrg) const Tab(text: 'Scheduled'),
-            const Tab(text: 'Order History'),
-          ],
-          labelStyle: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: _OrderTabBar(
+            controller: _tabs,
+            tabs: [
+              const Tab(text: 'Active Orders'),
+              if (isOrg) const Tab(text: 'Scheduled'),
+              const Tab(text: 'Order History'),
+            ],
           ),
-          unselectedLabelStyle: const TextStyle(fontSize: 13),
-          indicatorSize: TabBarIndicatorSize.tab,
         ),
       ),
       body: TabBarView(
@@ -106,6 +103,7 @@ class _BuyerOrdersTabsState extends ConsumerState<_BuyerOrdersTabs>
             key: const ValueKey('buyer_active'),
             provider: ref.watch(buyerActiveOrdersProvider(id)),
             viewerRole: 'buyer',
+            isHistory: false,
             emptyMessage: 'No active orders yet.\nShop in the Marketplace to get started.',
             emptyIcon: Icons.shopping_bag_outlined,
           ),
@@ -114,6 +112,7 @@ class _BuyerOrdersTabsState extends ConsumerState<_BuyerOrdersTabs>
             key: const ValueKey('buyer_history'),
             provider: ref.watch(buyerHistoryOrdersProvider(id)),
             viewerRole: 'buyer',
+            isHistory: true,
             emptyMessage: 'No order history yet.',
             emptyIcon: Icons.history_outlined,
           ),
@@ -132,6 +131,7 @@ class _OrderList extends ConsumerWidget {
   final String viewerRole;
   final String emptyMessage;
   final IconData emptyIcon;
+  final bool isHistory;
 
   const _OrderList({
     super.key,
@@ -139,6 +139,7 @@ class _OrderList extends ConsumerWidget {
     required this.viewerRole,
     required this.emptyMessage,
     required this.emptyIcon,
+    required this.isHistory,
   });
 
   @override
@@ -153,13 +154,97 @@ class _OrderList extends ConsumerWidget {
         if (orders.isEmpty) {
           return _EmptyState(message: emptyMessage, icon: emptyIcon);
         }
+        final grouped = <DateTime, List<OrderSummary>>{};
+        for (final order in orders) {
+          final sourceDate = isHistory
+              ? (order.deliveredAt ?? order.placedAt)
+              : order.placedAt;
+          final date = DateTime(
+            sourceDate.year,
+            sourceDate.month,
+            sourceDate.day,
+          );
+          grouped.putIfAbsent(date, () => []).add(order);
+        }
+        final dates = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+        final itemCount = dates.fold<int>(
+          0,
+          (count, date) => count + 1 + grouped[date]!.length,
+        );
+
         return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          itemCount: orders.length,
-          itemBuilder: (context, i) =>
-              OrderSummaryCard(order: orders[i], viewerRole: viewerRole),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          itemCount: itemCount,
+          itemBuilder: (context, index) {
+            var offset = 0;
+            for (final date in dates) {
+              if (index == offset) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8, bottom: 8),
+                  child: Text(
+                    DateFormat('MMM d, yyyy').format(date),
+                    style: Theme.of(context).textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                );
+              }
+              offset++;
+              final dateOrders = grouped[date]!;
+              if (index < offset + dateOrders.length) {
+                return OrderSummaryCard(
+                  order: dateOrders[index - offset],
+                  viewerRole: viewerRole,
+                );
+              }
+              offset += dateOrders.length;
+            }
+            return const SizedBox.shrink();
+          },
         );
       },
+    );
+  }
+}
+
+class _OrderTabBar extends StatelessWidget {
+  final TabController controller;
+  final List<Widget> tabs;
+
+  const _OrderTabBar({required this.controller, required this.tabs});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE8F0EA),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: TabBar(
+          controller: controller,
+          tabs: tabs,
+          labelColor: Theme.of(context).colorScheme.primary,
+          unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+          labelStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+          indicator: BoxDecoration(
+            color: const Color(0xFFD3E8D7),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          indicatorSize: TabBarIndicatorSize.tab,
+          dividerColor: Colors.transparent,
+          overlayColor: WidgetStateProperty.all(Colors.transparent),
+        ),
+      ),
     );
   }
 }
