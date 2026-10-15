@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:powersync/powersync.dart';
@@ -21,14 +22,19 @@ Future<void> initPowerSync() async {
   }
 
   supabase.auth.onAuthStateChange.listen((state) async {
-    switch (state.event) {
-      case AuthChangeEvent.signedIn:
-      case AuthChangeEvent.tokenRefreshed:
-        await db.connect(connector: SupabaseConnector());
-      case AuthChangeEvent.signedOut:
-        await db.disconnectAndClear();
-      default:
-        break;
+    try {
+      switch (state.event) {
+        case AuthChangeEvent.signedIn:
+        case AuthChangeEvent.tokenRefreshed:
+          await db.connect(connector: SupabaseConnector());
+        case AuthChangeEvent.signedOut:
+          await db.disconnectAndClear();
+        default:
+          break;
+      }
+    } catch (e) {
+      // A failure here must never wedge the auth listener.
+      debugPrint('PowerSync auth-state handling failed: $e');
     }
   });
 }

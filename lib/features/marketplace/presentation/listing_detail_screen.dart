@@ -269,7 +269,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
 
   Widget _buildContent(ThemeData theme, MarketplaceListing listing) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
       children: [
         if (_isOffline) _OfflineBanner(theme: theme),
         const SizedBox(height: 12),

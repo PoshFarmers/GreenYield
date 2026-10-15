@@ -10,10 +10,7 @@ class AuthService {
   static const _mobileRedirect = 'io.supabase.greenyield://login-callback';
 
   // Repository.insert always supplies the local id separately, so
-  // Profile.toInsertMap()'s own 'id' entry has to be stripped here —
-  // the previous hand-written SQL passed profile.id AND
-  // toInsertMap()['id'] into the same INSERT, producing a duplicate
-  // 'id' column. This fixes that as a side effect of the refactor.
+  // Profile.toInsertMap()'s own 'id' entry has to be stripped here.
   final _profiles = Repository<Profile>(
     table: 'profile',
     fromMap: Profile.fromMap,
@@ -47,7 +44,15 @@ class AuthService {
     );
   }
 
-  Future<void> signOut() => supabase.auth.signOut();
+  /// Signs out globally, but never hangs: if the server can't be reached
+  /// within a few seconds (or errors), the local session is cleared anyway.
+  Future<void> signOut() async {
+    try {
+      await supabase.auth.signOut().timeout(const Duration(seconds: 6));
+    } catch (_) {
+      await supabase.auth.signOut(scope: SignOutScope.local);
+    }
+  }
 
   Stream<Profile?> watchOwnProfile() {
     final user = currentUser;
@@ -62,8 +67,7 @@ class AuthService {
       _profiles.update(profile.id, profile);
 
   /// profile_role rows have no real model to speak of (just a role
-  /// string) and use a PowerSync-generated id, same as before — left
-  /// as a direct db call rather than forcing it through `Repository<T>`.
+  /// string) and use a PowerSync-generated id.
   Future<void> addRole(String role) async {
     final userId = currentUser!.id;
     await db.execute(

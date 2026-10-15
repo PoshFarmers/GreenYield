@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../wallet/presentation/widgets/wallet_summary_card.dart';
 
 import '../../../../core/auth/auth_providers.dart';
+import '../../../../core/auth/sign_out.dart';
 import '../../../../core/widgets/generic_profile_info_section.dart';
 import '../../../../models/buyer_profile.dart';
 import '../../../../models/profile.dart';
@@ -136,8 +137,7 @@ class _BuyerProfileViewScreenState
                         ),
                         const SizedBox(height: 12),
                         OutlinedButton.icon(
-                          onPressed: () =>
-                              ref.read(authServiceProvider).signOut(),
+                          onPressed: () => signOutAndReset(context, ref),
                           icon: const Icon(Icons.logout),
                           label: Text('logout'.tr()),
                           style: OutlinedButton.styleFrom(

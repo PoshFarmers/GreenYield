@@ -30,6 +30,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   }
 
   void _onScroll() {
+    if (!_scrollController.hasClients) return;
     if (_scrollController.position.pixels >
         _scrollController.position.maxScrollExtent - 200) {
       ref.read(notificationListProvider.notifier).loadMore();
@@ -43,8 +44,9 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     final unreadCount =
         ref.watch(unreadNotificationCountProvider).asData?.value ?? 0;
 
+    // No hardcoded background: the theme's scaffold colour handles
+    // light and dark mode.
     return Scaffold(
-      backgroundColor: AppColors.cream,
       appBar: AppBar(
         title: Text('notifications_title'.tr()),
         actions: [
@@ -100,6 +102,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
 
     if (state.error != null && state.items.isEmpty) {
       return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
           const SizedBox(height: 120),
           const Icon(Icons.error_outline, size: 48, color: AppColors.mutedGray),
@@ -115,6 +118,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
 
     return ListView.separated(
       controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
       itemCount: state.items.length + (state.hasMore ? 1 : 0),
       separatorBuilder: (_, _) => const SizedBox(height: 10),
@@ -168,6 +172,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
@@ -181,10 +186,10 @@ class _EmptyState extends StatelessWidget {
         Text(
           'notifications_empty_title'.tr(),
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 18,
-            color: AppColors.deepForestGreen,
+            color: cs.onSurface,
           ),
         ),
         const SizedBox(height: 6),

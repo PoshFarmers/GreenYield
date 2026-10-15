@@ -7,6 +7,7 @@ import '../../../wallet/presentation/widgets/wallet_summary_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/auth/auth_providers.dart';
+import '../../../../core/auth/sign_out.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/widgets/avatar_image.dart';
 import '../../../../features/navigation/presentation/app_nav_shell.dart';
@@ -271,9 +272,9 @@ class _ProfileBody extends ConsumerWidget {
             child: Text('cancel'.tr()),
           ),
           TextButton(
-            onPressed: () async {
+            onPressed: () {
               Navigator.of(dialogContext).pop();
-              await ref.read(authServiceProvider).signOut();
+              signOutAndReset(context, ref);
             },
             child: Text('logout'.tr()),
           ),
@@ -329,7 +330,7 @@ class _AvatarHeader extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             AvatarImage(path: profile.avatarUrl, radius: 52),
-            Positioned(right: -2, bottom: -2, child: _EditBadge(onTap: () {})),
+            const SizedBox.shrink(),
           ],
         ),
         const SizedBox(height: 14),
