@@ -28,8 +28,14 @@ class _AvatarImageState extends State<AvatarImage> {
     super.didUpdateWidget(oldWidget);
     if (widget.path != oldWidget.path) {
       _loadedFor = null;
-      _image = null;
-      _load();
+      final path = widget.path;
+      if (path == null || path.isEmpty) {
+        _image = null;
+      } else {
+        // Keep showing the current image until the new one is ready, instead
+        // of flashing the placeholder icon.
+        _load();
+      }
     }
   }
 
@@ -40,9 +46,14 @@ class _AvatarImageState extends State<AvatarImage> {
 
     try {
       final file = await _cacheService.getAvatarFile(path);
-      if (mounted) setState(() => _image = FileImage(file));
+      // Ignore results for a path that's no longer current.
+      if (mounted && widget.path == path) {
+        setState(() => _image = FileImage(file));
+      }
     } catch (_) {
-      // Avatar loading failure is non-fatal — placeholder icon shows instead.
+      // Non-fatal: fall back to the placeholder icon (never keep a previous
+      // person's avatar for a path that failed to load).
+      if (mounted && widget.path == path) setState(() => _image = null);
     }
   }
 

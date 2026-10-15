@@ -10,14 +10,18 @@ import '../../models/chat_models.dart';
 /// Direct messaging service.
 ///
 /// Messaging intentionally uses Supabase Realtime instead of PowerSync.
-/// The important rule here is to keep Realtime subscriptions scoped and to
-/// avoid re-querying the same data multiple times for one event.
+/// Keep Realtime subscriptions scoped and avoid re-querying the same data
+/// multiple times for one event.
 class ChatService {
   const ChatService();
 
   static const _attachmentsBucket = 'message-attachments';
 
-  static final Map<String, String> _urlCache = <String, String>{};
+  /// Signed URLs are requested with a 1h lifetime; drop them from the cache a
+  /// bit earlier so a long session never renders an expired URL.
+  static const _urlTtl = Duration(minutes: 50);
+
+  static final Map<String, ({String url, DateTime expiresAt})> _urlCache = {};
 
   String get _uid {
     final id = supabase.auth.currentUser?.id;
@@ -43,10 +47,8 @@ class ChatService {
 
   /// Fetches the current user's threads for the currently active role.
   ///
-  /// The role is part of the participant snapshot in the database. This is
-  /// important for users who can have more than one role; without it, a
-  /// Farmer can accidentally see a Buyer/Driver thread belonging to another
-  /// active role.
+  /// The role is part of the participant snapshot in the database, so a user
+  /// with several roles only sees threads belonging to the active one.
   Future<List<ChatThread>> getChatThreads(String activeRole) async {
     final rows = await supabase.rpc(
       'get_chat_threads',
@@ -60,13 +62,13 @@ class ChatService {
 
   /// Live thread list.
   ///
-  /// Only two lightweight subscriptions are needed:
+  /// Two lightweight subscriptions:
   ///  - conversation: a message INSERT bumps conversation.updated_at
-  ///  - participant: a new conversation creates the recipient's row
+  ///  - participant: new conversations / read-cursor changes for this user
   ///
-  /// We deliberately do NOT subscribe to the entire message table here.
-  /// Re-querying the thread list for every visible message event was a major
-  /// source of unnecessary work.
+  /// A `.stream()` always emits an initial snapshot. We already call [load]
+  /// when listening starts, so those snapshots are skipped; only real changes
+  /// trigger a (debounced) refetch.
   Stream<List<ChatThread>> watchChatThreads(String activeRole) {
     final controller = StreamController<List<ChatThread>>.broadcast();
 
@@ -98,22 +100,17 @@ class ChatService {
     controller.onListen = () {
       load();
 
-      // RLS scopes this stream to conversations the signed-in user can see.
-      // A new message updates conversation.updated_at through the database
-      // trigger, so this single subscription is enough for existing threads.
       conversationSub = supabase
           .from('conversation')
           .stream(primaryKey: ['id'])
+          .skip(1)
           .listen((_) => scheduleRefresh());
 
-      // When a brand-new conversation is created for the other participant,
-      // their conversation row already exists but their Realtime snapshot may
-      // not contain the new participant relationship yet. This catches that
-      // case without listening to the whole message table.
       participantSub = supabase
           .from('conversation_participant')
           .stream(primaryKey: ['id'])
           .eq('profile_id', _uid)
+          .skip(1)
           .listen((_) => scheduleRefresh());
     };
 
@@ -129,71 +126,7 @@ class ChatService {
     return controller.stream;
   }
 
-  /// Number of unread conversation threads for the active role.
-  ///
-  /// This uses one source of truth: conversation_participant.last_read_at.
-  /// The old implementation merged a PowerSync notification count with a
-  /// Realtime count, which could leave the two values out of sync.
-  Stream<int> getUnreadConversationCountStream(String activeRole) {
-    final controller = StreamController<int>.broadcast();
-    StreamSubscription<List<Map<String, dynamic>>>? conversationSub;
-    StreamSubscription<List<Map<String, dynamic>>>? participantSub;
-    Timer? debounce;
-    int requestVersion = 0;
-
-    Future<void> refresh() async {
-      final version = ++requestVersion;
-      try {
-        final value = await supabase.rpc(
-          'unread_conversation_count',
-          params: {'p_active_role': activeRole},
-        );
-        if (!controller.isClosed && version == requestVersion) {
-          controller.add((value as int?) ?? 0);
-        }
-      } catch (error, stackTrace) {
-        if (!controller.isClosed && version == requestVersion) {
-          controller.addError(error, stackTrace);
-        }
-      }
-    }
-
-    void scheduleRefresh() {
-      debounce?.cancel();
-      debounce = Timer(const Duration(milliseconds: 200), refresh);
-    }
-
-    controller.onListen = () {
-      refresh();
-
-      // Message INSERT -> conversation.updated_at changes.
-      conversationSub = supabase
-          .from('conversation')
-          .stream(primaryKey: ['id'])
-          .listen((_) => scheduleRefresh());
-
-      // Opening a chat changes the caller's last_read_at.
-      participantSub = supabase
-          .from('conversation_participant')
-          .stream(primaryKey: ['id'])
-          .eq('profile_id', _uid)
-          .listen((_) => scheduleRefresh());
-    };
-
-    controller.onCancel = () {
-      debounce?.cancel();
-      requestVersion++;
-      conversationSub?.cancel();
-      participantSub?.cancel();
-    };
-
-    return controller.stream;
-  }
-
   /// Streams only the latest [limit] messages in a room.
-  ///
-  /// Keeping the initial Realtime snapshot bounded is important for rooms
-  /// with a long history. Older messages can be added later with pagination.
   Stream<List<ChatMessage>> streamMessages(
     String conversationId, {
     int limit = 100,
@@ -211,6 +144,9 @@ class ChatService {
         );
   }
 
+  /// The other participant's read cursor. `.distinct()` matters: our own
+  /// mark-read write makes this table emit, but the peer's value is unchanged,
+  /// so nothing downstream should rebuild.
   Stream<DateTime?> streamPeerLastReadAt(String conversationId) {
     return supabase
         .from('conversation_participant')
@@ -224,13 +160,17 @@ class ChatService {
           final value = peer['last_read_at'];
           if (value == null) return null;
           return DateTime.parse(value as String).toLocal();
-        });
+        })
+        .distinct();
   }
 
+  /// Sends a message. Pass a client-generated [messageId] (uuid) to make
+  /// optimistic UI exact: the realtime row comes back with the same id.
   Future<void> sendMessage({
     required String conversationId,
     String? text,
     File? imageFile,
+    String? messageId,
   }) async {
     final trimmed = text?.trim();
     String? attachmentPath;
@@ -254,6 +194,7 @@ class ChatService {
     }
 
     await supabase.from('message').insert({
+      if (messageId != null) 'id': messageId,
       'conversation_id': conversationId,
       'sender_id': _uid,
       'body': (trimmed == null || trimmed.isEmpty) ? null : trimmed,
@@ -262,15 +203,24 @@ class ChatService {
     });
   }
 
-  Future<String> resolveAttachmentUrl(String path) {
+  /// Synchronous cache lookup so already-resolved images render instantly.
+  String? peekAttachmentUrl(String path) {
     final cached = _urlCache[path];
+    if (cached == null || !cached.expiresAt.isAfter(DateTime.now())) {
+      return null;
+    }
+    return cached.url;
+  }
+
+  Future<String> resolveAttachmentUrl(String path) {
+    final cached = peekAttachmentUrl(path);
     if (cached != null) return Future.value(cached);
 
     return supabase.storage
         .from(_attachmentsBucket)
         .createSignedUrl(path, 60 * 60)
         .then((url) {
-          _urlCache[path] = url;
+          _urlCache[path] = (url: url, expiresAt: DateTime.now().add(_urlTtl));
           return url;
         });
   }
