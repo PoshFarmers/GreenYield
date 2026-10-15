@@ -36,8 +36,6 @@ class InfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
-    final outline = theme.colorScheme.outlineVariant;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -66,9 +64,15 @@ class InfoCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerLowest,
+            color: theme.colorScheme.surface,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: outline),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,14 +184,14 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
+    return FilledButton.icon(
       key: ValueKey(id),
       onPressed: onTap,
       icon: Icon(icon, size: 16),
       label: Text(label),
-      style: OutlinedButton.styleFrom(
+      style: FilledButton.styleFrom(
+        backgroundColor: color.withValues(alpha: 0.12),
         foregroundColor: color,
-        side: BorderSide(color: color.withValues(alpha: 0.5)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         minimumSize: const Size(0, 38),
         textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
@@ -206,17 +210,15 @@ class ChatActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return OutlinedButton.icon(
+    final primary = Theme.of(context).colorScheme.primary;
+    return FilledButton.icon(
       key: ValueKey(id),
       onPressed: onTap,
       icon: const Icon(Icons.chat_bubble_outline, size: 16),
       label: const Text('Message'),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: theme.colorScheme.primary,
-        side: BorderSide(
-          color: theme.colorScheme.primary.withValues(alpha: 0.5),
-        ),
+      style: FilledButton.styleFrom(
+        backgroundColor: primary.withValues(alpha: 0.12),
+        foregroundColor: primary,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         minimumSize: const Size(0, 38),
         textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
