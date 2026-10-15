@@ -77,6 +77,7 @@ class OrderService {
             o.placed_at,
             o.order_date,
             o.delivery_id,
+            d.delivered_at,
             (SELECT SUM(quantity_kg) FROM order_item oi WHERE oi.order_id = o.id) AS total_quantity,
             COALESCE(p_farmer.first_name || ' ' || p_farmer.last_name, d.farmer_display_name) AS counterpart_name,
             (
@@ -129,6 +130,7 @@ class OrderService {
             o.placed_at,
             o.order_date,
             o.delivery_id,
+            d.delivered_at,
             (SELECT SUM(quantity_kg) FROM order_item oi WHERE oi.order_id = o.id) AS total_quantity,
             COALESCE(p_buyer.first_name || ' ' || p_buyer.last_name, d.buyer_display_name) AS counterpart_name,
             (
@@ -238,6 +240,21 @@ class OrderService {
               firstImg = crop['fallback_image_url'] as String;
             }
           }
+        }
+
+        try {
+          final detail = await fetchOrderDetailFromServer(o['id'] as String);
+          final detailImage = detail != null && detail.items.isNotEmpty
+              ? detail.items.first.imageUrl
+              : null;
+          if (detailImage != null && detailImage.isNotEmpty) {
+            firstImg = detailImage;
+          }
+        } catch (e) {
+          developer.log(
+            'Could not resolve delivery thumbnail from order detail: $e',
+            name: 'GreenYield.OrderService',
+          );
         }
 
         final orderSummary = OrderSummary(

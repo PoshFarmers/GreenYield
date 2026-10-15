@@ -169,6 +169,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     final asyncDetail = ref.watch(orderDetailProvider(widget.orderId));
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: const AppSecondaryHeader(
         title: 'Order Details',
         showBackButton: true,
@@ -242,7 +243,13 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: theme.colorScheme.outlineVariant),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
               child: Column(
                 children: detail.items
@@ -345,7 +352,13 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceContainerLowest,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -376,7 +389,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
               ],
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton.icon(
+                child: FilledButton.icon(
                   onPressed: () async {
                     final result = await ReviewDialog.show(
                       context,
@@ -396,6 +409,15 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                     isEditing ? Icons.edit_outlined : Icons.star_outline,
                   ),
                   label: Text(isEditing ? 'Edit your review' : 'Rate & review'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary.withValues(
+                      alpha: 0.12,
+                    ),
+                    foregroundColor: theme.colorScheme.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -542,6 +564,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         },
         icon: const Icon(Icons.location_on_outlined),
         label: const Text('Track Live Order'),
+        style: _primaryActionStyle(theme),
       );
     }
 
@@ -554,6 +577,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             : () => _handleAction(() => _service.markOrderPacked(detail.id)),
         icon: const Icon(Icons.inventory_2),
         label: const Text('Mark as Packed'),
+        style: _primaryActionStyle(theme),
       );
     }
 
@@ -567,6 +591,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                 ),
           icon: const Icon(Icons.local_shipping),
           label: const Text('Confirm Pickup'),
+          style: _primaryActionStyle(theme),
         );
       } else if ((detail.status == OrderStatus.pickedUp ||
               detail.status == OrderStatus.inTransit) &&
@@ -579,6 +604,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                 ),
           icon: const Icon(Icons.check_circle),
           label: const Text('Mark as Delivered'),
+          style: _primaryActionStyle(theme),
         );
       }
     }
@@ -618,10 +644,20 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
               secondaryButton,
               const SizedBox(width: 16),
             ],
-            Expanded(child: SizedBox(height: 48, child: primaryButton)),
+            Expanded(child: SizedBox(height: 52, child: primaryButton)),
           ],
         ),
       ),
+    );
+  }
+
+  ButtonStyle _primaryActionStyle(ThemeData theme) {
+    return FilledButton.styleFrom(
+      backgroundColor: theme.colorScheme.primary,
+      foregroundColor: Colors.white,
+      elevation: 2,
+      shadowColor: Colors.black.withValues(alpha: 0.12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 
@@ -731,7 +767,13 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.colorScheme.outlineVariant),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: Column(children: rows),
       ),
@@ -745,7 +787,13 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         children: [

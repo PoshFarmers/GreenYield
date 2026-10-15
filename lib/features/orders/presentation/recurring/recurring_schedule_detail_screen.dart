@@ -122,6 +122,7 @@ class _ScheduleItemsList extends StatelessWidget {
           o.next_run_at,
           oi.quantity_kg,
           c.name as crop_name,
+          c.category as crop_category,
           c.fallback_image_url
         FROM recurring_order o
         JOIN recurring_order_item oi ON oi.recurring_order_id = o.id
@@ -169,15 +170,39 @@ class _ScheduleItemsList extends StatelessWidget {
                 initiallyExpanded: true,
                 children: [
                   ...items.map((item) {
+                    final fallbackUrl = item['fallback_image_url'] as String?;
+                    final category = item['crop_category'] as String?;
+                    final isFruit = category?.toLowerCase() == 'fruit';
+                    final categoryIcon = Icon(
+                      isFruit ? Icons.apple : Icons.eco,
+                      size: 24,
+                      color: theme.colorScheme.primary,
+                    );
+
+                    final bucket =
+                        (fallbackUrl != null &&
+                            (fallbackUrl.contains('crop-fallback') ||
+                                fallbackUrl.startsWith('crops/') ||
+                                !fallbackUrl.contains('/')))
+                        ? 'crop-fallback-images'
+                        : 'crop-photos';
+
                     return ListTile(
                       leading: SizedBox(
                         width: 40,
                         height: 40,
-                        child: MediaImage(
-                          path: item['fallback_image_url'] as String?,
-                          bucket: 'crop-photos',
-                          public: true,
-                          placeholder: const Icon(Icons.image),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: MediaImage(
+                            path: fallbackUrl,
+                            bucket: bucket,
+                            public: true,
+                            placeholder: Container(
+                              color: theme.colorScheme.surfaceContainerHigh,
+                              alignment: Alignment.center,
+                              child: categoryIcon,
+                            ),
+                          ),
                         ),
                       ),
                       title: Text(item['crop_name'] as String),

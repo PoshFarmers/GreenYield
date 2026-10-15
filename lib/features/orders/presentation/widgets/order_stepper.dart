@@ -122,21 +122,8 @@ class _StepCircle extends StatelessWidget {
       return Container(
         width: 28,
         height: 28,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          border: Border.all(color: activeColor, width: 2.5),
-        ),
-        child: Center(
-          child: Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: activeColor,
-              shape: BoxShape.circle,
-            ),
-          ),
-        ),
+        decoration: BoxDecoration(color: activeColor, shape: BoxShape.circle),
+        child: Icon(_icons[index], color: Colors.white, size: 15),
       );
     }
 
@@ -145,20 +132,17 @@ class _StepCircle extends StatelessWidget {
       width: 28,
       height: 28,
       decoration: BoxDecoration(
-        color: Colors.transparent,
+        color: inactiveColor.withValues(alpha: 0.1),
         shape: BoxShape.circle,
-        border: Border.all(color: inactiveColor, width: 1.5),
       ),
-      child: Center(
-        child: Text(
-          '${index + 1}',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: inactiveColor,
-          ),
-        ),
-      ),
+      child: Icon(_icons[index], size: 15, color: inactiveColor),
     );
   }
+
+  static const _icons = [
+    Icons.receipt_long_outlined,
+    Icons.inventory_2_outlined,
+    Icons.local_shipping_outlined,
+    Icons.check_circle_outline,
+  ];
 }

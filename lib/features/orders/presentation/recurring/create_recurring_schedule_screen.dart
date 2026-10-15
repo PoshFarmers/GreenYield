@@ -16,6 +16,7 @@ class ScheduleItemState {
   final String cropId;
   final String cropName;
   final String imageUrl;
+  final String? cropCategory;
   double quantity;
   String? preferredFarmerId;
   String? preferredFarmerName;
@@ -25,6 +26,7 @@ class ScheduleItemState {
     required this.cropId,
     required this.cropName,
     required this.imageUrl,
+    this.cropCategory,
     this.quantity = 1.0,
     this.preferredFarmerId,
     this.preferredFarmerName,
@@ -65,6 +67,16 @@ class _CreateRecurringScheduleScreenState
 
   bool _isSaving = false;
   bool _isLoading = true;
+
+  String _resolveCropImageBucket(String? path) {
+    if (path == null) return 'crop-photos';
+    if (path.contains('crop-fallback') ||
+        path.startsWith('crops/') ||
+        !path.contains('/')) {
+      return 'crop-fallback-images';
+    }
+    return 'crop-photos';
+  }
 
   @override
   void initState() {
@@ -118,6 +130,7 @@ class _CreateRecurringScheduleScreenState
         final items = await db.getAll(
           '''
           SELECT oi.*, c.name as crop_name, c.fallback_image_url,
+            c.category as crop_category,
             trim(p.first_name || ' ' || p.last_name) as farmer_name,
             pl.price_per_kg
           FROM recurring_order_item oi
@@ -135,6 +148,7 @@ class _CreateRecurringScheduleScreenState
             cropId: item['crop_id'] as String,
             cropName: item['crop_name'] as String,
             imageUrl: item['fallback_image_url'] as String? ?? '',
+            cropCategory: item['crop_category'] as String?,
             quantity: (item['quantity_kg'] as num).toDouble(),
             preferredFarmerId: item['preferred_farmer_id'] as String?,
             preferredFarmerName: item['farmer_name'] as String?,
@@ -281,11 +295,15 @@ class _CreateRecurringScheduleScreenState
 
   DateTime _calculateNextRunAt(int deliveryDayOfWeek, String frequency) {
     final now = DateTime.now();
+    // DB day_of_week: 0=Sun, 1=Mon, ..., 6=Sat.
+    // Dart DateTime.weekday: 1=Mon, ..., 6=Sat, 7=Sun.
+    // Map: DB 0 (Sun) → Dart 7; DB 1–6 → Dart 1–6 (identical).
     final targetWeekday = deliveryDayOfWeek == 0
         ? DateTime.sunday
-        : deliveryDayOfWeek + 1;
+        : deliveryDayOfWeek;
     var daysToAdd = (targetWeekday - now.weekday) % DateTime.daysPerWeek;
-    if (daysToAdd == 0 && now.hour >= 0) {
+    // If already at that weekday (or calculation gives 0), push to next occurrence.
+    if (daysToAdd == 0) {
       daysToAdd = DateTime.daysPerWeek;
     }
 
@@ -510,15 +528,29 @@ class _CreateRecurringScheduleScreenState
                       ),
                     ),
                   ...items.map((item) {
+                    final isFruit = item.cropCategory?.toLowerCase() == 'fruit';
+                    final categoryIcon = Icon(
+                      isFruit ? Icons.apple : Icons.eco,
+                      size: 24,
+                      color: theme.colorScheme.primary,
+                    );
+
                     return ListTile(
                       leading: SizedBox(
                         width: 40,
                         height: 40,
-                        child: MediaImage(
-                          path: item.imageUrl,
-                          bucket: 'crop-photos',
-                          public: true,
-                          placeholder: const Icon(Icons.image),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: MediaImage(
+                            path: item.imageUrl,
+                            bucket: _resolveCropImageBucket(item.imageUrl),
+                            public: true,
+                            placeholder: Container(
+                              color: theme.colorScheme.surfaceContainerHigh,
+                              alignment: Alignment.center,
+                              child: categoryIcon,
+                            ),
+                          ),
                         ),
                       ),
                       title: Text(item.cropName),
@@ -738,6 +770,7 @@ class _CreateRecurringScheduleScreenState
       context: context,
       isScrollControlled: true,
       builder: (context) {
+        final theme = Theme.of(context);
         return FractionallySizedBox(
           heightFactor: 0.8,
           child: Column(
@@ -754,15 +787,31 @@ class _CreateRecurringScheduleScreenState
                   itemCount: crops.length,
                   itemBuilder: (context, index) {
                     final crop = crops[index];
+                    final fallbackUrl = crop['fallback_image_url'] as String?;
+                    final category = crop['category'] as String?;
+                    final isFruit = category?.toLowerCase() == 'fruit';
+                    final categoryIcon = Icon(
+                      isFruit ? Icons.apple : Icons.eco,
+                      size: 24,
+                      color: theme.colorScheme.primary,
+                    );
+
                     return ListTile(
                       leading: SizedBox(
                         width: 40,
                         height: 40,
-                        child: MediaImage(
-                          path: crop['fallback_image_url'] as String?,
-                          bucket: 'crop-photos',
-                          public: true,
-                          placeholder: const Icon(Icons.image),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: MediaImage(
+                            path: fallbackUrl,
+                            bucket: _resolveCropImageBucket(fallbackUrl),
+                            public: true,
+                            placeholder: Container(
+                              color: theme.colorScheme.surfaceContainerHigh,
+                              alignment: Alignment.center,
+                              child: categoryIcon,
+                            ),
+                          ),
                         ),
                       ),
                       title: Text(crop['name'] as String),
@@ -772,7 +821,8 @@ class _CreateRecurringScheduleScreenState
                           day,
                           crop['id'] as String,
                           crop['name'] as String,
-                          (crop['fallback_image_url'] as String?) ?? '',
+                          fallbackUrl ?? '',
+                          category,
                         );
                       },
                     );
@@ -790,8 +840,9 @@ class _CreateRecurringScheduleScreenState
     int day,
     String cropId,
     String cropName,
-    String imageUrl,
-  ) {
+    String imageUrl, [
+    String? cropCategory,
+  ]) {
     final quantityController = TextEditingController(text: '1');
 
     showModalBottomSheet(
@@ -936,6 +987,7 @@ class _CreateRecurringScheduleScreenState
                                   cropId: cropId,
                                   cropName: cropName,
                                   imageUrl: imageUrl,
+                                  cropCategory: cropCategory,
                                   quantity: qty,
                                   preferredFarmerId: pickedFarmerId,
                                   preferredFarmerName: pickedFarmerName,

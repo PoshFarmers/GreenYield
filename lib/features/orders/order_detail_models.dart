@@ -171,6 +171,7 @@ class OrderSummary {
   final double totalQuantity;
   final DateTime placedAt;
   final DateTime? orderDate;
+  final DateTime? deliveredAt;
 
   /// delivery_id — present once a delivery row exists server-side.
   final String? deliveryId;
@@ -190,6 +191,7 @@ class OrderSummary {
     this.totalQuantity = 0.0,
     required this.placedAt,
     this.orderDate,
+    this.deliveredAt,
     this.deliveryId,
     this.firstImageUrl,
     this.source = 'manual',
@@ -212,6 +214,9 @@ class OrderSummary {
       orderDate: row['order_date'] != null
           ? DateTime.tryParse(row['order_date'] as String)
           : null,
+      deliveredAt: row['delivered_at'] != null
+          ? DateTime.tryParse(row['delivered_at'] as String)
+          : null,
       deliveryId: row['delivery_id'] as String?,
       firstImageUrl: row['first_image_url'] as String?,
       source: row['source'] as String? ?? 'manual',
@@ -228,6 +233,7 @@ class OrderSummary {
     double? totalQuantity,
     DateTime? placedAt,
     DateTime? orderDate,
+    DateTime? deliveredAt,
     String? deliveryId,
     String? firstImageUrl,
   }) {
@@ -241,6 +247,7 @@ class OrderSummary {
       totalQuantity: totalQuantity ?? this.totalQuantity,
       placedAt: placedAt ?? this.placedAt,
       orderDate: orderDate ?? this.orderDate,
+      deliveredAt: deliveredAt ?? this.deliveredAt,
       deliveryId: deliveryId ?? this.deliveryId,
       firstImageUrl: firstImageUrl ?? this.firstImageUrl,
     );
