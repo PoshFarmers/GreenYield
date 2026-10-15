@@ -9,6 +9,8 @@ import '../../../models/profile.dart';
 import '../../navigation/presentation/app_nav_shell.dart';
 import '../../payments/models/linked_card.dart';
 import '../order_models.dart';
+import 'live_tracking_screen.dart';
+import 'order_detail_screen.dart';
 
 /// Sprint 2 — Task 3.2: Order Confirmation screen, shown right after
 /// [CheckoutScreen] finishes writing every per-farmer `orders` row
@@ -190,13 +192,35 @@ class _OrderConfirmationScreenState
                   width: double.infinity,
                   height: 52,
                   child: FilledButton.icon(
-                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('track_order_coming_soon'.tr())),
-                    ),
+                    onPressed: () {
+                      final orderIds = group.orderIds;
+                      if (orderIds.isNotEmpty) {
+                        if (orderIds.length == 1) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => LiveTrackingScreen(
+                                orderId: orderIds.first,
+                                viewerRole: 'buyer',
+                              ),
+                            ),
+                          );
+                        } else {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => OrderDetailScreen(
+                                orderId: orderIds.first,
+                                viewerRole: 'buyer',
+                              ),
+                            ),
+                          );
+                        }
+                      }
+                    },
                     icon: const Icon(Icons.track_changes_outlined),
                     label: Text('track_order'.tr()),
                   ),
                 ),
+
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,

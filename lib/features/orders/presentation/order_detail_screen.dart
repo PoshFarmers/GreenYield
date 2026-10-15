@@ -16,6 +16,7 @@ import '../order_service.dart';
 import '../../payments/models/linked_card.dart';
 import '../cancellation_models.dart';
 import '../order_detail_models.dart';
+import 'live_tracking_screen.dart';
 import 'widgets/cancel_order_dialog.dart';
 import 'widgets/info_card.dart';
 import 'widgets/order_item_card.dart';
@@ -489,6 +490,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
   // ---------------------------------------------------------------------------
 
   bool _hasActions(OrderDetail detail) {
+    final isTrackable =
+        detail.status != OrderStatus.delivered &&
+        detail.status != OrderStatus.completed &&
+        detail.status != OrderStatus.cancelled;
+    if (isTrackable &&
+        (widget.viewerRole == 'buyer' || widget.viewerRole == 'farmer')) {
+      return true;
+    }
     if (widget.viewerRole == 'farmer' &&
         (detail.status == OrderStatus.assigned ||
             detail.status == OrderStatus.confirmed)) {
@@ -512,6 +521,29 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     final theme = Theme.of(context);
     Widget primaryButton = const SizedBox();
     Widget? secondaryButton;
+
+    final isTrackable =
+        detail.status != OrderStatus.delivered &&
+        detail.status != OrderStatus.completed &&
+        detail.status != OrderStatus.cancelled;
+
+    if (isTrackable &&
+        (widget.viewerRole == 'buyer' || widget.viewerRole == 'farmer')) {
+      primaryButton = FilledButton.icon(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => LiveTrackingScreen(
+                orderId: detail.id,
+                viewerRole: widget.viewerRole,
+              ),
+            ),
+          );
+        },
+        icon: const Icon(Icons.location_on_outlined),
+        label: const Text('Track Live Order'),
+      );
+    }
 
     if (widget.viewerRole == 'farmer' &&
         (detail.status == OrderStatus.assigned ||

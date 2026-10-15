@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -39,6 +42,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   StreamSubscription<Position>? _positionSub;
   bool _startingRoute = false;
   final Set<String> _pendingDeliveryIds = {};
+  bool _isFullscreen = false;
+  DriverStop? _navigatingStop;
 
   @override
   void initState() {
@@ -57,6 +62,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
           permission == LocationPermission.deniedForever) {
         return;
       }
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null && mounted && _myPosition == null) {
+        setState(
+          () =>
+              _myPosition = ll.LatLng(lastKnown.latitude, lastKnown.longitude),
+        );
+      }
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
@@ -66,6 +78,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
       if (!mounted) return;
       setState(
         () => _myPosition = ll.LatLng(position.latitude, position.longitude),
+      );
+      _syncDriverPosition(
+        position.latitude,
+        position.longitude,
+        speedKmh: position.speed >= 0 ? position.speed * 3.6 : null,
+        heading: position.heading >= 0 ? position.heading : null,
       );
 
       _positionSub =
@@ -79,10 +97,41 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             setState(
               () => _myPosition = ll.LatLng(pos.latitude, pos.longitude),
             );
+            _syncDriverPosition(
+              pos.latitude,
+              pos.longitude,
+              speedKmh: pos.speed >= 0 ? pos.speed * 3.6 : null,
+              heading: pos.heading >= 0 ? pos.heading : null,
+            );
           });
     } catch (_) {
       // No GPS fix available — the map/list still work, just without
       // "nearest first" sorting or a driver marker.
+    }
+  }
+
+  void _syncDriverPosition(
+    double lat,
+    double lng, {
+    double? speedKmh,
+    double? heading,
+  }) {
+    final stops = ref
+        .read(driverTodayStopsProvider(widget.profile.id))
+        .when(data: (d) => d, error: (_, e) => null, loading: () => null);
+    if (stops != null && stops.isNotEmpty) {
+      final activeDeliveryIds = stops
+          .where((s) => !s.isDone)
+          .map((s) => s.deliveryId)
+          .toSet()
+          .toList();
+      _service.recordDriverLocation(
+        activeDeliveryIds: activeDeliveryIds,
+        latitude: lat,
+        longitude: lng,
+        speedKmh: speedKmh,
+        heading: heading,
+      );
     }
   }
 
@@ -114,6 +163,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
 
   Future<void> _navigateTo(DriverStop stop) async {
     if (!stop.hasCoordinates) return;
+    setState(() => _navigatingStop = stop);
     final uri = Uri.parse(
       'https://www.google.com/maps/dir/?api=1&destination=${stop.latitude},${stop.longitude}&travelmode=driving',
     );
@@ -149,7 +199,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
       if (stop.type == DriverStopType.pickup) {
         await _service.confirmPickup(stop.deliveryId);
       } else {
-        await _service.confirmDropoff(stop.deliveryId);
+        await _service.confirmDelivery(stop.deliveryId);
       }
       ref.invalidate(driverTodayStopsProvider(widget.profile.id));
       if (!mounted) return;
@@ -179,11 +229,19 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(driverTodayStopsProvider(widget.profile.id), (_, next) {
+      next.whenData((stops) {
+        if (_myPosition != null) {
+          _syncDriverPosition(_myPosition!.latitude, _myPosition!.longitude);
+        }
+      });
+    });
+
     final stopsAsync = ref.watch(driverTodayStopsProvider(widget.profile.id));
     final shiftStarted = ref.watch(driverShiftStartedProvider);
 
     return Scaffold(
-      appBar: AppHeader(profile: widget.profile),
+      appBar: _isFullscreen ? null : AppHeader(profile: widget.profile),
       body: SafeArea(
         child: stopsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -198,6 +256,33 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
           ),
           data: (rawStops) {
             final stops = _sortedByDistance(rawStops);
+
+            if (_isFullscreen) {
+              return PopScope(
+                canPop: false,
+                onPopInvokedWithResult: (didPop, _) {
+                  if (!didPop) {
+                    setState(() => _isFullscreen = false);
+                  }
+                },
+                child: SizedBox.expand(
+                  child: _StopsMap(
+                    stops: stops,
+                    myPosition: _myPosition,
+                    mapController: _mapController,
+                    navigatingStop: _navigatingStop,
+                    isFullscreen: true,
+                    onToggleFullscreen: () {
+                      setState(() => _isFullscreen = false);
+                    },
+                    onClearNavigation: () {
+                      setState(() => _navigatingStop = null);
+                    },
+                  ),
+                ),
+              );
+            }
+
             return RefreshIndicator(
               onRefresh: () async {
                 ref.invalidate(driverTodayStopsProvider(widget.profile.id));
@@ -216,6 +301,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                           shiftStarted: shiftStarted,
                           startingRoute: _startingRoute,
                           pendingDeliveryIds: _pendingDeliveryIds,
+                          navigatingStop: _navigatingStop,
+                          onToggleFullscreen: () {
+                            setState(() => _isFullscreen = true);
+                          },
+                          onClearNavigation: () {
+                            setState(() => _navigatingStop = null);
+                          },
                           onStartRoute: () => _handleStartRoute(stops),
                           onNavigate: _navigateTo,
                           onStopAction: _handleStopAction,
@@ -229,6 +321,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                           shiftStarted: shiftStarted,
                           startingRoute: _startingRoute,
                           pendingDeliveryIds: _pendingDeliveryIds,
+                          navigatingStop: _navigatingStop,
+                          onToggleFullscreen: () {
+                            setState(() => _isFullscreen = true);
+                          },
+                          onClearNavigation: () {
+                            setState(() => _navigatingStop = null);
+                          },
                           onStartRoute: () => _handleStartRoute(stops),
                           onNavigate: _navigateTo,
                           onStopAction: _handleStopAction,
@@ -266,6 +365,9 @@ class _NarrowLayout extends StatelessWidget {
   final bool shiftStarted;
   final bool startingRoute;
   final Set<String> pendingDeliveryIds;
+  final DriverStop? navigatingStop;
+  final VoidCallback onToggleFullscreen;
+  final VoidCallback onClearNavigation;
   final VoidCallback onStartRoute;
   final ValueChanged<DriverStop> onNavigate;
   final ValueChanged<DriverStop> onStopAction;
@@ -278,6 +380,9 @@ class _NarrowLayout extends StatelessWidget {
     required this.shiftStarted,
     required this.startingRoute,
     required this.pendingDeliveryIds,
+    required this.navigatingStop,
+    required this.onToggleFullscreen,
+    required this.onClearNavigation,
     required this.onStartRoute,
     required this.onNavigate,
     required this.onStopAction,
@@ -299,11 +404,15 @@ class _NarrowLayout extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: SizedBox(
-            height: 260,
+            height: 280,
             child: _StopsMap(
               stops: stops,
               myPosition: myPosition,
               mapController: mapController,
+              navigatingStop: navigatingStop,
+              isFullscreen: false,
+              onToggleFullscreen: onToggleFullscreen,
+              onClearNavigation: onClearNavigation,
             ),
           ),
         ),
@@ -337,6 +446,9 @@ class _WideLayout extends StatelessWidget {
   final bool shiftStarted;
   final bool startingRoute;
   final Set<String> pendingDeliveryIds;
+  final DriverStop? navigatingStop;
+  final VoidCallback onToggleFullscreen;
+  final VoidCallback onClearNavigation;
   final VoidCallback onStartRoute;
   final ValueChanged<DriverStop> onNavigate;
   final ValueChanged<DriverStop> onStopAction;
@@ -349,6 +461,9 @@ class _WideLayout extends StatelessWidget {
     required this.shiftStarted,
     required this.startingRoute,
     required this.pendingDeliveryIds,
+    required this.navigatingStop,
+    required this.onToggleFullscreen,
+    required this.onClearNavigation,
     required this.onStartRoute,
     required this.onNavigate,
     required this.onStopAction,
@@ -381,6 +496,10 @@ class _WideLayout extends StatelessWidget {
                       stops: stops,
                       myPosition: myPosition,
                       mapController: mapController,
+                      navigatingStop: navigatingStop,
+                      isFullscreen: false,
+                      onToggleFullscreen: onToggleFullscreen,
+                      onClearNavigation: onClearNavigation,
                     ),
                   ),
                 ),
@@ -579,104 +698,535 @@ class _RouteSummaryCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Map
+// Map — real road routing via OSRM with color-coded segments
 // ---------------------------------------------------------------------------
 
-class _StopsMap extends StatelessWidget {
+class _StopsMap extends StatefulWidget {
   final List<DriverStop> stops;
   final ll.LatLng? myPosition;
   final MapController mapController;
+  final DriverStop? navigatingStop;
+  final bool isFullscreen;
+  final VoidCallback onToggleFullscreen;
+  final VoidCallback onClearNavigation;
 
   const _StopsMap({
     required this.stops,
     required this.myPosition,
     required this.mapController,
+    this.navigatingStop,
+    this.isFullscreen = false,
+    required this.onToggleFullscreen,
+    required this.onClearNavigation,
   });
 
+  @override
+  State<_StopsMap> createState() => _StopsMapState();
+}
+
+class _StopsMapState extends State<_StopsMap>
+    with SingleTickerProviderStateMixin {
   static const _srilankaCenter = ll.LatLng(7.8731, 80.7718);
+
+  // Each segment: {points, color, isRoad}
+  final List<Map<String, dynamic>> _routeSegments = [];
+  List<ll.LatLng>? _navigatingRoutePoints;
+  bool _isFetchingRoutes = false;
+  bool _hasInitialFit = false;
+
+  // Pulsing animation for driver marker
+  late final AnimationController _pulseCtrl;
+  late final Animation<double> _pulseAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(
+      begin: 1.0,
+      end: 1.4,
+    ).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+    _fetchAllRoutes();
+  }
+
+  @override
+  void didUpdateWidget(_StopsMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Re-route when driver moves significantly (> 30 m), stops change, or active navigating stop changes
+    final posChanged =
+        widget.myPosition != oldWidget.myPosition &&
+        widget.myPosition != null &&
+        oldWidget.myPosition != null &&
+        _distKm(widget.myPosition!, oldWidget.myPosition!) > 0.03;
+    final stopsChanged = widget.stops.length != oldWidget.stops.length;
+    final navChanged =
+        widget.navigatingStop?.deliveryId !=
+            oldWidget.navigatingStop?.deliveryId ||
+        widget.navigatingStop?.type != oldWidget.navigatingStop?.type;
+    if ((posChanged || stopsChanged || navChanged) && !_isFetchingRoutes) {
+      _fetchAllRoutes();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  double _distKm(ll.LatLng a, ll.LatLng b) {
+    const ll.Distance d = ll.Distance();
+    return d.as(ll.LengthUnit.Kilometer, a, b);
+  }
+
+  /// Fetch a single road route segment from OSRM.
+  Future<List<ll.LatLng>?> _osrmRoute(ll.LatLng start, ll.LatLng end) async {
+    try {
+      final uri = Uri.parse(
+        'https://router.project-osrm.org/route/v1/driving/'
+        '${start.longitude},${start.latitude};'
+        '${end.longitude},${end.latitude}'
+        '?overview=full&geometries=geojson',
+      );
+      final res = await http
+          .get(uri, headers: {'User-Agent': 'GreenYieldApp/1.0 (lk)'})
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return null;
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      if ((data['code'] as String?) != 'Ok') return null;
+      final routes = data['routes'] as List?;
+      if (routes == null || routes.isEmpty) return null;
+      final first = routes.first as Map<String, dynamic>;
+      final coords =
+          ((first['geometry'] as Map<String, dynamic>?)?['coordinates']
+              as List?) ??
+          [];
+      final pts = <ll.LatLng>[];
+      for (final c in coords) {
+        if (c is List && c.length >= 2) {
+          pts.add(
+            ll.LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
+          );
+        }
+      }
+      return pts.length >= 2 ? pts : null;
+    } catch (e) {
+      developer.log('OSRM error: $e', name: 'GreenYield.DriverMap');
+      return null;
+    }
+  }
+
+  Future<void> _fetchAllRoutes() async {
+    if (_isFetchingRoutes) return;
+    _isFetchingRoutes = true;
+
+    // Check if we need to fetch the active navigation route in blue
+    List<ll.LatLng>? activeNavPoints;
+    if (widget.navigatingStop != null &&
+        widget.navigatingStop!.hasCoordinates &&
+        widget.myPosition != null) {
+      final navTarget = ll.LatLng(
+        widget.navigatingStop!.latitude!,
+        widget.navigatingStop!.longitude!,
+      );
+      final pts = await _osrmRoute(widget.myPosition!, navTarget);
+      activeNavPoints = pts ?? [widget.myPosition!, navTarget];
+    }
+
+    // Build ordered waypoints for overall route: driver → pending stops
+    final waypoints = <({ll.LatLng pos, Color color, String label})>[];
+    if (widget.myPosition != null) {
+      waypoints.add((
+        pos: widget.myPosition!,
+        color: Colors.transparent,
+        label: 'me',
+      ));
+    }
+    for (final stop in widget.stops.where(
+      (s) => !s.isDone && s.hasCoordinates,
+    )) {
+      waypoints.add((
+        pos: ll.LatLng(stop.latitude!, stop.longitude!),
+        color: stop.type == DriverStopType.pickup
+            ? const Color(0xFF2E7D32) // Green for pickup
+            : const Color(0xFFE65100), // Orange for dropoff
+        label: stop.type == DriverStopType.pickup ? 'pickup' : 'dropoff',
+      ));
+    }
+
+    final segments = <Map<String, dynamic>>[];
+    if (waypoints.length >= 2) {
+      for (int i = 0; i < waypoints.length - 1; i++) {
+        final from = waypoints[i].pos;
+        final toWp = waypoints[i + 1];
+        final roadPts = await _osrmRoute(from, toWp.pos);
+        segments.add({
+          'points': roadPts ?? [from, toWp.pos],
+          'color': toWp.color,
+          'isRoad': roadPts != null,
+        });
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _navigatingRoutePoints = activeNavPoints;
+        _routeSegments
+          ..clear()
+          ..addAll(segments);
+        _isFetchingRoutes = false;
+      });
+    } else {
+      _isFetchingRoutes = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final points = <ll.LatLng>[
-      if (myPosition != null) myPosition!,
-      for (final s in stops)
+
+    final allPoints = <ll.LatLng>[
+      if (widget.myPosition != null) widget.myPosition!,
+      for (final s in widget.stops)
         if (s.hasCoordinates) ll.LatLng(s.latitude!, s.longitude!),
     ];
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (points.length < 2) return;
-      try {
-        mapController.fitCamera(
-          CameraFit.bounds(
-            bounds: LatLngBounds.fromPoints(points),
-            padding: const EdgeInsets.all(48),
-          ),
-        );
-      } catch (_) {}
+      if (!_hasInitialFit && allPoints.length >= 2) {
+        try {
+          widget.mapController.fitCamera(
+            CameraFit.bounds(
+              bounds: LatLngBounds.fromPoints(allPoints),
+              padding: const EdgeInsets.all(52),
+            ),
+          );
+          _hasInitialFit = true;
+        } catch (_) {}
+      }
     });
 
-    return FlutterMap(
-      mapController: mapController,
-      options: MapOptions(
-        initialCenter: points.isNotEmpty ? points.first : _srilankaCenter,
-        initialZoom: points.isNotEmpty ? 12 : 7,
-      ),
+    return Stack(
       children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.greenyield.app',
-        ),
-        if (points.length > 1)
-          PolylineLayer(
-            polylines: [
-              Polyline(
-                points: points,
-                strokeWidth: 4,
-                color: theme.colorScheme.primary.withValues(alpha: 0.7),
-              ),
-            ],
+        FlutterMap(
+          mapController: widget.mapController,
+          options: MapOptions(
+            initialCenter: allPoints.isNotEmpty
+                ? allPoints.first
+                : _srilankaCenter,
+            initialZoom: allPoints.isNotEmpty ? 12 : 7,
           ),
-        MarkerLayer(
-          markers: [
-            if (myPosition != null)
-              Marker(
-                point: myPosition!,
-                width: 34,
-                height: 34,
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: theme.colorScheme.secondary,
-                    border: Border.all(color: Colors.white, width: 2),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.greenyield.app',
+            ),
+
+            // Base road route segments — green (pickups) & orange (dropoffs)
+            if (_routeSegments.isNotEmpty)
+              PolylineLayer(
+                polylines: [
+                  for (final seg in _routeSegments)
+                    Polyline(
+                      points: seg['points'] as List<ll.LatLng>,
+                      strokeWidth: 4.5,
+                      color: (seg['color'] as Color).withValues(
+                        alpha: widget.navigatingStop != null ? 0.35 : 0.85,
+                      ),
+                      pattern: (seg['isRoad'] as bool)
+                          ? const StrokePattern.solid()
+                          : StrokePattern.dashed(segments: const [10, 6]),
+                    ),
+                ],
+              )
+            else if (allPoints.length > 1)
+              PolylineLayer(
+                polylines: [
+                  Polyline(
+                    points: allPoints,
+                    strokeWidth: 3,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                    pattern: StrokePattern.dashed(segments: const [8, 6]),
                   ),
-                  child: const Icon(
-                    Icons.local_shipping,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                ),
+                ],
               ),
-            for (final stop in stops)
-              if (stop.hasCoordinates)
-                Marker(
-                  point: ll.LatLng(stop.latitude!, stop.longitude!),
-                  width: 40,
-                  height: 40,
-                  child: Icon(
-                    stop.type == DriverStopType.pickup
-                        ? Icons.storefront
-                        : Icons.location_on,
-                    size: 34,
-                    color: stop.isDone
-                        ? theme.colorScheme.outline
-                        : stop.type == DriverStopType.pickup
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.error,
+
+            // Active Navigation Route — vivid blue
+            if (_navigatingRoutePoints != null &&
+                _navigatingRoutePoints!.isNotEmpty)
+              PolylineLayer(
+                polylines: [
+                  // Outer halo for high contrast visibility
+                  Polyline(
+                    points: _navigatingRoutePoints!,
+                    strokeWidth: 9,
+                    color: const Color(0xFF0D47A1).withValues(alpha: 0.3),
                   ),
-                ),
+                  // Main blue road line
+                  Polyline(
+                    points: _navigatingRoutePoints!,
+                    strokeWidth: 5.5,
+                    color: const Color(0xFF1976D2),
+                  ),
+                ],
+              ),
+
+            MarkerLayer(
+              markers: [
+                // Driver marker — prominent real-time location with truck icon & pulsing badge
+                if (widget.myPosition != null)
+                  Marker(
+                    point: widget.myPosition!,
+                    width: 60,
+                    height: 60,
+                    child: AnimatedBuilder(
+                      animation: _pulseAnim,
+                      builder: (_, _) => Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Outer pulse ring
+                          Container(
+                            width: 52 * _pulseAnim.value,
+                            height: 52 * _pulseAnim.value,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFF1976D2)
+                                  .withValues(alpha: 0.28 / _pulseAnim.value),
+                            ),
+                          ),
+                          // Truck badge
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF1976D2), Color(0xFF0D47A1)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 2.5,
+                              ),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 8,
+                                  offset: Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.local_shipping,
+                              size: 20,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // Stop markers — always show original pickup/dropoff icon
+                for (final stop in widget.stops)
+                  if (stop.hasCoordinates)
+                    Marker(
+                      point: ll.LatLng(stop.latitude!, stop.longitude!),
+                      width: 50,
+                      height: 62,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: stop.isDone
+                                  ? theme.colorScheme.surfaceContainerHighest
+                                  : stop.type == DriverStopType.pickup
+                                  ? const Color(0xFF2E7D32)
+                                  : const Color(0xFFE65100),
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.28),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              stop.isDone
+                                  ? Icons.check
+                                  : stop.type == DriverStopType.pickup
+                                  ? Icons.storefront
+                                  : Icons.home_work,
+                              size: 18,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              stop.type == DriverStopType.pickup
+                                  ? 'Pickup'
+                                  : 'Drop',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+              ],
+            ),
           ],
         ),
+
+        // Fullscreen Toggle Button (<> icon overlay)
+        Positioned(
+          top: 12,
+          right: 12,
+          child: Material(
+            color: Colors.white.withValues(alpha: 0.95),
+            elevation: 4,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: widget.onToggleFullscreen,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Icon(
+                  widget.isFullscreen
+                      ? Icons.fullscreen_exit
+                      : Icons.fullscreen,
+                  size: 24,
+                  color: const Color(0xFF2E7D32),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // Center on driver button
+        if (widget.myPosition != null)
+          Positioned(
+            top: 60,
+            right: 12,
+            child: Material(
+              color: Colors.white.withValues(alpha: 0.95),
+              elevation: 4,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () {
+                  widget.mapController.move(widget.myPosition!, 15);
+                },
+                child: const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Icon(
+                    Icons.my_location,
+                    size: 22,
+                    color: Color(0xFF1976D2),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+        // Active Navigation Banner Overlay
+        if (widget.navigatingStop != null)
+          Positioned(
+            top: 12,
+            left: 12,
+            right: 70,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1976D2),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 6,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.navigation, color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Navigating to ${widget.navigatingStop!.counterpartName ?? widget.navigatingStop!.displayOrderId}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: widget.onClearNavigation,
+                    child: const Padding(
+                      padding: EdgeInsets.all(2),
+                      child: Icon(Icons.close, color: Colors.white, size: 18),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        // Routing in progress spinner overlay
+        if (_isFetchingRoutes)
+          Positioned(
+            bottom: 12,
+            right: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    'Routing...',
+                    style: TextStyle(color: Colors.white, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }

@@ -12,11 +12,13 @@ class DriverScheduleService {
             delivery_id,
             delivery:delivery_id (
               id,
+              order_id,
               status,
               assigned_at,
               farmer_display_name,
               buyer_display_name,
               order:order_id (
+                id,
                 total_amount,
                 order_date,
                 order_item (
@@ -51,6 +53,7 @@ class DriverScheduleService {
 
         final row = {
           'delivery_id': d['id'],
+          'order_id': d['order_id'] ?? o?['id'],
           'status': d['status'],
           'assigned_at': d['assigned_at'],
           'farmer_display_name': d['farmer_display_name'],
