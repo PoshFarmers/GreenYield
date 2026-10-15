@@ -18,25 +18,74 @@ import '../roles/role_nav_shell_registry.dart';
 ///                              -> that role's completeProfileBuilder
 ///                                 (from roleScreensRegistry)
 ///   everything exists         -> HomeScreen
-class AuthGate extends ConsumerWidget {
+///
+/// Every `when` uses `skipLoadingOnReload` so a provider rebuild (token
+/// refresh, app resume, invalidate) keeps the current screen up instead of
+/// replacing the whole nav shell with a spinner.
+class AuthGate extends ConsumerStatefulWidget {
   const AuthGate({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends ConsumerState<AuthGate> {
+  // Cache for the role-profile completeness check. The same Future is reused
+  // across rebuilds while it's pending or has resolved `true`. While the
+  // result is `false` it's re-run on each rebuild, because the onboarding
+  // screens call `ref.invalidate(ownProfileProvider)` precisely to get that
+  // re-check after they finish.
+  String? _completionKey;
+  bool? _completionResult;
+  Future<bool>? _completionFuture;
+  int _completionToken = 0;
+
+  Future<bool> _completionFor(
+    String profileId,
+    String role,
+    RoleScreens screens,
+  ) {
+    final key = '$profileId:$role';
+    if (_completionFuture == null ||
+        _completionKey != key ||
+        _completionResult == false) {
+      final token = ++_completionToken;
+      _completionKey = key;
+      _completionResult = null;
+      _completionFuture = screens.hasCompletedProfile(profileId).then((value) {
+        if (token == _completionToken) _completionResult = value;
+        return value;
+      });
+    }
+    return _completionFuture!;
+  }
+
+  void _resetCompletion() {
+    _completionToken++;
+    _completionKey = null;
+    _completionResult = null;
+    _completionFuture = null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authStateChangesProvider);
 
     return authState.when(
+      skipLoadingOnReload: true,
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(body: Center(child: Text('$error'))),
       data: (_) {
         final authService = ref.watch(authServiceProvider);
         if (!authService.isSignedIn) {
+          _resetCompletion();
           return const LoginScreen();
         }
 
         final profileAsync = ref.watch(ownProfileProvider);
         return profileAsync.when(
+          skipLoadingOnReload: true,
           loading: () =>
               const Scaffold(body: Center(child: CircularProgressIndicator())),
           error: (error, _) => Scaffold(body: Center(child: Text('$error'))),
@@ -49,6 +98,7 @@ class AuthGate extends ConsumerWidget {
 
             final rolesAsync = ref.watch(ownRolesProvider);
             return rolesAsync.when(
+              skipLoadingOnReload: true,
               loading: () => const Scaffold(
                 body: Center(child: CircularProgressIndicator()),
               ),
@@ -83,7 +133,7 @@ class AuthGate extends ConsumerWidget {
                 }
 
                 return FutureBuilder<bool>(
-                  future: roleScreens.hasCompletedProfile(profile.id),
+                  future: _completionFor(profile.id, activeRole, roleScreens),
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) {
                       return const Scaffold(

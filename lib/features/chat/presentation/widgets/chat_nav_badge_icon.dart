@@ -7,8 +7,8 @@ import '../../application/chat_providers.dart';
 /// Drop-in icon for the Chat tab's `NavTab.iconBuilder` on every role's
 /// bottom nav shell. Shows the same yellow notification-badge styling
 /// as `NotificationBadgeWidget`, but sourced from
-/// `unreadConversationCountProvider` — a live count of distinct
-/// *threads* with unread messages, not total unread messages.
+/// `unreadConversationCountProvider` — a count of distinct *threads* with
+/// unread messages (derived from the thread list), not total unread messages.
 class ChatNavBadgeIcon extends ConsumerWidget {
   final IconData icon;
   final String activeRole;
@@ -21,9 +21,7 @@ class ChatNavBadgeIcon extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final count =
-        ref.watch(unreadConversationCountProvider(activeRole)).asData?.value ??
-        0;
+    final count = ref.watch(unreadConversationCountProvider(activeRole));
 
     return Badge(
       isLabelVisible: count > 0,

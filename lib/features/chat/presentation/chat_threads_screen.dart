@@ -183,6 +183,8 @@ class _ChatThreadsScreenState extends ConsumerState<ChatThreadsScreen>
           Expanded(
             child: threadsAsync.when(
               skipLoadingOnReload: true,
+              // Keep the list on screen after a transient stream error.
+              skipError: true,
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(
                 child: Padding(
@@ -248,7 +250,20 @@ class _ChatThreadsScreenState extends ConsumerState<ChatThreadsScreen>
                 return ListView.separated(
                   itemCount: filtered.length,
                   separatorBuilder: (_, _) => const Divider(height: 1),
+                  // Keys let a tile (and its avatar state) follow its thread
+                  // when the list reorders, instead of being reused for a
+                  // different person.
+                  findChildIndexCallback: (key) {
+                    if (key is ValueKey<String>) {
+                      final i = filtered.indexWhere(
+                        (t) => t.conversationId == key.value,
+                      );
+                      return i < 0 ? null : i;
+                    }
+                    return null;
+                  },
                   itemBuilder: (context, index) => _ThreadTile(
+                    key: ValueKey(filtered[index].conversationId),
                     thread: filtered[index],
                     profile: widget.profile,
                   ),
@@ -262,11 +277,11 @@ class _ChatThreadsScreenState extends ConsumerState<ChatThreadsScreen>
   }
 }
 
-class _ThreadTile extends ConsumerWidget {
+class _ThreadTile extends StatelessWidget {
   final ChatThread thread;
   final Profile profile;
 
-  const _ThreadTile({required this.thread, required this.profile});
+  const _ThreadTile({super.key, required this.thread, required this.profile});
 
   String _roleLabel() => switch (thread.otherRole) {
     ChatRole.farmer => 'role_farmer'.tr(),
@@ -302,7 +317,7 @@ class _ThreadTile extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final snippet = thread.lastMessageText ?? 'chat_photo'.tr();
 
     return Material(
@@ -386,31 +401,19 @@ class _ThreadTile extends ConsumerWidget {
               ),
           ],
         ),
-        onTap: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ChatScreen(
-                conversationId: thread.conversationId,
-                otherName: thread.otherName,
-                otherAvatarUrl: thread.otherAvatarUrl,
-                currentUserId: profile.id,
-              ),
+        // No manual invalidate on return: the room's mark-read write fires
+        // the participant realtime event, which refreshes the list (and the
+        // nav badge, which is derived from it) once.
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              conversationId: thread.conversationId,
+              otherName: thread.otherName,
+              otherAvatarUrl: thread.otherAvatarUrl,
+              currentUserId: profile.id,
             ),
-          );
-
-          // The room may have marked the conversation as read while it was
-          // open. Refresh the list once when returning so the snippet,
-          // unread badge and ordering are immediately correct even if the
-          // Realtime participant UPDATE arrives a little later.
-          if (context.mounted && profile.activeRole != null) {
-            final activeRole = profile.activeRole!;
-            // Refresh both the thread list and the global nav badge immediately
-            // after the room marks messages as read. Do not wait for the
-            // participant Realtime UPDATE to arrive.
-            ref.invalidate(chatThreadsProvider(activeRole));
-            ref.invalidate(unreadConversationCountProvider(activeRole));
-          }
-        },
+          ),
+        ),
       ),
     );
   }
