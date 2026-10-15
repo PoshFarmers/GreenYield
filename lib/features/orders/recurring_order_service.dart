@@ -211,7 +211,17 @@ class RecurringOrderService {
       }
 
       if (_isTomorrow(finalOrder.nextRunAt, now)) {
-        await fulfillOrderNow(orderId);
+        // Best-effort: fire tomorrow's occurrence. If stock or funds are
+        // unavailable the schedule is still active and will be retried
+        // automatically. Never let this throw — the schedule was saved.
+        try {
+          await fulfillOrderNow(orderId);
+        } on StateError catch (_) {
+          // awaiting_funds / awaiting_inventory — the schedule is saved;
+          // the user will get a notification when it retries.
+        } catch (_) {
+          // Unexpected — still don't abort the save.
+        }
       }
     }
   }

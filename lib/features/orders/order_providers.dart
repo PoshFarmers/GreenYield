@@ -18,7 +18,6 @@ const _buyerActiveStatuses = [
   'placed',
   'confirmed',
   'assigned',
-  'packed',
   'picked_up',
   'in_transit',
 ];
