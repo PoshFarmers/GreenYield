@@ -37,7 +37,6 @@ class OrderSummaryCard extends StatelessWidget {
     final cropNameText = order.cropNames.isNotEmpty
         ? order.cropNames.join(', ')
         : 'Order Items';
-
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
@@ -50,15 +49,11 @@ class OrderSummaryCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-            width: 1,
-          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -91,6 +86,28 @@ class OrderSummaryCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (order.source == 'recurring')
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Recurring',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ),
+                  ),
                 OrderStatusChip(status: order.status),
               ],
             ),
@@ -99,13 +116,8 @@ class OrderSummaryCard extends StatelessWidget {
             // Inner card
             Container(
               decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
+                color: const Color(0xFFF5F7F6),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: theme.colorScheme.outlineVariant.withValues(
-                    alpha: 0.6,
-                  ),
-                ),
               ),
               padding: const EdgeInsets.all(12),
               child: Row(
@@ -150,13 +162,21 @@ class OrderSummaryCard extends StatelessWidget {
                         Text(
                           order.totalQuantity > 0
                               ? '${order.totalQuantity.toStringAsFixed(0)} kg'
-                              : 'LKR ${order.totalAmount.toStringAsFixed(2)}',
+                              : '0 kg',
                           style: GoogleFonts.inter(
                             fontSize: 13,
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'LKR ${order.totalAmount.toStringAsFixed(2)}',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: theme.colorScheme.primary,
                     ),
                   ),
                 ],

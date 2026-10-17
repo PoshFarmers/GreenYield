@@ -50,11 +50,39 @@ class DriverHomeService {
     );
   }
 
-  /// Driver confirms dropoff at the buyer: completes the delivery.
-  Future<void> confirmDropoff(String deliveryId) async {
+  /// Driver confirms delivery at the buyer: moves the delivery to `delivered`.
+  Future<void> confirmDelivery(String deliveryId) async {
     await supabase.rpc(
       'transition_delivery_status',
       params: {'p_delivery_id': deliveryId, 'p_new_status': 'delivered'},
     );
+  }
+
+  /// Records the driver's real-time GPS location in `delivery_tracking`
+  /// so buyers and farmers can see the driver's live truck location.
+  Future<void> recordDriverLocation({
+    required List<String> activeDeliveryIds,
+    required double latitude,
+    required double longitude,
+    double? speedKmh,
+    double? heading,
+  }) async {
+    if (activeDeliveryIds.isEmpty) return;
+    for (final deliveryId in activeDeliveryIds) {
+      try {
+        await supabase.from('delivery_tracking').insert({
+          'delivery_id': deliveryId,
+          'location_point': 'POINT($longitude $latitude)',
+          if (speedKmh != null) 'speed_kmh': speedKmh,
+          if (heading != null) 'heading': heading,
+          'recorded_at': DateTime.now().toUtc().toIso8601String(),
+        });
+      } catch (e) {
+        developer.log(
+          'Failed to record driver delivery ping: $e',
+          name: 'GreenYield.DriverHomeService',
+        );
+      }
+    }
   }
 }

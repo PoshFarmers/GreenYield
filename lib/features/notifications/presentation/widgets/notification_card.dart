@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../models/notification_item.dart';
+import '../../../orders/presentation/recurring/recurring_schedule_detail_screen.dart';
 
 /// One notification row: type icon, title, description, relative
 /// timestamp, and an unread indicator (accent bar + dot). Tap to expand
 /// and show the full message body. Wrap in a `Dismissible` where
 /// swipe-to-dismiss is needed (see NotificationScreen).
+///
+/// Colours come from the theme so the card works in dark mode.
 class NotificationCard extends StatefulWidget {
   final NotificationItem notification;
   final VoidCallback? onTap;
@@ -46,20 +49,20 @@ class _NotificationCardState extends State<NotificationCard>
     } else {
       _expandController.reverse();
     }
-    // Call the onTap callback if provided
     widget.onTap?.call();
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final unread = !widget.notification.isRead;
-    final (icon, iconColor) = _iconFor(widget.notification);
+    final (icon, iconColor) = _iconFor(widget.notification, cs);
     final hasBody =
         widget.notification.body != null &&
         widget.notification.body!.isNotEmpty;
 
     return Material(
-      color: AppColors.cream,
+      color: cs.surface,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -99,9 +102,9 @@ class _NotificationCardState extends State<NotificationCard>
                             widget.notification.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w700,
-                              color: AppColors.deepForestGreen,
+                              color: cs.onSurface,
                             ),
                           ),
                         ),
@@ -123,24 +126,58 @@ class _NotificationCardState extends State<NotificationCard>
                         overflow: _isExpanded
                             ? TextOverflow.visible
                             : TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: Colors.black87,
+                          color: cs.onSurface.withValues(alpha: 0.8),
                         ),
                       ),
                       if (_isExpanded) ...[
                         const SizedBox(height: 8),
                         Align(
                           alignment: Alignment.centerRight,
-                          child: Text(
-                            'Tap to collapse',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.freshLeafGreen.withValues(
-                                alpha: 0.7,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Tap to collapse',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.freshLeafGreen.withValues(
+                                    alpha: 0.7,
+                                  ),
+                                  fontStyle: FontStyle.italic,
+                                ),
                               ),
-                              fontStyle: FontStyle.italic,
-                            ),
+                              if (widget.notification.sourceTable ==
+                                      'recurring_schedule' &&
+                                  widget.notification.sourceId != null) ...[
+                                const SizedBox(width: 16),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            RecurringScheduleDetailScreen(
+                                              scheduleId:
+                                                  widget.notification.sourceId!,
+                                            ),
+                                      ),
+                                    );
+                                  },
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 4,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('View Schedule'),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ],
@@ -185,18 +222,18 @@ class _NotificationCardState extends State<NotificationCard>
     return AppColors.freshLeafGreen;
   }
 
-  (IconData, Color) _iconFor(NotificationItem n) {
+  (IconData, Color) _iconFor(NotificationItem n, ColorScheme cs) {
     switch (n.category) {
       case NotificationCategory.orders:
         return (Icons.receipt_long_outlined, AppColors.freshLeafGreen);
       case NotificationCategory.payments:
         return (Icons.payments_outlined, AppColors.warnAmber);
       case NotificationCategory.logistics:
-        return (Icons.local_shipping_outlined, AppColors.deepForestGreen);
+        return (Icons.local_shipping_outlined, cs.primary);
       case NotificationCategory.messages:
         return (Icons.chat_bubble_outline, AppColors.freshLeafGreen);
       case NotificationCategory.account:
-        return (Icons.person_outline, AppColors.deepForestGreen);
+        return (Icons.person_outline, cs.primary);
       case NotificationCategory.system:
         return (Icons.info_outline, AppColors.mutedGray);
     }

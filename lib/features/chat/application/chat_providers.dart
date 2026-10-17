@@ -13,14 +13,23 @@ final chatThreadsProvider = StreamProvider.family<List<ChatThread>, String>((
   return ref.watch(chatServiceProvider).watchChatThreads(activeRole);
 });
 
-/// Live count of unread conversation threads for the currently active role.
-final unreadConversationCountProvider = StreamProvider.family<int, String>((
+/// Number of threads with unread messages, derived from the thread list so
+/// there is a single source of truth (no second RPC / realtime stream).
+/// Being a plain [Provider], listeners only rebuild when the count changes.
+final unreadConversationCountProvider = Provider.family<int, String>((
   ref,
   activeRole,
 ) {
-  return ref
-      .watch(chatServiceProvider)
-      .getUnreadConversationCountStream(activeRole);
+  final threads = ref
+      .watch(chatThreadsProvider(activeRole))
+      .when(
+        skipLoadingOnReload: true,
+        skipError: true,
+        data: (t) => t,
+        loading: () => const <ChatThread>[],
+        error: (_, _) => const <ChatThread>[],
+      );
+  return threads.where((t) => t.hasUnread).length;
 });
 
 /// Live message stream for one conversation room.

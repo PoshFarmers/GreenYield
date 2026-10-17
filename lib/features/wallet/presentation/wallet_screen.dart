@@ -3,11 +3,23 @@ import 'package:flutter/material.dart';
 
 import '../../../core/widgets/app_secondary_header.dart';
 import '../../../models/wallet.dart';
+import '../../payments/presentation/payment_methods_screen.dart';
+import '../wallet_history.dart';
 import '../wallet_service.dart';
+import 'top_up_screen.dart';
+import 'wallet_transaction_detail_screen.dart';
+import 'withdraw_screen.dart';
+import 'withdrawal_history_screen.dart';
 
-/// Shared wallet screen for any role — shows the live balance, a
-/// "Top Up" action (self-service credit via the `topup_wallet` RPC),
-/// and a scrollable list of recent transactions.
+/// Shared wallet screen for any role: live balance, Top up / Withdraw / Cards,
+/// this-month summary and a filterable, date-grouped, infinitely scrolling
+/// transaction list (all from the local mirror, so it works offline).
+///
+/// NOTE: the body is a SingleChildScrollView (not a lazy ListView) on
+/// purpose. The balance/month StreamBuilders hold single-subscription
+/// PowerSync streams; a lazy list disposes and re-creates them while
+/// scrolling, which re-listens to a consumed stream and renders the red
+/// error boxes.
 class WalletScreen extends StatefulWidget {
   final String profileId;
 
@@ -18,85 +30,88 @@ class WalletScreen extends StatefulWidget {
 }
 
 class _WalletScreenState extends State<WalletScreen> {
+  static const _pageSize = 30;
+
   final _service = const WalletService();
-  bool _isToppingUp = false;
+  final _history = const WalletHistoryService();
+  final _scroll = ScrollController();
 
-  Future<void> _showTopUpSheet() async {
-    final controller = TextEditingController();
-    final formKey = GlobalKey<FormState>();
+  late final Stream<Wallet?> _balance;
+  late final Stream<WalletMonthSummary> _month;
+  late Stream<List<WalletTransaction>> _txns;
 
-    final amount = await showModalBottomSheet<double>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
-          ),
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'top_up_wallet'.tr(),
-                  style: Theme.of(sheetContext).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: controller,
-                  autofocus: true,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'amount_lkr'.tr(),
-                    hintText: 'enter_amount_hint'.tr(),
-                  ),
-                  validator: (value) {
-                    final parsed = double.tryParse(value?.trim() ?? '');
-                    if (parsed == null || parsed <= 0) {
-                      return 'error_enter_valid_amount'.tr();
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () {
-                    if (formKey.currentState!.validate()) {
-                      Navigator.of(sheetContext)
-                          .pop(double.parse(controller.text.trim()));
-                    }
-                  },
-                  child: Text('top_up'.tr()),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+  WalletFilter _filter = WalletFilter.all;
+  int _limit = _pageSize;
+  int _loaded = 0;
+  List<WalletTransaction>? _last;
+  bool _loadingMore = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _balance = _service.watchBalance(widget.profileId).asBroadcastStream();
+    _month = _history.watchMonthSummary(widget.profileId).asBroadcastStream();
+    _bind();
+    _scroll.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scroll.removeListener(_onScroll);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _bind() {
+    _txns = _history.watchTransactions(
+      widget.profileId,
+      filter: _filter,
+      limit: _limit,
     );
+  }
 
-    if (amount == null) return;
-
-    setState(() => _isToppingUp = true);
-    try {
-      await _service.topUp(amount);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('top_up_success'.tr())));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('${'top_up_failed'.tr()}\n$e')));
-    } finally {
-      if (mounted) setState(() => _isToppingUp = false);
+  void _onScroll() {
+    if (!_scroll.hasClients || _loadingMore) return;
+    final p = _scroll.position;
+    // `_loaded >= _limit` means the last page was full, so there may be more.
+    if (p.pixels >= p.maxScrollExtent - 300 && _loaded >= _limit) {
+      _loadingMore = true;
+      // Defer: scroll notifications can fire during layout.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _limit += _pageSize;
+          _bind();
+        });
+        _loadingMore = false;
+      });
     }
+  }
+
+  void _setFilter(WalletFilter f) {
+    if (f == _filter) return;
+    setState(() {
+      _filter = f;
+      _limit = _pageSize;
+      _loaded = 0;
+      _last = null;
+      _bind();
+    });
+  }
+
+  void _push(Widget screen) =>
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+
+  String _dayLabel(DateTime d) {
+    final now = DateTime.now();
+    final diff = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).difference(DateTime(d.year, d.month, d.day)).inDays;
+    if (diff == 0) return 'payments_wallet_today'.tr();
+    if (diff == 1) return 'payments_wallet_yesterday'.tr();
+    return DateFormat.yMMMd(context.locale.toString()).format(d);
   }
 
   @override
@@ -109,167 +124,326 @@ class _WalletScreenState extends State<WalletScreen> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
-            child: StreamBuilder<Wallet?>(
-              stream: _service.watchBalance(widget.profileId),
-              builder: (context, walletSnapshot) {
-                final wallet = walletSnapshot.data;
-                final balanceText = wallet == null
-                    ? 'LKR 0.00'
-                    : '${wallet.currency} ${wallet.balance.toStringAsFixed(2)}';
-
-                return ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer.withValues(
-                          alpha: 0.4,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'current_balance'.tr(),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
+            child: SingleChildScrollView(
+              controller: _scroll,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _balanceCard(theme),
+                  const SizedBox(height: 12),
+                  _monthSummary(theme),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => _push(const WithdrawalHistoryScreen()),
+                      icon: const Icon(Icons.history, size: 18),
+                      label: Text('payments_withdraw_history'.tr()),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'recent_transactions'.tr(),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final f in WalletFilter.values) ...[
+                          ChoiceChip(
+                            label: Text(f.labelKey.tr()),
+                            selected: _filter == f,
+                            onSelected: (_) => _setFilter(f),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            balanceText,
-                            style: theme.textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton.icon(
-                            onPressed: _isToppingUp ? null : _showTopUpSheet,
-                            icon: _isToppingUp
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.add),
-                            label: Text('top_up'.tr()),
-                          ),
+                          const SizedBox(width: 8),
                         ],
-                      ),
+                      ],
                     ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'recent_transactions'.tr(),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    StreamBuilder<List<WalletTransaction>>(
-                      stream: _service.watchTransactions(widget.profileId),
-                      builder: (context, txnSnapshot) {
-                        final transactions = txnSnapshot.data ?? [];
-                        if (transactions.isEmpty) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 24),
-                            child: Center(
-                              child: Text(
-                                'no_transactions_yet'.tr(),
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                          );
-                        }
-                        return Column(
-                          children: transactions
-                              .map((txn) => _TransactionTile(transaction: txn))
-                              .toList(),
-                        );
-                      },
-                    ),
-                  ],
-                );
-              },
+                  ),
+                  const SizedBox(height: 8),
+                  StreamBuilder<List<WalletTransaction>>(
+                    stream: _txns,
+                    builder: (context, snapshot) {
+                      final txns = snapshot.data ?? _last;
+                      if (snapshot.data != null) {
+                        _last = snapshot.data;
+                        _loaded = snapshot.data!.length;
+                      }
+                      return _list(theme, txns);
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+
+  Widget _balanceCard(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'current_balance'.tr(),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 6),
+          StreamBuilder<Wallet?>(
+            stream: _balance,
+            builder: (context, snapshot) => Text(
+              walletMoney(snapshot.data?.balance ?? 0),
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _push(const TopUpScreen()),
+                  icon: const Icon(Icons.add),
+                  label: Text('top_up'.tr()),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      _push(WithdrawScreen(profileId: widget.profileId)),
+                  icon: const Icon(Icons.arrow_upward),
+                  label: Text('payments_withdraw_button'.tr()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _push(const PaymentMethodsScreen()),
+              icon: const Icon(Icons.credit_card_outlined),
+              label: Text('payments_wallet_cards'.tr()),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _monthSummary(ThemeData theme) {
+    return StreamBuilder<WalletMonthSummary>(
+      stream: _month,
+      builder: (context, snapshot) {
+        final s = snapshot.data ?? const WalletMonthSummary();
+        Widget tile(String key, double v, IconData icon, Color color) =>
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(icon, size: 16, color: color),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            key.tr(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      walletMoney(v),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+        return Row(
+          children: [
+            tile(
+              'payments_wallet_month_in',
+              s.moneyIn,
+              Icons.south_west,
+              theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 12),
+            tile(
+              'payments_wallet_month_out',
+              s.moneyOut,
+              Icons.north_east,
+              theme.colorScheme.error,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _list(ThemeData theme, List<WalletTransaction>? txns) {
+    if (txns == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (txns.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        child: Column(
+          children: [
+            Icon(
+              Icons.receipt_long_outlined,
+              size: 48,
+              color: theme.colorScheme.outline,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              (_filter == WalletFilter.all
+                      ? 'no_transactions_yet'
+                      : 'payments_wallet_empty_filter')
+                  .tr(),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final children = <Widget>[];
+    DateTime? currentDay;
+    for (final t in txns) {
+      final local = t.createdAt.toLocal();
+      final day = DateTime(local.year, local.month, local.day);
+      if (currentDay != day) {
+        currentDay = day;
+        children.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 14, bottom: 4),
+            child: Text(
+              _dayLabel(day),
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        );
+      }
+      children.add(
+        _TxnTile(
+          transaction: t,
+          onTap: () => _push(WalletTransactionDetailScreen(transaction: t)),
+        ),
+      );
+    }
+    if (_loaded >= _limit) {
+      children.add(
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 16),
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+      );
+    }
+    return Column(children: children);
+  }
 }
 
-class _TransactionTile extends StatelessWidget {
+class _TxnTile extends StatelessWidget {
   final WalletTransaction transaction;
+  final VoidCallback onTap;
 
-  const _TransactionTile({required this.transaction});
-
-  String get _labelKey => switch (transaction.type) {
-    WalletTransactionType.topup => 'transaction_type_topup',
-    WalletTransactionType.payment => 'transaction_type_payment',
-    WalletTransactionType.payout => 'transaction_type_payout',
-    WalletTransactionType.refund => 'transaction_type_refund',
-    WalletTransactionType.withdrawal => 'transaction_type_withdrawal',
-    WalletTransactionType.adjustment => 'transaction_type_adjustment',
-  };
-
-  IconData get _icon => switch (transaction.type) {
-    WalletTransactionType.topup => Icons.add_circle_outline,
-    WalletTransactionType.payment => Icons.shopping_cart_outlined,
-    WalletTransactionType.payout => Icons.local_shipping_outlined,
-    WalletTransactionType.refund => Icons.undo_outlined,
-    WalletTransactionType.withdrawal => Icons.arrow_upward_outlined,
-    WalletTransactionType.adjustment => Icons.tune_outlined,
-  };
+  const _TxnTile({required this.transaction, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isCredit = transaction.amount >= 0;
-    final amountColor = isCredit
-        ? Colors.green.shade700
+    final t = transaction;
+    final isCredit = t.amount >= 0;
+    final color = isCredit
+        ? theme.colorScheme.primary
         : theme.colorScheme.error;
-    final amountText =
-        '${isCredit ? '+' : ''}${transaction.amount.toStringAsFixed(2)}';
+    final amount = NumberFormat('#,##0.00').format(t.amount.abs());
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: theme.colorScheme.surfaceContainerHighest,
-            child: Icon(_icon, size: 18, color: theme.colorScheme.primary),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_labelKey.tr(), style: theme.textTheme.bodyMedium),
-                Text(
-                  '${transaction.createdAt.year}-${transaction.createdAt.month.toString().padLeft(2, '0')}-${transaction.createdAt.day.toString().padLeft(2, '0')}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              child: Icon(
+                walletTxnIcon(t),
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    walletTxnTitle(t),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium,
                   ),
-                ),
-              ],
+                  Text(
+                    DateFormat.jm(context.locale.toString())
+                        .format(t.createdAt.toLocal()),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Text(
-            amountText,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: amountColor,
+            const SizedBox(width: 8),
+            Text(
+              '${isCredit ? '+' : '-'}$amount',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

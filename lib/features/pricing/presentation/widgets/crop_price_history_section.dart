@@ -1,17 +1,24 @@
 import 'package:easy_localization/easy_localization.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/media_image.dart';
 import '../../../../models/farmer_profile.dart';
-import '../../../../models/price_history.dart';
-import '../../market_price_service.dart';
+import '../../../../models/produce_listing.dart';
+import '../../../listings/produce_listing_service.dart';
+import 'price_history_chart.dart';
 
-/// Crop-picker + line chart of the last 30 days of `price_history`
-/// for the selected crop.
+/// Farmer home: crop chips (with images) + [PriceHistoryChart] for the
+/// selected crop, with the farmer's own active listing price and default price
+/// as dashed overlays.
 class CropPriceHistorySection extends StatefulWidget {
+  final String farmerProfileId;
   final List<FarmerCrop> crops;
 
-  const CropPriceHistorySection({super.key, required this.crops});
+  const CropPriceHistorySection({
+    super.key,
+    required this.farmerProfileId,
+    required this.crops,
+  });
 
   @override
   State<CropPriceHistorySection> createState() =>
@@ -19,53 +26,21 @@ class CropPriceHistorySection extends StatefulWidget {
 }
 
 class _CropPriceHistorySectionState extends State<CropPriceHistorySection> {
-  final _service = const MarketPriceService();
   String? _selectedCropId;
-  List<PriceHistory>? _history;
-  bool _isLoading = false;
+  PriceRange _range = PriceRange.d30;
 
   @override
   void initState() {
     super.initState();
-    if (widget.crops.isNotEmpty) {
-      _selectedCropId = widget.crops.first.cropId;
-      _load();
-    }
+    _selectedCropId = widget.crops.firstOrNull?.cropId;
   }
 
   @override
   void didUpdateWidget(covariant CropPriceHistorySection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.crops.isEmpty) {
-      if (_selectedCropId != null || _history != null) {
-        setState(() {
-          _selectedCropId = null;
-          _history = null;
-        });
-      }
-      return;
+    if (!widget.crops.any((c) => c.cropId == _selectedCropId)) {
+      _selectedCropId = widget.crops.firstOrNull?.cropId;
     }
-
-    final selectedCropStillExists = widget.crops.any(
-      (crop) => crop.cropId == _selectedCropId,
-    );
-    if (!selectedCropStillExists) {
-      _selectedCropId = widget.crops.first.cropId;
-      _load();
-    }
-  }
-
-  Future<void> _load() async {
-    final cropId = _selectedCropId;
-    if (cropId == null) return;
-    setState(() => _isLoading = true);
-    final history = await _service.getRecentHistory(cropId, limit: 30);
-    if (!mounted) return;
-    setState(() {
-      // API returns newest-first; the chart wants oldest-first.
-      _history = history.reversed.toList();
-      _isLoading = false;
-    });
   }
 
   @override
@@ -89,6 +64,11 @@ class _CropPriceHistorySectionState extends State<CropPriceHistorySection> {
       );
     }
 
+    final selected = widget.crops.firstWhere(
+      (c) => c.cropId == _selectedCropId,
+      orElse: () => widget.crops.first,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -99,79 +79,104 @@ class _CropPriceHistorySectionState extends State<CropPriceHistorySection> {
           ),
         ),
         const SizedBox(height: 8),
-        DropdownButton<String>(
-          value: _selectedCropId,
-          isExpanded: true,
-          items: widget.crops
-              .map(
-                (c) =>
-                    DropdownMenuItem(value: c.cropId, child: Text(c.cropName)),
-              )
-              .toList(),
-          onChanged: (value) {
-            setState(() => _selectedCropId = value);
-            _load();
-          },
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 180,
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : (_history == null || _history!.length < 2)
-              ? Center(
-                  child: Text(
-                    'no_price_history_yet'.tr(),
-                    style: theme.textTheme.bodySmall,
-                  ),
-                )
-              : LineChart(
-                  LineChartData(
-                    gridData: const FlGridData(show: false),
-                    titlesData: FlTitlesData(
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 44,
-                          getTitlesWidget: (value, meta) => Text(
-                            value.toStringAsFixed(0),
-                            style: theme.textTheme.labelSmall,
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final c in widget.crops)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    showCheckmark: false,
+                    avatar: ClipOval(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: MediaImage(
+                          path: c.displayImage.path,
+                          bucket: c.displayImage.bucket,
+                          public: c.displayImage.isFallback,
+                          placeholder: Icon(
+                            Icons.eco,
+                            size: 16,
+                            color: theme.colorScheme.primary,
                           ),
                         ),
-                      ),
-                      bottomTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
                       ),
                     ),
-                    borderData: FlBorderData(show: false),
-                    lineBarsData: [
-                      LineChartBarData(
-                        isCurved: true,
-                        color: theme.colorScheme.primary,
-                        barWidth: 3,
-                        dotData: const FlDotData(show: false),
-                        belowBarData: BarAreaData(
-                          show: true,
-                          color: theme.colorScheme.primary.withValues(
-                            alpha: 0.12,
-                          ),
-                        ),
-                        spots: [
-                          for (var i = 0; i < _history!.length; i++)
-                            FlSpot(i.toDouble(), _history![i].avgPricePerKg),
-                        ],
-                      ),
-                    ],
+                    label: Text(c.cropName),
+                    selected: c.cropId == selected.cropId,
+                    onSelected: (_) =>
+                        setState(() => _selectedCropId = c.cropId),
                   ),
                 ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _ChartWithOverlay(
+          key: ValueKey(selected.cropId),
+          farmerProfileId: widget.farmerProfileId,
+          crop: selected,
+          range: _range,
+          onRangeChanged: (r) => _range = r,
         ),
       ],
+    );
+  }
+}
+
+/// Owns the own-listings stream (created per State, so remounting never
+/// re-listens to a consumed PowerSync watch stream).
+class _ChartWithOverlay extends StatefulWidget {
+  final String farmerProfileId;
+  final FarmerCrop crop;
+  final PriceRange range;
+  final ValueChanged<PriceRange> onRangeChanged;
+
+  const _ChartWithOverlay({
+    super.key,
+    required this.farmerProfileId,
+    required this.crop,
+    required this.range,
+    required this.onRangeChanged,
+  });
+
+  @override
+  State<_ChartWithOverlay> createState() => _ChartWithOverlayState();
+}
+
+class _ChartWithOverlayState extends State<_ChartWithOverlay> {
+  late final Stream<List<ProduceListing>> _listings;
+
+  @override
+  void initState() {
+    super.initState();
+    _listings = ProduceListingService().watchOwnListings(
+      widget.farmerProfileId,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<ProduceListing>>(
+      stream: _listings,
+      builder: (context, snapshot) {
+        double? own;
+        for (final l in snapshot.data ?? const <ProduceListing>[]) {
+          if (l.cropId == widget.crop.cropId && l.status == 'active') {
+            own = l.pricePerKg;
+            break;
+          }
+        }
+        return PriceHistoryChart(
+          cropId: widget.crop.cropId,
+          ownPricePerKg: own,
+
+          initialRange: widget.range,
+          onRangeChanged: widget.onRangeChanged,
+        );
+      },
     );
   }
 }

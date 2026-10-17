@@ -37,7 +37,7 @@ class CheckoutSummary {
 }
 
 /// What [CheckoutService.placeOrder] hands back once every per-farmer
-/// `orders` row has been written locally — everything the confirmation
+/// `orders` row has been written — everything the confirmation
 /// screen needs to render, keyed by the shared `checkout_group_id`.
 class PlacedOrderGroup {
   final String checkoutGroupId;
@@ -50,6 +50,12 @@ class PlacedOrderGroup {
   /// Stored in `orders.order_date` on the server side.
   final DateTime orderDate;
 
+  /// How the buyer paid: 'wallet' | 'card'. For cards, the brand and last 4
+  /// digits (never the full number) so the confirmation can say "Paid with …".
+  final String paymentMethod;
+  final String? cardLast4;
+  final String? cardBrand;
+
   const PlacedOrderGroup({
     required this.checkoutGroupId,
     required this.orderIds,
@@ -57,6 +63,9 @@ class PlacedOrderGroup {
     required this.placedAt,
     required this.deliveryAddress,
     required this.orderDate,
+    this.paymentMethod = 'wallet',
+    this.cardLast4,
+    this.cardBrand,
   });
 
   /// Short, human-friendly id for display — the full

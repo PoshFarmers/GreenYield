@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart' as ll;
 
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/location/location_service.dart';
+import '../../../core/widgets/app_secondary_header.dart';
 import '../../../models/profile.dart';
 
 /// Step 3 of profile setup — shared by every role, but the copy shown
@@ -160,15 +161,7 @@ class _LocationSetupScreenState extends ConsumerState<LocationSetupScreen> {
     final colors = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _titleKey.tr(),
-          style: TextStyle(color: colors.primary, fontWeight: FontWeight.w600),
-        ),
-        actions: [
-          IconButton(icon: const Icon(Icons.help_outline), onPressed: () {}),
-        ],
-      ),
+      appBar: AppSecondaryHeader(title: _titleKey.tr(), showBackButton: false),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

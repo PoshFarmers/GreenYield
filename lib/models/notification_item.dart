@@ -11,12 +11,20 @@ enum NotificationCategory {
   system;
 
   static NotificationCategory fromType(String type) {
-    if (type.startsWith('order_')) return NotificationCategory.orders;
-    if (type.startsWith('payment_') || type.startsWith('refund_')) {
+    if (type.startsWith('order_') || type.startsWith('recurring_')) {
+      return NotificationCategory.orders;
+    }
+    if (type.startsWith('payment_') ||
+        type.startsWith('refund_') ||
+        type.startsWith('payout_')) {
       return NotificationCategory.payments;
     }
-    if (type.startsWith('delivery_')) return NotificationCategory.logistics;
-    if (type == 'new_message') return NotificationCategory.messages;
+    if (type.startsWith('delivery_')) {
+      return NotificationCategory.logistics;
+    }
+    if (type == 'new_message') {
+      return NotificationCategory.messages;
+    }
     if (type == 'role_added' || type.startsWith('profile_')) {
       return NotificationCategory.account;
     }

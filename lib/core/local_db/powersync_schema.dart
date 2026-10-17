@@ -15,7 +15,11 @@ const schema = Schema([
     Column.text('created_at'),
   ]),
   Table('profile_role', [Column.text('profile_id'), Column.text('role')]),
-  Table('farmer_profile', [Column.text('profile_id')]),
+  Table('farmer_profile', [
+    Column.text('profile_id'),
+    Column.real('avg_rating'),
+    Column.integer('review_count'),
+  ]),
   Table('farmer_crop', [
     Column.text('farmer_profile_id'),
     Column.text('crop_id'),
@@ -27,6 +31,8 @@ const schema = Schema([
     Column.text('name'),
     Column.text('category'),
     Column.text('fallback_image_url'),
+    Column.real('price_floor_per_kg'),
+    Column.real('price_ceiling_per_kg'),
   ]),
   Table('produce_listing', [
     Column.text('farmer_profile_id'),
@@ -128,6 +134,8 @@ const schema = Schema([
     Column.real('min_price_per_kg'),
     Column.real('max_price_per_kg'),
     Column.text('as_of_date'),
+    Column.integer('sample_size'),
+    Column.text('source'),
     Column.text('updated_at'),
   ]),
   Table('price_trend', [
@@ -144,6 +152,8 @@ const schema = Schema([
     Column.real('min_price_per_kg'),
     Column.real('max_price_per_kg'),
     Column.integer('order_count'),
+    Column.real('total_quantity_kg'),
+    Column.integer('is_synthetic'),
     Column.text('created_at'),
   ]),
   // --- Sprint 2 / Task 3.2 — Order Creation & Checkout Flow ---
@@ -163,11 +173,13 @@ const schema = Schema([
     Column.text('payment_id'),
     Column.real('subtotal_amount'),
     Column.real('delivery_fee_amount'),
+    Column.real('tax_amount'),
     Column.real('total_amount'),
     Column.text('delivery_address'),
     Column.text(
       'order_date',
     ), // buyer-selected delivery date (added in 20260914000000)
+    Column.text('source'), // 'manual' | 'recurring' (added in 20260927093817)
     Column.text('placed_at'),
     Column.text('created_at'),
     Column.text('updated_at'),
@@ -234,7 +246,23 @@ const schema = Schema([
     Column.real('balance_after'),
     Column.text('reference_table'),
     Column.text('reference_id'),
+    Column.text('description'),
+    Column.text('metadata'),
     Column.text('created_at'),
+  ]),
+  // --- Farmer rating & reviews (see .../20260916120000_farmer_review.sql) ---
+  // Writes go through the submit_farmer_review() RPC, not a local
+  // insert-then-upload — there is no client insert/update RLS policy on
+  // this table. It's still registered so PowerSync replicates the
+  // result back down for offline reads.
+  Table('farmer_review', [
+    Column.text('order_id'),
+    Column.text('buyer_profile_id'),
+    Column.text('farmer_profile_id'),
+    Column.integer('rating'),
+    Column.text('comment'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
   ]),
   // no client insert/update RLS policy exists for this table.
   Table('pricing_rule', [
@@ -246,6 +274,36 @@ const schema = Schema([
     Column.text('effective_from'),
     Column.text('effective_to'),
     Column.integer('is_active'),
+    Column.text('created_at'),
+  ]),
+  Table('recurring_schedule', [
+    Column.text('buyer_profile_id'),
+    Column.text('label'),
+    Column.text('status'),
+    Column.text('end_date'),
+    Column.text('created_at'),
+  ]),
+  Table('recurring_order', [
+    Column.text('schedule_id'),
+    Column.text('frequency'),
+    Column.integer('day_of_week'),
+    Column.text('next_run_at'),
+    Column.text('delivery_address'),
+    Column.text('delivery_location'),
+    Column.text('status'),
+    Column.text('last_processed_date'),
+    Column.text('processing_status'),
+    Column.text('last_attempt_at'),
+    Column.text('last_error'),
+    Column.text('last_low_balance_notice_date'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  Table('recurring_order_item', [
+    Column.text('recurring_order_id'),
+    Column.text('crop_id'),
+    Column.real('quantity_kg'),
+    Column.text('preferred_farmer_id'),
     Column.text('created_at'),
   ]),
 ]);

@@ -24,11 +24,13 @@ enum NotificationFilter {
   logistics,
   account;
 
-  String? get typePrefix => switch (this) {
-    NotificationFilter.orders => 'order_',
-    NotificationFilter.payments => 'payment_',
-    NotificationFilter.logistics => 'delivery_',
-    NotificationFilter.account => 'role_',
+  /// A chip can match several `type` prefixes (Payments covers payment_,
+  /// refund_ and payout_).
+  List<String>? get typePrefixes => switch (this) {
+    NotificationFilter.orders => const ['order_'],
+    NotificationFilter.payments => const ['payment_', 'refund_', 'payout_'],
+    NotificationFilter.logistics => const ['delivery_'],
+    NotificationFilter.account => const ['role_'],
     _ => null,
   };
 
@@ -98,7 +100,7 @@ class NotificationListController extends Notifier<NotificationListState> {
       final page = reset ? 0 : (state.items.length ~/ _pageSize);
       final results = await _service.fetchPage(
         isRead: currentFilter.isRead,
-        typePrefix: currentFilter.typePrefix,
+        typePrefixes: currentFilter.typePrefixes,
         page: page,
         limit: _pageSize,
       );

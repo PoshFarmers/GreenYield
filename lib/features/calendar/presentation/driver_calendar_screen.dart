@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../models/driver_task.dart';
 import '../../../models/profile.dart';
+import '../../orders/presentation/order_detail_screen.dart';
 import '../driver_schedule_service.dart';
 
 /// Short month-name translation keys, indexed 1..12 (index 0 unused),
@@ -540,12 +541,22 @@ class _TaskCard extends StatelessWidget {
                             ],
                           ),
                         ],
-                        if (!task.isDone) ...[
+                        if (!task.isDone && task.orderId != null) ...[
                           const SizedBox(height: 8),
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () {},
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => OrderDetailScreen(
+                                      orderId: task.orderId!,
+                                      viewerRole: 'driver',
+                                    ),
+                                  ),
+                                );
+                              },
                               style: TextButton.styleFrom(
                                 padding: EdgeInsets.zero,
                                 minimumSize: const Size(0, 0),

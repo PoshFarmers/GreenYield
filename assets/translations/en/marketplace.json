@@ -48,5 +48,14 @@
   "estimated_total": "Estimated total",
   "delivery_fee_unknown": "Calculated at checkout",
   "delivery_fee_unknown_hint": "We don't have enough location data yet to estimate delivery cost.",
-  "showing_saved_results_offline": "You're offline — showing your last saved results"
+  "showing_saved_results_offline": "You're offline — showing your last saved results",
+  "buyer_market_title": "Market prices",
+  "buyer_market_entry_subtitle": "See what crops are selling for today",
+  "buyer_market_below": "{percent}% below market",
+  "buyer_market_above": "{percent}% above market",
+  "buyer_market_at": "At market price",
+  "buyer_market_average": "Market average {amount}/kg",
+  "buyer_market_range": "Range {min} – {max}",
+  "buyer_market_empty": "No crops to show yet",
+  "buyer_market_no_data": "No market data yet"
 }

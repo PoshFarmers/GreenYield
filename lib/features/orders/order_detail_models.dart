@@ -2,6 +2,8 @@
 // ENUMs — mirrors Postgres order_status and delivery_status ENUMs exactly.
 // ---------------------------------------------------------------------------
 
+import 'cancellation_models.dart';
+
 enum OrderStatus {
   placed,
   confirmed,
@@ -76,7 +78,7 @@ enum OrderStatus {
       case OrderStatus.inTransit:
         return 'On The Way';
       case OrderStatus.delivered:
-        return 'Delivered';
+        return 'Completed';
       case OrderStatus.completed:
         return 'Completed';
       case OrderStatus.cancelled:
@@ -102,6 +104,14 @@ enum OrderStatus {
       this == OrderStatus.confirmed ||
       this == OrderStatus.assigned ||
       this == OrderStatus.packed;
+
+  /// Whether the buyer can rate/review the farmer for this order —
+  /// mirrors the `status in ('delivered', 'completed')` check in the
+  /// `submit_farmer_review` RPC. Doesn't account for a review already
+  /// existing (edit vs. first-time add) — check
+  /// `FarmerReviewService.watchReviewForOrder` for that.
+  bool get isReviewable =>
+      this == OrderStatus.delivered || this == OrderStatus.completed;
 }
 
 enum DeliveryStatus {
@@ -161,12 +171,15 @@ class OrderSummary {
   final double totalQuantity;
   final DateTime placedAt;
   final DateTime? orderDate;
+  final DateTime? deliveredAt;
 
   /// delivery_id — present once a delivery row exists server-side.
   final String? deliveryId;
 
   /// Optional thumbnail of the first item
   final String? firstImageUrl;
+
+  final String source;
 
   const OrderSummary({
     required this.id,
@@ -178,8 +191,10 @@ class OrderSummary {
     this.totalQuantity = 0.0,
     required this.placedAt,
     this.orderDate,
+    this.deliveredAt,
     this.deliveryId,
     this.firstImageUrl,
+    this.source = 'manual',
   });
 
   /// Short human-readable order id: GY-XXXXXX
@@ -199,8 +214,12 @@ class OrderSummary {
       orderDate: row['order_date'] != null
           ? DateTime.tryParse(row['order_date'] as String)
           : null,
+      deliveredAt: row['delivered_at'] != null
+          ? DateTime.tryParse(row['delivered_at'] as String)
+          : null,
       deliveryId: row['delivery_id'] as String?,
       firstImageUrl: row['first_image_url'] as String?,
+      source: row['source'] as String? ?? 'manual',
     );
   }
 
@@ -214,6 +233,7 @@ class OrderSummary {
     double? totalQuantity,
     DateTime? placedAt,
     DateTime? orderDate,
+    DateTime? deliveredAt,
     String? deliveryId,
     String? firstImageUrl,
   }) {
@@ -227,6 +247,7 @@ class OrderSummary {
       totalQuantity: totalQuantity ?? this.totalQuantity,
       placedAt: placedAt ?? this.placedAt,
       orderDate: orderDate ?? this.orderDate,
+      deliveredAt: deliveredAt ?? this.deliveredAt,
       deliveryId: deliveryId ?? this.deliveryId,
       firstImageUrl: firstImageUrl ?? this.firstImageUrl,
     );
@@ -293,6 +314,7 @@ class DeliverySummary {
             : null,
         deliveryId: row['delivery_id'] as String?,
         firstImageUrl: row['first_image_url'] as String?,
+        source: row['source'] as String? ?? 'manual',
       ),
     );
   }
@@ -345,6 +367,22 @@ class OrderDetail {
   final double subtotalAmount;
   final double deliveryFeeAmount;
   final double totalAmount;
+  final double taxAmount;
+
+  // Payment info (buyer view only)
+  final String? paymentMethod; // 'wallet' | 'card'
+  final String? paymentCardLast4;
+  final String? paymentCardBrand;
+
+  // Settlement (null until the order is settled at `delivered`).
+  // commission/net: farmer view only. driverPayout: driver view only.
+  final double? commissionAmount;
+  final double? netPayout;
+  final double? driverPayout;
+
+  // Cancellation (Task 5). `refund` is buyer-only; null when nothing was refunded.
+  final RefundInfo? refund;
+  final String? cancellationNote;
 
   // Items
   final List<OrderItemDetail> items;
@@ -384,6 +422,15 @@ class OrderDetail {
     required this.deliveryFeeAmount,
     required this.totalAmount,
     required this.items,
+    this.taxAmount = 0,
+    this.paymentMethod,
+    this.paymentCardLast4,
+    this.paymentCardBrand,
+    this.commissionAmount,
+    this.netPayout,
+    this.driverPayout,
+    this.refund,
+    this.cancellationNote,
     required this.buyerProfileId,
     required this.buyerName,
     this.buyerPhone,

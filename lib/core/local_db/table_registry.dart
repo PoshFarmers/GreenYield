@@ -50,12 +50,21 @@ final Map<String, TableConfig> tableRegistry = {
   'order_item': const TableConfig(tableName: 'order_item'),
   'payment': const TableConfig(tableName: 'payment'),
 
+  // --- Farmer rating & reviews ---
+  'farmer_review': const TableConfig(tableName: 'farmer_review'),
+
   // --- Driver dispatch: nearest-driver auto-assignment at checkout ---
   'delivery': const TableConfig(tableName: 'delivery'),
   'delivery_assignment': const TableConfig(tableName: 'delivery_assignment'),
 
   // --- add new tables here as wallet lands ---
   // 'listing': TableConfig(tableName: 'listing', remotePkColumn: 'id'),
+  'recurring_schedule': const TableConfig(tableName: 'recurring_schedule'),
+  'recurring_order': const TableConfig(
+    tableName: 'recurring_order',
+    jsonbColumns: {'delivery_address'},
+  ),
+  'recurring_order_item': const TableConfig(tableName: 'recurring_order_item'),
 };
 
 TableConfig configFor(String table) {

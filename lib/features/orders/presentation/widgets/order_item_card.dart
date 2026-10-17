@@ -29,71 +29,78 @@ class OrderItemCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Thumbnail
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: SizedBox(
-              width: 56,
-              height: 56,
-              child: item.imageUrl != null
-                  ? MediaImage(
-                      path: item.imageUrl,
-                      bucket: _imageBucket,
-                      public: _isPublicImage,
-                      placeholder: _placeholder(theme),
-                    )
-                  : _placeholder(theme),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F7F6),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Thumbnail
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 56,
+                height: 56,
+                child: item.imageUrl != null
+                    ? MediaImage(
+                        path: item.imageUrl,
+                        bucket: _imageBucket,
+                        public: _isPublicImage,
+                        placeholder: _placeholder(theme),
+                      )
+                    : _placeholder(theme),
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
+            const SizedBox(width: 12),
 
-          // Name + quantity + price
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            // Name + quantity + price
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.cropName,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${item.quantityKg.toStringAsFixed(0)} kg  '
+                    '·  LKR ${item.pricePerKg.toStringAsFixed(2)}/kg',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // Line total
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  item.cropName,
+                  'LKR ${item.lineTotal.toStringAsFixed(2)}',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 2),
                 Text(
-                  '${item.quantityKg.toStringAsFixed(0)} kg  '
-                  '·  LKR ${item.pricePerKg.toStringAsFixed(2)}/kg',
+                  'x${item.quantityKg.toStringAsFixed(0)}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(width: 8),
-
-          // Line total
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                'LKR ${item.lineTotal.toStringAsFixed(2)}',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                'x${item.quantityKg.toStringAsFixed(0)}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

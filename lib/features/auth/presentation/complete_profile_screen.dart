@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/storage/avatar_service.dart';
+import '../../../core/widgets/app_secondary_header.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../models/profile.dart';
 
@@ -152,7 +153,10 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text('complete_profile'.tr())),
+      appBar: AppSecondaryHeader(
+        title: 'complete_profile'.tr(),
+        showBackButton: false,
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'live_tracking_models.dart';
 import 'order_detail_models.dart';
 import 'order_service.dart';
 
@@ -17,7 +18,6 @@ const _buyerActiveStatuses = [
   'placed',
   'confirmed',
   'assigned',
-  'packed',
   'picked_up',
   'in_transit',
 ];
@@ -128,4 +128,10 @@ final driverCompletedDeliveriesProvider = StreamProvider.autoDispose
 final orderDetailProvider = StreamProvider.autoDispose
     .family<OrderDetail?, String>((ref, orderId) {
       return _orderService.watchOrderDetail(orderId);
+    });
+
+/// Live tracking detail provider — used by LiveTrackingScreen.
+final liveOrderTrackingProvider = StreamProvider.autoDispose
+    .family<LiveOrderTracking?, String>((ref, orderId) {
+      return _orderService.watchLiveOrderTracking(orderId);
     });

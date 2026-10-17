@@ -1,21 +1,22 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../wallet/presentation/widgets/wallet_summary_card.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/auth/auth_providers.dart';
+import '../../../../core/auth/sign_out.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/widgets/avatar_image.dart';
 import '../../../../features/navigation/presentation/app_nav_shell.dart';
 import '../../../../models/driver_profile.dart';
 import '../../../../models/profile.dart';
-import '../../../../models/wallet.dart';
-import '../../../wallet/wallet_service.dart';
 import '../driver_profile_service.dart';
 import 'driver_manage_routes_screen.dart';
 import 'driver_profile_edit_screen.dart';
 import 'widgets/route_draft_editor.dart'; // weekdayKeys, RouteDayPill
-import '../../../wallet/presentation/wallet_screen.dart';
 
 /// Driver's profile screen — mirrors the Figma "Profile" design.
 ///
@@ -217,7 +218,7 @@ class _ProfileBody extends ConsumerWidget {
               const SizedBox(height: 20),
               const _StatsCard(),
               const SizedBox(height: 16),
-              _WalletCard(profileId: driverProfile.profileId),
+              WalletSummaryCard(profileId: driverProfile.profileId),
               const SizedBox(height: 24),
               _VehiclesSection(vehicle: vehicle, onEdit: onEditVehicle),
               const SizedBox(height: 24),
@@ -271,9 +272,9 @@ class _ProfileBody extends ConsumerWidget {
             child: Text('cancel'.tr()),
           ),
           TextButton(
-            onPressed: () async {
+            onPressed: () {
               Navigator.of(dialogContext).pop();
-              await ref.read(authServiceProvider).signOut();
+              signOutAndReset(context, ref);
             },
             child: Text('logout'.tr()),
           ),
@@ -329,7 +330,7 @@ class _AvatarHeader extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             AvatarImage(path: profile.avatarUrl, radius: 52),
-            Positioned(right: -2, bottom: -2, child: _EditBadge(onTap: () {})),
+            const SizedBox.shrink(),
           ],
         ),
         const SizedBox(height: 14),
@@ -497,73 +498,6 @@ class _StatItem extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-// --- Wallet card --------------------------------------------------------
-
-class _WalletCard extends StatelessWidget {
-  final String profileId;
-
-  const _WalletCard({required this.profileId});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return _CardShell(
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.account_balance_wallet_outlined,
-              color: theme.colorScheme.primary,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'wallet_balance'.tr(),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                ),
-                StreamBuilder<Wallet?>(
-                  stream: const WalletService().watchBalance(profileId),
-                  builder: (context, snapshot) {
-                    final wallet = snapshot.data;
-                    final text = wallet == null
-                        ? '${'LKR'} 0.00'
-                        : '${wallet.currency} ${wallet.balance.toStringAsFixed(2)}';
-                    return Text(
-                      text,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => WalletScreen(profileId: profileId),
-              ),
-            ),
-            child: Text('view'.tr()),
-          ),
-        ],
-      ),
     );
   }
 }

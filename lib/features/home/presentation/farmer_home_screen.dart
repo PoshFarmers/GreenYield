@@ -117,7 +117,10 @@ class FarmerHomeScreen extends ConsumerWidget {
                       stream: farmerService.watchOwnProfile(profile.id),
                       builder: (context, farmerSnapshot) {
                         final crops = farmerSnapshot.data?.crops ?? [];
-                        return CropPriceHistorySection(crops: crops);
+                        return CropPriceHistorySection(
+                          farmerProfileId: profile.id,
+                          crops: crops,
+                        );
                       },
                     ),
                     // const SizedBox(height: 28),

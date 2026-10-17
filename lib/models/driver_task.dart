@@ -35,8 +35,11 @@ class DriverTask {
   final bool isDone;
   final List<String> thumbnailEmojis;
 
+  final String? orderId;
+
   const DriverTask({
     required this.id,
+    this.orderId,
     required this.type,
     required this.titleKey,
     this.titleArgs = const {},
@@ -67,6 +70,7 @@ class DriverTask {
 
     return DriverTask(
       id: row['delivery_id'] as String,
+      orderId: row['order_id'] as String?,
       type: isPickupPhase ? DriverTaskType.pickup : DriverTaskType.delivery,
       titleKey: isPickupPhase ? 'pickup_at' : 'delivery_to',
       titleArgs: {

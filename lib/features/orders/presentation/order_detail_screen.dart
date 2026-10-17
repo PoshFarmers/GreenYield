@@ -1,11 +1,23 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
+import '../../../core/supabase/client.dart';
 import '../../../core/widgets/app_secondary_header.dart';
+import '../../../models/farmer_review.dart';
+import '../../chat/chat_service.dart';
+import '../../chat/presentation/chat_screen.dart';
+import '../../navigation/presentation/app_nav_shell.dart';
+import '../../reviews/farmer_review_service.dart';
+import '../../reviews/presentation/widgets/review_dialog.dart';
+import '../../reviews/presentation/widgets/star_rating.dart';
 import '../order_providers.dart';
 import '../order_service.dart';
+import '../../payments/models/linked_card.dart';
+import '../cancellation_models.dart';
 import '../order_detail_models.dart';
+import 'live_tracking_screen.dart';
+import 'widgets/cancel_order_dialog.dart';
 import 'widgets/info_card.dart';
 import 'widgets/order_item_card.dart';
 import 'widgets/order_status_chip.dart';
@@ -27,7 +39,117 @@ class OrderDetailScreen extends ConsumerStatefulWidget {
 
 class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
   final _service = const OrderService();
+  final _reviewService = const FarmerReviewService();
   bool _isLoadingAction = false;
+  bool _reviewPromptChecked = false;
+
+  /// Auto-shows the "rate your experience" popup once per screen visit,
+  /// the first time a buyer opens a delivered order that hasn't been
+  /// reviewed yet. Skippable — the same review entry point stays
+  /// available inline (see [_buildReviewSection]) if they dismiss it.
+  Future<void> _maybeShowReviewPrompt(OrderDetail detail) async {
+    if (_reviewPromptChecked ||
+        widget.viewerRole != 'buyer' ||
+        !detail.status.isReviewable) {
+      return;
+    }
+    _reviewPromptChecked = true;
+
+    final existing = await _reviewService.getReviewForOrder(detail.id);
+    if (!mounted || existing != null) return;
+
+    final result = await ReviewDialog.show(
+      context,
+      orderId: detail.id,
+      farmerName: detail.farmerName,
+    );
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Thanks for your review!')));
+    }
+  }
+
+  Future<void> _openChat({
+    required String targetUserId,
+    required String targetRole,
+    required String targetName,
+  }) async {
+    if (targetUserId.isEmpty) return;
+    final callerRole = widget.viewerRole;
+    final currentUserId = supabase.auth.currentUser?.id;
+    if (currentUserId == null) return;
+
+    try {
+      const chatService = ChatService();
+      final conversationId = await chatService.getOrCreateConversation(
+        callerRole: callerRole,
+        otherUserId: targetUserId,
+        otherRole: targetRole,
+      );
+      if (!mounted) return;
+
+      final navigator = Navigator.of(context);
+      navigator.popUntil((route) => route.isFirst);
+      ref.read(navShellIndexProvider.notifier).select(3);
+
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            conversationId: conversationId,
+            otherName: targetName,
+            otherAvatarUrl: null,
+            currentUserId: currentUserId,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to open chat: $e')));
+      }
+    }
+  }
+
+  /// Buyer cancel flow: refund preview -> dialog (optional reason) -> cancel.
+  Future<void> _confirmCancel(OrderDetail detail) async {
+    setState(() => _isLoadingAction = true);
+    CancellationPreview? preview;
+    try {
+      preview = await _service.getCancellationPreview(detail.id);
+    } catch (_) {
+      // The preview is informational; the dialog works without it.
+    }
+    if (!mounted) return;
+    setState(() => _isLoadingAction = false);
+
+    final reason = await showCancelOrderDialog(
+      context,
+      orderDisplayId: detail.displayId,
+      preview: preview,
+    );
+    if (reason == null || !mounted) return;
+
+    setState(() => _isLoadingAction = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _service.cancelOrder(
+        detail.id,
+        note: reason.isEmpty ? null : reason,
+      );
+      ref.invalidate(orderDetailProvider(widget.orderId));
+      final refund = preview == null
+          ? ''
+          : ' ${cancellationRefundText(preview)}';
+      messenger.showSnackBar(
+        SnackBar(content: Text('${'payments_cancel_done'.tr()}$refund')),
+      );
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Action failed: $e')));
+    } finally {
+      if (mounted) setState(() => _isLoadingAction = false);
+    }
+  }
 
   Future<void> _handleAction(Future<void> Function() action) async {
     setState(() => _isLoadingAction = true);
@@ -47,6 +169,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     final asyncDetail = ref.watch(orderDetailProvider(widget.orderId));
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: const AppSecondaryHeader(
         title: 'Order Details',
         showBackButton: true,
@@ -58,6 +181,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           if (detail == null) {
             return const Center(child: Text('Order not found.'));
           }
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _maybeShowReviewPrompt(detail),
+          );
           return _buildContent(context, detail);
         },
       ),
@@ -117,7 +243,13 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: theme.colorScheme.outlineVariant),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
               child: Column(
                 children: detail.items
@@ -131,6 +263,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             _buildSectionHeader('Order Summary'),
             const SizedBox(height: 12),
             _buildSummaryCard(context, detail),
+            _buildPaymentInfo(context, detail),
           ],
         ),
 
@@ -160,7 +293,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           title: detail.farmerName,
           phone: detail.farmerPhone,
           address: detail.farmerAddress,
-          extraAction: ChatActionButton(id: 'chat_farmer', onTap: () {}),
+          extraAction: ChatActionButton(
+            id: 'chat_farmer',
+            onTap: () => _openChat(
+              targetUserId: detail.farmerProfileId,
+              targetRole: 'farmer',
+              targetName: detail.farmerName,
+            ),
+          ),
         ),
         if (detail.driverProfileId != null) ...[
           const SizedBox(height: 20),
@@ -171,7 +311,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             phone: detail.driverPhone,
             subtitle:
                 '${detail.vehicleType ?? 'Vehicle'} • ${detail.vehiclePlate ?? ''}',
-            extraAction: ChatActionButton(id: 'chat_driver', onTap: () {}),
+            extraAction: ChatActionButton(
+              id: 'chat_driver',
+              onTap: () => _openChat(
+                targetUserId: detail.driverProfileId!,
+                targetRole: 'driver',
+                targetName: detail.driverName ?? 'Driver',
+              ),
+            ),
           ),
         ] else if (detail.status == OrderStatus.placed ||
             detail.status == OrderStatus.confirmed) ...[
@@ -183,7 +330,100 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             subtitle: 'We are locating the nearest driver for your order.',
           ),
         ],
+        if (widget.viewerRole == 'buyer' && detail.status.isReviewable) ...[
+          const SizedBox(height: 20),
+          _buildReviewSection(detail),
+        ],
       ],
+    );
+  }
+
+  Widget _buildReviewSection(OrderDetail detail) {
+    return StreamBuilder<FarmerReview?>(
+      stream: _reviewService.watchReviewForOrder(detail.id),
+      builder: (context, snapshot) {
+        final theme = Theme.of(context);
+        final existing = snapshot.data;
+        final isEditing = existing != null;
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isEditing ? 'Your review' : 'Rate your experience',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (isEditing) ...[
+                StarRatingDisplay(rating: existing.rating.toDouble(), size: 18),
+                if (existing.comment != null &&
+                    existing.comment!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(existing.comment!, style: theme.textTheme.bodyMedium),
+                ],
+                const SizedBox(height: 12),
+              ] else ...[
+                Text(
+                  'How was your experience with ${detail.farmerName}?',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    final result = await ReviewDialog.show(
+                      context,
+                      orderId: detail.id,
+                      farmerName: detail.farmerName,
+                      existingReview: existing,
+                    );
+                    if (result == true && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Thanks for your review!'),
+                        ),
+                      );
+                    }
+                  },
+                  icon: Icon(
+                    isEditing ? Icons.edit_outlined : Icons.star_outline,
+                  ),
+                  label: Text(isEditing ? 'Edit your review' : 'Rate & review'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary.withValues(
+                      alpha: 0.12,
+                    ),
+                    foregroundColor: theme.colorScheme.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -196,7 +436,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           leadingIcon: Icons.person_outlined,
           title: detail.buyerName,
           phone: detail.buyerPhone,
-          extraAction: ChatActionButton(id: 'chat_buyer', onTap: () {}),
+          extraAction: ChatActionButton(
+            id: 'chat_buyer',
+            onTap: () => _openChat(
+              targetUserId: detail.buyerProfileId,
+              targetRole: 'buyer',
+              targetName: detail.buyerName,
+            ),
+          ),
         ),
         if (detail.driverProfileId != null) ...[
           const SizedBox(height: 20),
@@ -207,7 +454,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             phone: detail.driverPhone,
             subtitle:
                 '${detail.vehicleType ?? 'Vehicle'} • ${detail.vehiclePlate ?? ''}',
-            extraAction: ChatActionButton(id: 'chat_driver', onTap: () {}),
+            extraAction: ChatActionButton(
+              id: 'chat_driver',
+              onTap: () => _openChat(
+                targetUserId: detail.driverProfileId!,
+                targetRole: 'driver',
+                targetName: detail.driverName ?? 'Driver',
+              ),
+            ),
           ),
         ],
       ],
@@ -224,7 +478,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           title: detail.farmerName,
           phone: detail.farmerPhone,
           address: detail.farmerAddress,
-          extraAction: ChatActionButton(id: 'chat_farmer', onTap: () {}),
+          extraAction: ChatActionButton(
+            id: 'chat_farmer',
+            onTap: () => _openChat(
+              targetUserId: detail.farmerProfileId,
+              targetRole: 'farmer',
+              targetName: detail.farmerName,
+            ),
+          ),
         ),
         const SizedBox(height: 20),
         InfoCard(
@@ -233,7 +494,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           title: detail.buyerName,
           phone: detail.buyerPhone,
           address: detail.buyerAddress,
-          extraAction: ChatActionButton(id: 'chat_buyer', onTap: () {}),
+          extraAction: ChatActionButton(
+            id: 'chat_buyer',
+            onTap: () => _openChat(
+              targetUserId: detail.buyerProfileId,
+              targetRole: 'buyer',
+              targetName: detail.buyerName,
+            ),
+          ),
         ),
       ],
     );
@@ -244,6 +512,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
   // ---------------------------------------------------------------------------
 
   bool _hasActions(OrderDetail detail) {
+    final isTrackable =
+        detail.status != OrderStatus.delivered &&
+        detail.status != OrderStatus.completed &&
+        detail.status != OrderStatus.cancelled;
+    if (isTrackable &&
+        (widget.viewerRole == 'buyer' || widget.viewerRole == 'farmer')) {
+      return true;
+    }
     if (widget.viewerRole == 'farmer' &&
         (detail.status == OrderStatus.assigned ||
             detail.status == OrderStatus.confirmed)) {
@@ -268,6 +544,30 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     Widget primaryButton = const SizedBox();
     Widget? secondaryButton;
 
+    final isTrackable =
+        detail.status != OrderStatus.delivered &&
+        detail.status != OrderStatus.completed &&
+        detail.status != OrderStatus.cancelled;
+
+    if (isTrackable &&
+        (widget.viewerRole == 'buyer' || widget.viewerRole == 'farmer')) {
+      primaryButton = FilledButton.icon(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => LiveTrackingScreen(
+                orderId: detail.id,
+                viewerRole: widget.viewerRole,
+              ),
+            ),
+          );
+        },
+        icon: const Icon(Icons.location_on_outlined),
+        label: const Text('Track Live Order'),
+        style: _primaryActionStyle(theme),
+      );
+    }
+
     if (widget.viewerRole == 'farmer' &&
         (detail.status == OrderStatus.assigned ||
             detail.status == OrderStatus.confirmed)) {
@@ -277,6 +577,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             : () => _handleAction(() => _service.markOrderPacked(detail.id)),
         icon: const Icon(Icons.inventory_2),
         label: const Text('Mark as Packed'),
+        style: _primaryActionStyle(theme),
       );
     }
 
@@ -290,6 +591,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                 ),
           icon: const Icon(Icons.local_shipping),
           label: const Text('Confirm Pickup'),
+          style: _primaryActionStyle(theme),
         );
       } else if ((detail.status == OrderStatus.pickedUp ||
               detail.status == OrderStatus.inTransit) &&
@@ -302,6 +604,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                 ),
           icon: const Icon(Icons.check_circle),
           label: const Text('Mark as Delivered'),
+          style: _primaryActionStyle(theme),
         );
       }
     }
@@ -311,6 +614,8 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
       secondaryButton = TextButton(
         onPressed: _isLoadingAction
             ? null
+            : widget.viewerRole == 'buyer'
+            ? () => _confirmCancel(detail)
             : () => _handleAction(() => _service.cancelOrder(detail.id)),
         style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
         child: const Text('Cancel Order'),
@@ -339,10 +644,20 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
               secondaryButton,
               const SizedBox(width: 16),
             ],
-            Expanded(child: SizedBox(height: 48, child: primaryButton)),
+            Expanded(child: SizedBox(height: 52, child: primaryButton)),
           ],
         ),
       ),
+    );
+  }
+
+  ButtonStyle _primaryActionStyle(ThemeData theme) {
+    return FilledButton.styleFrom(
+      backgroundColor: theme.colorScheme.primary,
+      foregroundColor: Colors.white,
+      elevation: 2,
+      shadowColor: Colors.black.withValues(alpha: 0.12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 
@@ -357,6 +672,114 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     );
   }
 
+  /// Buyer: how it was paid. Farmer: commission + net payout. Driver: payout.
+  /// Payout rows only appear once the order is settled (server returns null before).
+  Widget _buildPaymentInfo(BuildContext context, OrderDetail detail) {
+    final theme = Theme.of(context);
+    String money(double v) => 'LKR ${v.toStringAsFixed(2)}';
+    final rows = <Widget>[];
+
+    if (widget.viewerRole == 'buyer' && detail.paymentMethod != null) {
+      rows.add(
+        _SummaryRow(
+          label: 'payments_payment_method'.tr(),
+          value: detail.paymentMethod == 'card'
+              ? 'payments_paid_with_card'.tr(
+                  namedArgs: {
+                    'card':
+                        '${CardBrand.fromDb(detail.paymentCardBrand).label} •••• ${detail.paymentCardLast4 ?? ''}',
+                  },
+                )
+              : 'payments_paid_with_wallet'.tr(),
+        ),
+      );
+    }
+    final refund = detail.refund;
+    if (widget.viewerRole == 'buyer' && refund != null) {
+      if (rows.isNotEmpty) rows.add(const SizedBox(height: 8));
+      rows.add(
+        _SummaryRow(
+          label: 'payments_refund_amount'.tr(),
+          value: money(refund.amount),
+        ),
+      );
+      rows.add(const SizedBox(height: 8));
+      rows.add(
+        _SummaryRow(
+          label: 'payments_refund_status'.tr(),
+          value: refund.isCard
+              ? 'payments_refund_to_card'.tr(
+                  namedArgs: {
+                    'card':
+                        '${CardBrand.fromDb(refund.cardBrand).label} •••• ${refund.cardLast4 ?? ''}',
+                  },
+                )
+              : 'payments_refund_to_wallet'.tr(),
+        ),
+      );
+    }
+    final cancelNote = detail.cancellationNote;
+    if (detail.status == OrderStatus.cancelled &&
+        cancelNote != null &&
+        cancelNote.trim().isNotEmpty) {
+      if (rows.isNotEmpty) rows.add(const SizedBox(height: 8));
+      rows.add(
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            '${'payments_cancel_reason'.tr()}: ${cancelNote.trim()}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+    if (widget.viewerRole == 'farmer' && detail.netPayout != null) {
+      rows.add(
+        _SummaryRow(
+          label: 'payments_commission'.tr(),
+          value: '- ${money(detail.commissionAmount ?? 0)}',
+        ),
+      );
+      rows.add(const SizedBox(height: 8));
+      rows.add(
+        _SummaryRow(
+          label: 'payments_net_payout'.tr(),
+          value: money(detail.netPayout!),
+        ),
+      );
+    }
+    if (widget.viewerRole == 'driver' && detail.driverPayout != null) {
+      rows.add(
+        _SummaryRow(
+          label: 'payments_driver_payout'.tr(),
+          value: money(detail.driverPayout!),
+        ),
+      );
+    }
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(children: rows),
+      ),
+    );
+  }
+
   Widget _buildSummaryCard(BuildContext context, OrderDetail detail) {
     final theme = Theme.of(context);
     return Container(
@@ -364,7 +787,13 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -376,6 +805,11 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           _SummaryRow(
             label: 'Delivery Fee',
             value: 'LKR ${detail.deliveryFeeAmount.toStringAsFixed(2)}',
+          ),
+          const SizedBox(height: 8),
+          _SummaryRow(
+            label: 'tax'.tr(),
+            value: 'LKR ${detail.taxAmount.toStringAsFixed(2)}',
           ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),

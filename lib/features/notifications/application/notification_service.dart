@@ -20,7 +20,7 @@ class NotificationService {
   /// (e.g. 'order_' for the Orders filter chip).
   Future<List<NotificationItem>> fetchPage({
     bool? isRead,
-    String? typePrefix,
+    List<String>? typePrefixes,
     int page = 0,
     int limit = 20,
   }) async {
@@ -32,9 +32,11 @@ class NotificationService {
 
     if (isRead == true) where.add('read_at is not null');
     if (isRead == false) where.add('read_at is null');
-    if (typePrefix != null) {
-      where.add('type like ?');
-      params.add('$typePrefix%');
+    if (typePrefixes != null && typePrefixes.isNotEmpty) {
+      where.add(
+        '(${List.filled(typePrefixes.length, 'type like ?').join(' OR ')})',
+      );
+      params.addAll(typePrefixes.map((prefix) => '$prefix%'));
     }
 
     params.addAll([limit, page * limit]);

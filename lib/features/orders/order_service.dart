@@ -3,6 +3,8 @@ import 'dart:developer' as developer;
 
 import '../../core/local_db/powersync.dart';
 import '../../core/supabase/client.dart';
+import 'live_tracking_models.dart';
+import 'cancellation_models.dart';
 import 'order_detail_models.dart';
 
 /// Sprint 3 — Task: Multi-Role Order Management.
@@ -71,9 +73,11 @@ class OrderService {
             o.checkout_group_id,
             o.status,
             o.total_amount,
+            o.source,
             o.placed_at,
             o.order_date,
             o.delivery_id,
+            d.delivered_at,
             (SELECT SUM(quantity_kg) FROM order_item oi WHERE oi.order_id = o.id) AS total_quantity,
             COALESCE(p_farmer.first_name || ' ' || p_farmer.last_name, d.farmer_display_name) AS counterpart_name,
             (
@@ -122,9 +126,11 @@ class OrderService {
             o.checkout_group_id,
             o.status,
             o.total_amount,
+            o.source,
             o.placed_at,
             o.order_date,
             o.delivery_id,
+            d.delivered_at,
             (SELECT SUM(quantity_kg) FROM order_item oi WHERE oi.order_id = o.id) AS total_quantity,
             COALESCE(p_buyer.first_name || ' ' || p_buyer.last_name, d.buyer_display_name) AS counterpart_name,
             (
@@ -236,6 +242,21 @@ class OrderService {
           }
         }
 
+        try {
+          final detail = await fetchOrderDetailFromServer(o['id'] as String);
+          final detailImage = detail != null && detail.items.isNotEmpty
+              ? detail.items.first.imageUrl
+              : null;
+          if (detailImage != null && detailImage.isNotEmpty) {
+            firstImg = detailImage;
+          }
+        } catch (e) {
+          developer.log(
+            'Could not resolve delivery thumbnail from order detail: $e',
+            name: 'GreenYield.OrderService',
+          );
+        }
+
         final orderSummary = OrderSummary(
           id: o['id'] as String,
           checkoutGroupId: o['checkout_group_id'] as String,
@@ -276,7 +297,34 @@ class OrderService {
     yield await fetchDeliveries();
   }
 
+  /// Watch live tracking details for an order.
+  Stream<LiveOrderTracking?> watchLiveOrderTracking(String orderId) {
+    return db
+        .watch(
+          'SELECT id, status FROM orders WHERE id = ? UNION SELECT order_id AS id, status FROM delivery WHERE order_id = ? LIMIT 1',
+          parameters: [orderId, orderId],
+        )
+        .asyncMap((_) async {
+          try {
+            final data = await supabase.rpc(
+              'get_live_order_tracking',
+              params: {'p_order_id': orderId},
+            );
+            if (data != null) {
+              return LiveOrderTracking.fromMap(data as Map<String, dynamic>);
+            }
+          } catch (e) {
+            developer.log(
+              'get_live_order_tracking RPC failed: $e',
+              name: 'GreenYield.OrderService',
+            );
+          }
+          return null;
+        });
+  }
+
   /// Watch the full detail of a single order.
+
   ///
   /// The local PowerSync SQLite only replicates the *current user's* profile
   /// row (RLS: `profile.id = auth.uid()`), so JOINing p_farmer / p_buyer /
@@ -291,20 +339,21 @@ class OrderService {
   Stream<OrderDetail?> watchOrderDetail(String orderId) {
     return db
         .watch(
-          'SELECT id, status FROM orders WHERE id = ? LIMIT 1',
-          parameters: [orderId],
+          'SELECT id, status FROM orders WHERE id = ? UNION SELECT order_id AS id, status FROM delivery WHERE order_id = ? LIMIT 1',
+          parameters: [orderId, orderId],
         )
         .asyncMap((rows) async {
-          if (rows.isEmpty) return null;
           try {
-            return await fetchOrderDetailFromServer(orderId);
+            final serverDetail = await fetchOrderDetailFromServer(orderId);
+            if (serverDetail != null) return serverDetail;
           } catch (e) {
             developer.log(
               'get_order_detail RPC failed, falling back to local: $e',
               name: 'GreenYield.OrderService',
             );
-            return _fetchOrderDetailLocally(orderId);
           }
+          if (rows.isEmpty) return null;
+          return _fetchOrderDetailLocally(orderId);
         });
   }
 
@@ -339,6 +388,19 @@ class OrderService {
       subtotalAmount: _toDouble(row['subtotal_amount']),
       deliveryFeeAmount: _toDouble(row['delivery_fee_amount']),
       totalAmount: _toDouble(row['total_amount']),
+      taxAmount: _toDouble(row['tax_amount']),
+      paymentMethod: row['payment_method'] as String?,
+      paymentCardLast4: row['payment_card_last4'] as String?,
+      paymentCardBrand: row['payment_card_brand'] as String?,
+      commissionAmount: row['commission_amount'] == null
+          ? null
+          : _toDouble(row['commission_amount']),
+      netPayout: row['net_payout'] == null
+          ? null
+          : _toDouble(row['net_payout']),
+      driverPayout: row['driver_payout'] == null
+          ? null
+          : _toDouble(row['driver_payout']),
       items: items,
       buyerProfileId: row['buyer_profile_id'] as String,
       buyerName: buyerName.isNotEmpty ? buyerName : 'Buyer',
@@ -348,6 +410,8 @@ class OrderService {
       farmerName: farmerName.isNotEmpty ? farmerName : 'Farmer',
       farmerPhone: row['farmer_phone'] as String?,
       farmerAddress: null, // not included in RPC yet
+      refund: RefundInfo.fromDetailMap(row),
+      cancellationNote: row['cancellation_note'] as String?,
       deliveryId: row['delivery_id'] as String?,
       deliveryStatus: row['delivery_status'] != null
           ? DeliveryStatus.fromDb(row['delivery_status'] as String)
@@ -377,6 +441,7 @@ class OrderService {
         o.total_amount,
         o.placed_at,
         o.order_date,
+        o.tax_amount,
         o.delivery_address,
         d.id              AS delivery_id,
         d.status          AS delivery_status,
@@ -397,10 +462,10 @@ class OrderService {
                 ON da.delivery_id = d.id AND da.is_current = 1
       LEFT JOIN profile p_driver ON p_driver.id = da.driver_profile_id
       LEFT JOIN vehicle v ON v.driver_profile_id = da.driver_profile_id
-      WHERE o.id = ?
+      WHERE o.id = ? OR d.order_id = ?
       LIMIT 1
       ''',
-      [orderId],
+      [orderId, orderId],
     );
 
     if (rows.isEmpty) return null;
@@ -435,6 +500,7 @@ class OrderService {
       subtotalAmount: _toDouble(row['subtotal_amount']),
       deliveryFeeAmount: _toDouble(row['delivery_fee_amount']),
       totalAmount: _toDouble(row['total_amount']),
+      taxAmount: _toDouble(row['tax_amount']),
       items: items,
       buyerProfileId: row['buyer_profile_id'] as String,
       buyerName: buyerDisplayName ?? 'Buyer',
@@ -505,6 +571,15 @@ class OrderService {
       'transition_delivery_status',
       params: {'p_delivery_id': deliveryId, 'p_new_status': 'delivered'},
     );
+  }
+
+  /// What cancelling would refund (and where). Calls `get_cancellation_preview`.
+  Future<CancellationPreview> getCancellationPreview(String orderId) async {
+    final data = await supabase.rpc(
+      'get_cancellation_preview',
+      params: {'p_order_id': orderId},
+    );
+    return CancellationPreview.fromMap(Map<String, dynamic>.from(data as Map));
   }
 
   /// Buyer or driver cancels an order. Calls `cancel_order(p_order_id)`.
