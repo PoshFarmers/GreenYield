@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../recurring_order_models.dart';
 import '../../recurring_order_service.dart';
 import 'create_recurring_schedule_screen.dart';
+import 'recurring_messages.dart';
 import 'recurring_schedule_detail_screen.dart';
 
 class RecurringScheduleListWidget extends StatefulWidget {
@@ -242,10 +243,13 @@ class _QuickActionMenu extends StatelessWidget {
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert),
       onSelected: (val) async {
-        if (val == 'pause') {
-          await service.pauseSchedule(schedule.id);
-        } else if (val == 'resume') {
-          await service.resumeSchedule(schedule.id, updatedNextRunAtMap: {});
+        if (val == 'pause' || val == 'resume') {
+          await setScheduleActiveWithFeedback(
+            context,
+            service,
+            schedule.id,
+            active: val == 'resume',
+          );
         } else if (val == 'edit') {
           Navigator.push(
             context,
