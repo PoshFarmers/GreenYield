@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/local_db/powersync.dart';
+import '../../../../core/supabase/client.dart';
 import '../../../../core/widgets/app_secondary_header.dart';
+import '../../../../core/widgets/avatar_image.dart';
 import '../../../../core/widgets/media_image.dart';
+import '../../../../models/marketplace_listing.dart';
+import '../../../marketplace/marketplace_service.dart';
+import 'recurring_messages.dart';
 
 import 'package:greenyield/models/wallet.dart';
 import 'package:greenyield/features/wallet/wallet_service.dart';
@@ -53,6 +57,7 @@ class CreateRecurringScheduleScreen extends ConsumerStatefulWidget {
 class _CreateRecurringScheduleScreenState
     extends ConsumerState<CreateRecurringScheduleScreen> {
   final _service = RecurringOrderService();
+  final _marketplace = const MarketplaceService();
   final _labelController = TextEditingController();
   final _addressController = TextEditingController();
 
@@ -92,75 +97,77 @@ class _CreateRecurringScheduleScreenState
     }
 
     try {
+      // Server reads: the local mirror of these tables is empty after a
+      // re-login (the recurring sync streams are invalid).
       final scheduleId = widget.existingScheduleId!;
-      final scheduleRows = await db.getAll(
-        'SELECT * FROM recurring_schedule WHERE id = ?',
-        [scheduleId],
-      );
-      if (scheduleRows.isEmpty) {
+      final schedule = await supabase
+          .from('recurring_schedule')
+          .select('label, end_date')
+          .eq('id', scheduleId)
+          .maybeSingle();
+      if (schedule == null) {
         if (mounted) setState(() => _isLoading = false);
         return;
       }
 
-      final schedule = scheduleRows.first;
       _labelController.text = schedule['label'] as String;
       if (schedule['end_date'] != null) {
         _endDate = DateTime.parse(schedule['end_date'] as String).toLocal();
       }
 
-      final orders = await db.getAll(
-        'SELECT * FROM recurring_order WHERE schedule_id = ?',
-        [scheduleId],
-      );
+      final days = await _service.fetchScheduleDays(scheduleId);
+      if (days.isNotEmpty) {
+        _frequency = days.first.frequency;
+        _addressController.text =
+            days.first.deliveryAddress?['line1']?.toString() ?? '';
+      }
 
-      if (orders.isNotEmpty) {
-        _frequency = orders.first['frequency'] as String;
-        final addressMap = orders.first['delivery_address'];
-        if (addressMap is Map) {
-          _addressController.text = addressMap['line1']?.toString() ?? '';
-        } else if (addressMap is String) {
-          _addressController.text = addressMap; // simplified parsing
+      // Preferred farmers' names/prices, one marketplace lookup per crop.
+      final farmerInfo = <String, Map<String, dynamic>>{}; // crop:farmer
+      final cropsWithPreferred = {
+        for (final day in days)
+          for (final item in day.items)
+            if (item.preferredFarmerId != null) item.cropId: item.cropName,
+      };
+      for (final entry in cropsWithPreferred.entries) {
+        try {
+          for (final f in await _farmersForCrop(entry.key, entry.value)) {
+            farmerInfo['${entry.key}:${f['id']}'] = f;
+          }
+        } catch (_) {
+          // Name/price are cosmetic here; the choice itself is kept.
         }
       }
 
-      for (final order in orders) {
-        final orderId = order['id'] as String;
-        final day = order['day_of_week'] as int;
-        _selectedDays.add(day);
-
-        final items = await db.getAll(
-          '''
-          SELECT oi.*, c.name as crop_name, c.fallback_image_url,
-            c.category as crop_category,
-            trim(p.first_name || ' ' || p.last_name) as farmer_name,
-            pl.price_per_kg
-          FROM recurring_order_item oi
-          JOIN crop c ON c.id = oi.crop_id
-          LEFT JOIN farmer_profile fp ON fp.profile_id = oi.preferred_farmer_id
-          LEFT JOIN profile p ON p.id = fp.profile_id
-          LEFT JOIN produce_listing pl ON pl.farmer_profile_id = oi.preferred_farmer_id AND pl.crop_id = oi.crop_id AND pl.status = 'active'
-          WHERE oi.recurring_order_id = ?
-          ''',
-          [orderId],
-        );
-
-        _itemsPerDay[day] = items.map((item) {
+      for (final day in days) {
+        _selectedDays.add(day.dayOfWeek);
+        _itemsPerDay[day.dayOfWeek] = day.items.map((item) {
+          final farmer = farmerInfo['${item.cropId}:${item.preferredFarmerId}'];
           return ScheduleItemState(
-            cropId: item['crop_id'] as String,
-            cropName: item['crop_name'] as String,
-            imageUrl: item['fallback_image_url'] as String? ?? '',
-            cropCategory: item['crop_category'] as String?,
-            quantity: (item['quantity_kg'] as num).toDouble(),
-            preferredFarmerId: item['preferred_farmer_id'] as String?,
-            preferredFarmerName: item['farmer_name'] as String?,
-            preferredFarmerPrice: item['price_per_kg'] != null
-                ? (item['price_per_kg'] as num).toDouble()
-                : null,
+            cropId: item.cropId,
+            cropName: item.cropName,
+            imageUrl: item.fallbackImageUrl ?? '',
+            cropCategory: item.cropCategory,
+            quantity: item.quantityKg,
+            preferredFarmerId: item.preferredFarmerId,
+            preferredFarmerName: item.preferredFarmerId == null
+                ? null
+                : (farmer?['farmer_name'] as String? ?? 'Preferred farmer'),
+            preferredFarmerPrice: (farmer?['price_per_kg'] as num?)?.toDouble(),
           );
         }).toList();
       }
     } catch (e) {
       debugPrint('Error loading schedule: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Couldn't load this schedule. Check your connection and try again.",
+            ),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -222,94 +229,56 @@ class _CreateRecurringScheduleScreenState
     }
   }
 
+  /// One atomic server call. Next delivery dates are computed server-side
+  /// (Asia/Colombo); if a chosen day is tomorrow, that order is placed
+  /// right away and we say so.
   Future<void> _saveSchedule() async {
     setState(() => _isSaving = true);
+    final messenger = ScaffoldMessenger.of(context);
     try {
-      final orders = <RecurringOrder>[];
-      final itemsByOrderId = <String, List<RecurringOrderItem>>{};
-      final now = DateTime.now();
-      final tempScheduleId = const Uuid().v4();
+      final result = await _service.saveSchedule(
+        scheduleId: widget.existingScheduleId,
+        label: _labelController.text.trim(),
+        frequency: _frequency,
+        deliveryAddress: {'line1': _addressController.text.trim()},
+        endDate: _endDate,
+        itemsByDay: {
+          for (final day in _selectedDays)
+            day: [
+              for (final item in _itemsPerDay[day] ?? <ScheduleItemState>[])
+                RecurringItemInput(
+                  cropId: item.cropId,
+                  quantityKg: item.quantity,
+                  preferredFarmerId: item.preferredFarmerId,
+                ),
+            ],
+        },
+      );
 
-      for (final day in _selectedDays) {
-        final dayItems = _itemsPerDay[day] ?? [];
-        if (dayItems.isEmpty) continue;
-
-        final orderId = const Uuid().v4();
-        orders.add(
-          RecurringOrder(
-            id: orderId,
-            scheduleId: tempScheduleId,
-            dayOfWeek: day,
-            frequency: _frequency,
-            deliveryAddress: {'line1': _addressController.text.trim()},
-            nextRunAt: _calculateNextRunAt(day, _frequency),
-            status: 'active',
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
-
-        itemsByOrderId[orderId] = [];
-
-        for (final item in dayItems) {
-          itemsByOrderId[orderId]!.add(
-            RecurringOrderItem(
-              id: const Uuid().v4(),
-              recurringOrderId: orderId,
-              cropId: item.cropId,
-              quantityKg: item.quantity,
-              preferredFarmerId: item.preferredFarmerId,
-              createdAt: now,
-            ),
-          );
-        }
-      }
-
-      if (widget.existingScheduleId != null) {
-        await _service.updateSchedule(
-          scheduleId: widget.existingScheduleId!,
-          label: _labelController.text.trim(),
-          orders: orders,
-          itemsByOrderId: itemsByOrderId,
-          endDate: _endDate,
-        );
-      } else {
-        await _service.createSchedule(
-          buyerProfileId: widget.buyerProfileId,
-          label: _labelController.text.trim(),
-          orders: orders,
-          itemsByOrderId: itemsByOrderId,
-          endDate: _endDate,
+      if (result.problemReasons.isNotEmpty) {
+        debugPrint(
+          "Tomorrow's recurring order not placed: ${result.problemReasons}",
         );
       }
-
+      messenger.showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 5),
+          content: Text(recurringTomorrowMessage(result.summary, saved: true)),
+        ),
+      );
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Couldn't save the schedule. Check your connection and try again.",
+          ),
+        ),
+      );
+      debugPrint('save_recurring_schedule failed: $e');
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
-  }
-
-  DateTime _calculateNextRunAt(int deliveryDayOfWeek, String frequency) {
-    final now = DateTime.now();
-    // DB day_of_week: 0=Sun, 1=Mon, ..., 6=Sat.
-    // Dart DateTime.weekday: 1=Mon, ..., 6=Sat, 7=Sun.
-    // Map: DB 0 (Sun) → Dart 7; DB 1–6 → Dart 1–6 (identical).
-    final targetWeekday = deliveryDayOfWeek == 0
-        ? DateTime.sunday
-        : deliveryDayOfWeek;
-    var daysToAdd = (targetWeekday - now.weekday) % DateTime.daysPerWeek;
-    // If already at that weekday (or calculation gives 0), push to next occurrence.
-    if (daysToAdd == 0) {
-      daysToAdd = DateTime.daysPerWeek;
-    }
-
-    final occurrence = now.add(Duration(days: daysToAdd));
-    return DateTime(occurrence.year, occurrence.month, occurrence.day);
   }
 
   @override
@@ -959,7 +928,10 @@ class _CreateRecurringScheduleScreenState
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () async {
-                            final selected = await _showFarmerPicker(cropId);
+                            final selected = await _showFarmerPicker(
+                              cropId,
+                              cropName,
+                            );
                             if (selected != null && selected.isNotEmpty) {
                               setSheetState(() {
                                 pickedFarmerId = selected['id'] as String;
@@ -1017,28 +989,59 @@ class _CreateRecurringScheduleScreenState
     );
   }
 
-  Future<Map<String, dynamic>?> _showFarmerPicker(String cropId) async {
-    final farmers = await db.getAll(
-      '''
-      SELECT 
-        fp.profile_id AS id,
-        trim(p.first_name || ' ' || p.last_name) AS farmer_name,
-        l.price_per_kg,
-        l.available_quantity_kg,
-        p.avatar_url
-      FROM produce_listing l
-      JOIN farmer_profile fp ON fp.profile_id = l.farmer_profile_id
-      JOIN profile p ON p.id = fp.profile_id
-      WHERE l.crop_id = ?
-        AND l.status = 'active'
-        AND l.available_quantity_kg > 0
-        AND (l.expires_at IS NULL OR l.expires_at > datetime('now'))
-      GROUP BY fp.profile_id, p.first_name, p.last_name, l.price_per_kg,
-        l.available_quantity_kg, p.avatar_url
-      ORDER BY l.available_quantity_kg DESC, l.price_per_kg ASC
-    ''',
-      [cropId],
-    );
+  /// Farmers currently selling [cropId], one row per farmer (their
+  /// best-stocked listing). Server-side via the marketplace search: other
+  /// users' profiles don't sync locally, and the local listing column is
+  /// `status_text`, so the old local query returned nothing.
+  Future<List<Map<String, dynamic>>> _farmersForCrop(
+    String cropId,
+    String cropName,
+  ) async {
+    final listings = await _marketplace.search(query: cropName, limit: 50);
+    final byFarmer = <String, MarketplaceListing>{};
+    for (final l in listings) {
+      if (l.cropId != cropId || l.isSoldOut) continue;
+      final best = byFarmer[l.farmerProfileId];
+      if (best == null || l.availableQuantityKg > best.availableQuantityKg) {
+        byFarmer[l.farmerProfileId] = l;
+      }
+    }
+    final rows = byFarmer.values.toList()
+      ..sort((a, b) {
+        final byStock = b.availableQuantityKg.compareTo(a.availableQuantityKg);
+        return byStock != 0 ? byStock : a.pricePerKg.compareTo(b.pricePerKg);
+      });
+    return [
+      for (final l in rows)
+        {
+          'id': l.farmerProfileId,
+          'farmer_name': l.farmerName.isEmpty ? 'Farmer' : l.farmerName,
+          'price_per_kg': l.pricePerKg,
+          'available_quantity_kg': l.availableQuantityKg,
+          'avatar_url': l.farmerAvatarUrl,
+        },
+    ];
+  }
+
+  Future<Map<String, dynamic>?> _showFarmerPicker(
+    String cropId,
+    String cropName,
+  ) async {
+    List<Map<String, dynamic>> farmers;
+    try {
+      farmers = await _farmersForCrop(cropId, cropName);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Couldn't load farmers. Check your connection and try again.",
+            ),
+          ),
+        );
+      }
+      return null;
+    }
 
     if (!mounted) return null;
 
@@ -1107,13 +1110,11 @@ class _CreateRecurringScheduleScreenState
                         itemBuilder: (context, index) {
                           final f = filteredFarmers[index];
                           return ListTile(
-                            leading: CircleAvatar(
-                              backgroundImage: f['avatar_url'] != null
-                                  ? NetworkImage(f['avatar_url'] as String)
-                                  : null,
-                              child: f['avatar_url'] == null
-                                  ? const Icon(Icons.person)
-                                  : null,
+                            // avatar_url is a storage path, not a URL —
+                            // AvatarImage resolves it (NetworkImage can't).
+                            leading: AvatarImage(
+                              path: f['avatar_url'] as String?,
+                              radius: 20,
                             ),
                             title: Text(
                               f['farmer_name'] as String? ?? 'Farmer',

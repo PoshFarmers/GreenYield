@@ -7,6 +7,7 @@ import '../../../../core/widgets/media_image.dart';
 import '../../../../models/notification_item.dart';
 import '../../recurring_order_models.dart';
 import '../../recurring_order_service.dart';
+import 'recurring_messages.dart';
 
 class RecurringScheduleDetailScreen extends StatefulWidget {
   final String scheduleId;
@@ -63,16 +64,12 @@ class _RecurringScheduleDetailScreenState
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
-                onPressed: () async {
-                  if (isActive) {
-                    await _service.pauseSchedule(schedule.id);
-                  } else {
-                    await _service.resumeSchedule(
-                      schedule.id,
-                      updatedNextRunAtMap: {},
-                    );
-                  }
-                },
+                onPressed: () => setScheduleActiveWithFeedback(
+                  context,
+                  _service,
+                  schedule.id,
+                  active: !isActive,
+                ),
                 icon: Icon(isActive ? Icons.pause : Icons.play_arrow),
                 label: Text(isActive ? 'Pause Schedule' : 'Resume Schedule'),
                 style: OutlinedButton.styleFrom(
@@ -87,7 +84,13 @@ class _RecurringScheduleDetailScreenState
                 ),
               ),
               const SizedBox(height: 8),
-              _ScheduleItemsList(scheduleId: schedule.id),
+              // Keyed on status so pausing/resuming (which moves next
+              // delivery dates) reloads the list.
+              _ScheduleItemsList(
+                key: ValueKey('${schedule.id}:${schedule.status}'),
+                scheduleId: schedule.id,
+                service: _service,
+              ),
               const SizedBox(height: 32),
               Text(
                 'History',
@@ -105,56 +108,129 @@ class _RecurringScheduleDetailScreenState
   }
 }
 
-class _ScheduleItemsList extends StatelessWidget {
+/// Items per delivery day, read from the server: the local mirror of the
+/// recurring tables is empty after a re-login (invalid sync streams),
+/// which is why this used to show "No items." after logging back in.
+class _ScheduleItemsList extends StatefulWidget {
   final String scheduleId;
+  final RecurringOrderService service;
 
-  const _ScheduleItemsList({required this.scheduleId});
+  const _ScheduleItemsList({
+    super.key,
+    required this.scheduleId,
+    required this.service,
+  });
+
+  @override
+  State<_ScheduleItemsList> createState() => _ScheduleItemsListState();
+}
+
+class _ScheduleItemsListState extends State<_ScheduleItemsList> {
+  late Future<List<RecurringDayDetail>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  void _load() {
+    _future = widget.service.fetchScheduleDays(widget.scheduleId);
+  }
+
+  Future<void> _skip(RecurringDayDetail day) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final next = await widget.service.skipNextOrder(day.recurringOrderId);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            next == null
+                ? 'Skipped the next delivery.'
+                : 'Skipped. Next delivery: ${_formatDate(next)}.',
+          ),
+        ),
+      );
+      if (mounted) setState(_load);
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't skip. Check your connection and try again."),
+        ),
+      );
+    }
+  }
+
+  static String _formatDate(DateTime d) {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${days[d.weekday - 1]}, ${d.day} ${months[d.month - 1]}';
+  }
+
+  /// Status of the next delivery, in buyer terms.
+  (String, Color)? _statusChip(RecurringDayDetail day) {
+    final today = DateTime.now();
+    final tomorrow = DateTime(today.year, today.month, today.day + 1);
+    final next = DateTime(
+      day.nextDelivery.year,
+      day.nextDelivery.month,
+      day.nextDelivery.day,
+    );
+    return switch (day.processingStatus) {
+      'awaiting_funds' => ('Waiting for wallet funds', Colors.red),
+      'awaiting_inventory' => ('Waiting for stock', Colors.orange),
+      _ when next == tomorrow => ('Order placed', Colors.green),
+      _ => null,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: db.watch(
-        '''
-        SELECT 
-          o.id as order_id,
-          o.day_of_week, 
-          o.next_run_at,
-          oi.quantity_kg,
-          c.name as crop_name,
-          c.category as crop_category,
-          c.fallback_image_url
-        FROM recurring_order o
-        JOIN recurring_order_item oi ON oi.recurring_order_id = o.id
-        JOIN crop c ON c.id = oi.crop_id
-        WHERE o.schedule_id = ?
-        ORDER BY o.day_of_week ASC
-      ''',
-        parameters: [scheduleId],
-      ),
+    return FutureBuilder<List<RecurringDayDetail>>(
+      future: _future,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+        if (snapshot.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator());
         }
-        final rows = snapshot.data!;
-        if (rows.isEmpty) return const Text('No items.');
-
-        // Group by day
-        final Map<int, List<Map<String, dynamic>>> grouped = {};
-        for (var row in rows) {
-          final day = row['day_of_week'] as int;
-          grouped.putIfAbsent(day, () => []).add(row);
+        if (snapshot.hasError) {
+          return Row(
+            children: [
+              const Expanded(
+                child: Text("Couldn't load items. Check your connection."),
+              ),
+              TextButton(
+                onPressed: () => setState(_load),
+                child: const Text('Retry'),
+              ),
+            ],
+          );
         }
+        final daysWithItems = (snapshot.data ?? const <RecurringDayDetail>[])
+            .where((d) => d.items.isNotEmpty)
+            .toList();
+        if (daysWithItems.isEmpty) return const Text('No items.');
 
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
         return Column(
-          children: grouped.entries.map((e) {
-            final dayIndex = e.key;
-            final items = e.value;
-            final dayName = days[dayIndex % 7];
-            final orderId = items.first['order_id'] as String;
+          children: daysWithItems.map((day) {
+            final dayName = dayNames[day.dayOfWeek % 7];
+            final chip = _statusChip(day);
 
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
@@ -168,11 +244,42 @@ class _ScheduleItemsList extends StatelessWidget {
                   dayName,
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
+                subtitle: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      day.status == 'active'
+                          ? 'Next: ${_formatDate(day.nextDelivery)}'
+                          : 'Paused',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    if (chip != null && day.status == 'active')
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: chip.$2.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          chip.$1,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: chip.$2,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
                 initiallyExpanded: true,
                 children: [
-                  ...items.map((item) {
-                    final fallbackUrl = item['fallback_image_url'] as String?;
-                    final category = item['crop_category'] as String?;
+                  ...day.items.map((item) {
+                    final fallbackUrl = item.fallbackImageUrl;
+                    final category = item.cropCategory;
                     final isFruit = category?.toLowerCase() == 'fruit';
                     final categoryIcon = Icon(
                       isFruit ? Icons.apple : Icons.eco,
@@ -206,30 +313,22 @@ class _ScheduleItemsList extends StatelessWidget {
                           ),
                         ),
                       ),
-                      title: Text(item['crop_name'] as String),
+                      title: Text(item.cropName),
                       trailing: Text(
-                        '${item['quantity_kg']} kg',
+                        '${_formatKg(item.quantityKg)} kg',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     );
                   }),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        await RecurringOrderService().skipNextOrder(orderId);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Skipped next occurrence.'),
-                            ),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.skip_next),
-                      label: const Text('Skip Next'),
+                  if (day.status == 'active')
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: OutlinedButton.icon(
+                        onPressed: () => _skip(day),
+                        icon: const Icon(Icons.skip_next),
+                        label: const Text('Skip Next'),
+                      ),
                     ),
-                  ),
                 ],
               ),
             );
@@ -239,6 +338,9 @@ class _ScheduleItemsList extends StatelessWidget {
     );
   }
 }
+
+String _formatKg(double kg) =>
+    kg == kg.roundToDouble() ? kg.toStringAsFixed(0) : kg.toStringAsFixed(1);
 
 class _ScheduleHistoryList extends StatelessWidget {
   final String scheduleId;
