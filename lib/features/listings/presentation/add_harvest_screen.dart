@@ -15,7 +15,9 @@ import '../../../models/profile.dart';
 import '../../pricing/presentation/widgets/market_price_comparison_card.dart';
 import '../../profile/farmer/crop_price_bounds.dart';
 import '../../profile/farmer/farmer_profile_service.dart';
+import '../assistant/gemini_listing_assistant.dart';
 import '../produce_listing_service.dart';
+import 'widgets/snap_to_list_sheet.dart';
 
 /// Multi-step "post produce for sale" flow — writes one `produce_listing`
 /// row (see CROP_AND_LISTING_DESIGN.md §2 step 3). The crop must already
@@ -50,6 +52,7 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
   Uint8List? _photoBytes;
   String? _photoFileName;
   bool _isPublishing = false;
+  bool _isSnapping = false;
   String? _errorMessage;
 
   @override
@@ -352,15 +355,6 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: 16),
-        TextField(
-          controller: _searchController,
-          decoration: InputDecoration(
-            hintText: 'search_crops'.tr(),
-            prefixIcon: const Icon(Icons.search),
-          ),
-          onChanged: (value) => setState(() => _search = value),
-        ),
-        const SizedBox(height: 16),
         StreamBuilder<FarmerProfile?>(
           stream: _farmerProfileStream,
           builder: (context, snapshot) {
@@ -388,19 +382,84 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
                 )
                 .toList();
 
-            return GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 0.95,
-              children: filtered.map(_buildCropCard).toList(),
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Fast path first; the manual picker below is unchanged.
+                _SnapToListCard(
+                  busy: _isSnapping,
+                  onTap: () => _snapToList(crops),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'search_crops'.tr(),
+                    prefixIcon: const Icon(Icons.search),
+                  ),
+                  onChanged: (value) => setState(() => _search = value),
+                ),
+                const SizedBox(height: 16),
+                GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 0.95,
+                  children: filtered.map(_buildCropCard).toList(),
+                ),
+              ],
             );
           },
         ),
       ],
     );
+  }
+
+  /// Snap-to-List: photo → suggestion sheet → (on "Use these") crop,
+  /// description and photo pre-filled, straight on to quantity & price.
+  /// The photo goes through the same `_photoBytes` path as a manually
+  /// picked one, so it's uploaded via the offline media queue on publish.
+  Future<void> _snapToList(List<FarmerCrop> crops) async {
+    if (_isSnapping) return;
+    final source = await showImageSourceSheet(context);
+    if (source == null || !mounted) return;
+
+    setState(() => _isSnapping = true);
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 1600,
+        imageQuality: 85,
+      );
+      if (picked == null || !mounted) return;
+      final bytes = await picked.readAsBytes();
+      if (!mounted) return;
+
+      final result = await SnapToListSheet.show(
+        context,
+        imageBytes: bytes,
+        crops: crops,
+        assistant: ref.read(listingAssistantProvider),
+      );
+      if (result == null || !mounted) return;
+
+      _selectCrop(result.crop);
+      setState(() {
+        if (result.description.isNotEmpty) {
+          _descriptionController.text = result.description;
+        }
+        _photoBytes = bytes;
+        _photoFileName = picked.name;
+        _errorMessage = null;
+        _step = 1;
+      });
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('snap_applied'.tr())));
+    } finally {
+      if (mounted) setState(() => _isSnapping = false);
+    }
   }
 
   Widget _buildCropCard(FarmerCrop crop) {
@@ -825,6 +884,89 @@ class _AddHarvestScreenState extends ConsumerState<AddHarvestScreen> {
   String _formatDate(DateTime date) =>
       '${date.year}-${date.month.toString().padLeft(2, '0')}-'
       '${date.day.toString().padLeft(2, '0')}';
+}
+
+/// Entry point for Snap-to-List at the top of the crop step.
+class _SnapToListCard extends StatelessWidget {
+  final bool busy;
+  final VoidCallback onTap;
+
+  const _SnapToListCard({required this.busy, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final radius = BorderRadius.circular(16);
+
+    return Material(
+      color: scheme.primary,
+      borderRadius: radius,
+      child: InkWell(
+        borderRadius: radius,
+        onTap: busy ? null : onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: scheme.onPrimary.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: busy
+                    ? Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: scheme.onPrimary,
+                        ),
+                      )
+                    : Icon(Icons.photo_camera, color: scheme.onPrimary),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'snap_card_title'.tr(),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: scheme.onPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.auto_awesome,
+                          size: 16,
+                          color: scheme.onPrimary,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'snap_card_subtitle'.tr(),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onPrimary.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: scheme.onPrimary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ReviewField extends StatelessWidget {

@@ -12,6 +12,7 @@ import 'package:latlong2/latlong.dart' as ll;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/widgets/app_header.dart';
+import '../../driver_tips/presentation/driver_tips_card.dart';
 import '../../../models/driver_stop.dart';
 import '../../../models/profile.dart';
 import '../../orders/driver_home_providers.dart';
@@ -418,6 +419,8 @@ class _NarrowLayout extends StatelessWidget {
           onStartRoute: onStartRoute,
         ),
         const SizedBox(height: 14),
+        DriverTipsCard(stops: stops),
+        const SizedBox(height: 14),
         ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: SizedBox(
@@ -527,9 +530,19 @@ class _WideLayout extends StatelessWidget {
           Expanded(
             flex: 4,
             child: stops.isEmpty
-                ? const _EmptyStopsMessage()
+                ? ListView(
+                    children: [
+                      DriverTipsCard(stops: stops),
+                      const SizedBox(height: 12),
+                      const _EmptyStopsMessage(),
+                    ],
+                  )
                 : ListView(
                     children: [
+                      // Top of the list on wide layouts, so the map keeps
+                      // its full height on the left.
+                      DriverTipsCard(stops: stops),
+                      const SizedBox(height: 12),
                       for (final stop in stops) ...[
                         _StopCard(
                           stop: stop,
