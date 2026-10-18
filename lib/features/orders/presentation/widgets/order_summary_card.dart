@@ -66,12 +66,16 @@ class OrderSummaryCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
+                    color: theme.brightness == Brightness.dark
+                        ? Colors.orange.shade900.withValues(alpha: 0.3)
+                        : Colors.orange.shade50,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     Icons.local_shipping_outlined,
-                    color: Colors.brown.shade700,
+                    color: theme.brightness == Brightness.dark
+                        ? Colors.orange.shade300
+                        : Colors.brown.shade700,
                     size: 20,
                   ),
                 ),
@@ -95,7 +99,9 @@ class OrderSummaryCard extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
+                        color: theme.brightness == Brightness.dark
+                            ? Colors.blue.shade900.withValues(alpha: 0.4)
+                            : Colors.blue.shade50,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -103,7 +109,9 @@ class OrderSummaryCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade700,
+                          color: theme.brightness == Brightness.dark
+                              ? Colors.blue.shade300
+                              : Colors.blue.shade700,
                         ),
                       ),
                     ),
@@ -116,7 +124,11 @@ class OrderSummaryCard extends StatelessWidget {
             // Inner card
             Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F7F6),
+                color: theme.brightness == Brightness.dark
+                    ? theme.colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.35,
+                      )
+                    : const Color(0xFFF5F7F6),
                 borderRadius: BorderRadius.circular(12),
               ),
               padding: const EdgeInsets.all(12),

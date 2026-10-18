@@ -33,7 +33,11 @@ class OrderItemCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F7F6),
+          color: theme.brightness == Brightness.dark
+              ? theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.35,
+                )
+              : const Color(0xFFF5F7F6),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(

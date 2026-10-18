@@ -464,9 +464,13 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen>
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: isPickedUp
-                                    ? const Color(0xFFE3F2FD)
-                                    : const Color(0xFFE8F5E9),
+                                color: theme.brightness == Brightness.dark
+                                    ? (isPickedUp
+                                          ? const Color(0xFF0D3256)
+                                          : const Color(0xFF1B3820))
+                                    : (isPickedUp
+                                          ? const Color(0xFFE3F2FD)
+                                          : const Color(0xFFE8F5E9)),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
@@ -476,9 +480,13 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen>
                                         ? Icons.local_shipping
                                         : Icons.storefront,
                                     size: 16,
-                                    color: isPickedUp
-                                        ? const Color(0xFF1976D2)
-                                        : const Color(0xFF2E7D32),
+                                    color: theme.brightness == Brightness.dark
+                                        ? (isPickedUp
+                                              ? const Color(0xFF64B5F6)
+                                              : const Color(0xFF81C784))
+                                        : (isPickedUp
+                                              ? const Color(0xFF1976D2)
+                                              : const Color(0xFF2E7D32)),
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
@@ -488,9 +496,13 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen>
                                     style: GoogleFonts.inter(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
-                                      color: isPickedUp
-                                          ? const Color(0xFF1976D2)
-                                          : const Color(0xFF2E7D32),
+                                      color: theme.brightness == Brightness.dark
+                                          ? (isPickedUp
+                                                ? const Color(0xFF64B5F6)
+                                                : const Color(0xFF81C784))
+                                          : (isPickedUp
+                                                ? const Color(0xFF1976D2)
+                                                : const Color(0xFF2E7D32)),
                                     ),
                                   ),
                                 ],
@@ -527,9 +539,13 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen>
                                 Icon(
                                   Icons.alt_route,
                                   size: 16,
-                                  color: isPickedUp
-                                      ? const Color(0xFF1976D2)
-                                      : const Color(0xFF2E7D32),
+                                  color: theme.brightness == Brightness.dark
+                                      ? (isPickedUp
+                                            ? const Color(0xFF64B5F6)
+                                            : const Color(0xFF81C784))
+                                      : (isPickedUp
+                                            ? const Color(0xFF1976D2)
+                                            : const Color(0xFF2E7D32)),
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
@@ -544,9 +560,13 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen>
                                 Icon(
                                   Icons.timer_outlined,
                                   size: 15,
-                                  color: isPickedUp
-                                      ? const Color(0xFF1976D2)
-                                      : const Color(0xFF2E7D32),
+                                  color: theme.brightness == Brightness.dark
+                                      ? (isPickedUp
+                                            ? const Color(0xFF64B5F6)
+                                            : const Color(0xFF81C784))
+                                      : (isPickedUp
+                                            ? const Color(0xFF1976D2)
+                                            : const Color(0xFF2E7D32)),
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
@@ -554,9 +574,13 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen>
                                   style: GoogleFonts.inter(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: isPickedUp
-                                        ? const Color(0xFF1976D2)
-                                        : const Color(0xFF2E7D32),
+                                    color: theme.brightness == Brightness.dark
+                                        ? (isPickedUp
+                                              ? const Color(0xFF64B5F6)
+                                              : const Color(0xFF81C784))
+                                        : (isPickedUp
+                                              ? const Color(0xFF1976D2)
+                                              : const Color(0xFF2E7D32)),
                                   ),
                                 ),
                               ],

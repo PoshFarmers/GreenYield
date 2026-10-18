@@ -192,14 +192,23 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isActive = status == 'active';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isActive ? Colors.green.shade50 : Colors.amber.shade50,
+        color: isDark
+            ? (isActive
+                  ? Colors.green.shade900.withValues(alpha: 0.35)
+                  : Colors.amber.shade900.withValues(alpha: 0.35))
+            : (isActive ? Colors.green.shade50 : Colors.amber.shade50),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isActive ? Colors.green.shade200 : Colors.amber.shade200,
+          color: isDark
+              ? (isActive
+                    ? Colors.green.shade700.withValues(alpha: 0.5)
+                    : Colors.amber.shade700.withValues(alpha: 0.5))
+              : (isActive ? Colors.green.shade200 : Colors.amber.shade200),
         ),
       ),
       child: Text(
@@ -207,7 +216,9 @@ class _StatusPill extends StatelessWidget {
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.bold,
-          color: isActive ? Colors.green.shade700 : Colors.amber.shade700,
+          color: isDark
+              ? (isActive ? Colors.green.shade300 : Colors.amber.shade300)
+              : (isActive ? Colors.green.shade700 : Colors.amber.shade700),
         ),
       ),
     );

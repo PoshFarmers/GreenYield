@@ -39,54 +39,57 @@ class OrderStatusChip extends StatelessWidget {
   }
 
   (Color bg, Color fg, IconData icon) _palette(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     switch (status) {
       case OrderStatus.placed:
         return (
-          const Color(0xFFE8F5E9),
-          const Color(0xFF388E3C),
+          isDark ? const Color(0xFF1B3820) : const Color(0xFFE8F5E9),
+          isDark ? const Color(0xFF81C784) : const Color(0xFF388E3C),
           Icons.receipt_outlined,
         );
       case OrderStatus.confirmed:
         return (
-          const Color(0xFFE3F2FD),
-          const Color(0xFF1976D2),
+          isDark ? const Color(0xFF0D3256) : const Color(0xFFE3F2FD),
+          isDark ? const Color(0xFF64B5F6) : const Color(0xFF1976D2),
           Icons.check_circle_outline,
         );
       case OrderStatus.assigned:
         return (
-          const Color(0xFFFFF8E1),
-          const Color(0xFFF57F17),
+          isDark ? const Color(0xFF3E2F00) : const Color(0xFFFFF8E1),
+          isDark ? const Color(0xFFFFD54F) : const Color(0xFFF57F17),
           Icons.person_pin_outlined,
         );
       case OrderStatus.packed:
         return (
-          const Color(0xFFF3E5F5),
-          const Color(0xFF7B1FA2),
+          isDark ? const Color(0xFF331A3D) : const Color(0xFFF3E5F5),
+          isDark ? const Color(0xFFBA68C8) : const Color(0xFF7B1FA2),
           Icons.inventory_2_outlined,
         );
       case OrderStatus.pickedUp:
         return (
-          const Color(0xFFE8F5E9),
-          const Color(0xFF2E7D32),
+          isDark ? const Color(0xFF16381C) : const Color(0xFFE8F5E9),
+          isDark ? const Color(0xFF81C784) : const Color(0xFF2E7D32),
           Icons.local_shipping_outlined,
         );
       case OrderStatus.inTransit:
         return (
-          const Color(0xFFFFF3E0),
-          const Color(0xFFE65100),
+          isDark ? const Color(0xFF3E2000) : const Color(0xFFFFF3E0),
+          isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100),
           Icons.directions_car_outlined,
         );
       case OrderStatus.delivered:
         return (
-          const Color(0xFFE8F5E9),
-          const Color(0xFF1B5E20),
+          isDark ? const Color(0xFF1B3820) : const Color(0xFFE8F5E9),
+          isDark ? const Color(0xFF81C784) : const Color(0xFF1B5E20),
           Icons.verified_outlined,
         );
       case OrderStatus.completed:
         return (
-          const Color(0xFFE8F5E9),
-          const Color(0xFF1B5E20),
+          isDark ? const Color(0xFF1B3820) : const Color(0xFFE8F5E9),
+          isDark ? const Color(0xFF81C784) : const Color(0xFF1B5E20),
           Icons.verified_outlined,
         );
       case OrderStatus.cancelled:

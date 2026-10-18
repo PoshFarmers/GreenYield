@@ -220,7 +220,10 @@ class _OrderTabBar extends StatelessWidget {
         height: 44,
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: const Color(0xFFE8F0EA),
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Theme.of(context).colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.5)
+              : const Color(0xFFE8F0EA),
           borderRadius: BorderRadius.circular(24),
         ),
         child: TabBar(
@@ -237,7 +240,9 @@ class _OrderTabBar extends StatelessWidget {
             fontWeight: FontWeight.w500,
           ),
           indicator: BoxDecoration(
-            color: const Color(0xFFD3E8D7),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.25)
+                : const Color(0xFFD3E8D7),
             borderRadius: BorderRadius.circular(20),
           ),
           indicatorSize: TabBarIndicatorSize.tab,
